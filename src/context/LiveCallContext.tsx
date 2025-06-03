@@ -48,6 +48,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   // Ensures we only send the greeting once:
   const greetingSentRef = useRef(false);
 
+  // For screen streaming
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenIntervalRef = useRef<number | null>(null);
+
   // ─── Clean‐up on Unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -64,6 +69,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }
       );
+      stopScreenStreaming();
       // Close AudioContext
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
@@ -369,6 +375,93 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // ─── startScreenStreaming(): capture screen frames and send via WebSocket ──
+  // This follows the Gemini Live API spec for realtimeInput.screen
+  // https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
+  const startScreenStreaming = () => {
+    try {
+      if (!screenStream.current || screenIntervalRef.current) {
+        return;
+      }
+
+      let video = screenVideoRef.current;
+      if (!video) {
+        video = document.createElement('video');
+        video.playsInline = true;
+        video.muted = true;
+        screenVideoRef.current = video;
+      }
+      video.srcObject = screenStream.current;
+      video.play().catch(() => {});
+
+      let canvas = screenCanvasRef.current;
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        screenCanvasRef.current = canvas;
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas not supported');
+      }
+
+      const capture = () => {
+        if (
+          !screenStream.current ||
+          websocketRef.current?.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
+        if (!video!.videoWidth || !video!.videoHeight) {
+          return;
+        }
+        canvas!.width = video!.videoWidth;
+        canvas!.height = video!.videoHeight;
+        ctx.drawImage(video!, 0, 0, canvas!.width, canvas!.height);
+        canvas!.toBlob(
+          (blob) => {
+            if (!blob) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result as string;
+              const base64 = dataUrl.split(',')[1];
+              const payload = {
+                // See https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
+                realtimeInput: {
+                  screen: { data: base64, mimeType: blob.type },
+                },
+              };
+              try {
+                websocketRef.current?.send(JSON.stringify(payload));
+              } catch (err) {
+                console.error('[Live] Screen send error:', err);
+                setErrorMessage('Failed to send screen frame.');
+              }
+            };
+            reader.readAsDataURL(blob);
+          },
+          'image/jpeg'
+        );
+      };
+
+      // Send around 2 frames per second (tweak as needed)
+      screenIntervalRef.current = window.setInterval(capture, 500);
+    } catch (err) {
+      console.error('[Live] startScreenStreaming error:', err);
+      setErrorMessage('Failed to start screen streaming.');
+    }
+  };
+
+  const stopScreenStreaming = () => {
+    if (screenIntervalRef.current) {
+      clearInterval(screenIntervalRef.current);
+      screenIntervalRef.current = null;
+    }
+    if (screenVideoRef.current) {
+      screenVideoRef.current.pause();
+      screenVideoRef.current.srcObject = null;
+    }
+  };
+
   // ─── toggleMicrophone(): stop mic streaming (and processor) ─────────────────
   const toggleMicrophone = (): void => {
     try {
@@ -398,6 +491,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       if (isScreenSharing && screenStream.current) {
         screenStream.current.getTracks().forEach((t) => t.stop());
         screenStream.current = null;
+        stopScreenStreaming();
         setIsScreenSharing(false);
       } else {
         const screen = await navigator.mediaDevices.getDisplayMedia({
@@ -407,7 +501,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         screen.getVideoTracks()[0].addEventListener('ended', () => {
           setIsScreenSharing(false);
           screenStream.current = null;
+          stopScreenStreaming();
         });
+        startScreenStreaming();
         setIsScreenSharing(true);
       }
     } catch (err) {
@@ -449,6 +545,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         websocketRef.current.close();
         websocketRef.current = null;
       }
+      stopScreenStreaming();
       [screenStream.current, microphoneStream.current, videoStream.current].forEach(
         (stream) => {
           if (stream) {
