@@ -10,6 +10,10 @@ import { useLiveCall } from '../../context/LiveCallContext';
 import { useProjects } from '../../context/ProjectContext';
 import { Session } from '../../types';
 
+// Temporary agent instruction; in the future this may come from agent configuration
+const agentSystemInstruction =
+  'You are roleplaying a real person testing a new interface while talking to a designer.';
+
 export const LiveSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -45,7 +49,9 @@ export const LiveSession: React.FC = () => {
       !didStartRef.current
     ) {
       didStartRef.current = true;
-      startCall().catch((err) => console.error('startCall() error:', err));
+      startCall(agentSystemInstruction).catch((err) =>
+        console.error('startCall() error:', err)
+      );
     }
   }, [sessionId, projects, startCall]); // No “status” here
 
