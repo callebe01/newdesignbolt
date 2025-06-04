@@ -65,12 +65,18 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
 }
 
 export async function analyzeTranscripts(transcriptionIds: string[], count: number = 5): Promise<AnalysisResult> {
+  const { data: session } = await supabase.auth.getSession();
+  
+  if (!session?.access_token) {
+    throw new Error('Authentication required');
+  }
+
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ transcriptionIds, count })
