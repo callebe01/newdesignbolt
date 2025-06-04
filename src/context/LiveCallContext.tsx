@@ -15,6 +15,7 @@ interface LiveCallContextType {
   isMicrophoneActive: boolean;
   isVideoActive: boolean;
   errorMessage: string | null;
+  transcript: string;
   startCall: () => Promise<void>;
   endCall: () => void;
   toggleScreenShare: () => Promise<void>;
@@ -34,6 +35,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [isVideoActive, setIsVideoActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState('');
 
   // ─── Refs ───────────────────────────────────────────────────────────────────
   const websocketRef = useRef<WebSocket | null>(null);
@@ -233,6 +235,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   // 1) If part.text exists, log or store it
                   if (typeof part.text === 'string') {
                     console.log('[Live] AI says (text):', part.text);
+                    setTranscript((t) => t + part.text + ' ');
                   }
                   // 2) If part.inlineData.data exists, Base64→PCM→play
                   if (
@@ -580,6 +583,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         isMicrophoneActive,
         isVideoActive,
         errorMessage,
+        transcript,
         startCall,
         endCall,
         toggleScreenShare,

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Session, SessionInsights, UserStatement, UserPreference, UserFriction, UserDecision } from '../types';
 import { useProjects } from './ProjectContext';
+import { useLiveCall } from './LiveCallContext';
+import { analyzeTranscriptWithOpenAI } from '../utils/openai';
 
 interface SessionContextType {
   currentSession: Session | null;
@@ -15,12 +17,14 @@ interface SessionContextType {
   addUserFriction: (content: string, severity: 'low' | 'medium' | 'high') => void;
   addUserDecision: (content: string) => void;
   setHypothesis: (hypothesis: string) => void;
+  analyzeTranscript: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { updateProject, projects } = useProjects();
+  const { transcript } = useLiveCall();
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -179,6 +183,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
+  const analyzeTranscript = async (): Promise<void> => {
+    if (!transcript) return;
+    try {
+      const result = await analyzeTranscriptWithOpenAI(transcript);
+      updateSessionInsights(result);
+    } catch (err) {
+      console.error('[Session] analyzeTranscript failed:', err);
+    }
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -194,6 +208,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addUserFriction,
         addUserDecision,
         setHypothesis,
+        analyzeTranscript,
       }}
     >
       {children}

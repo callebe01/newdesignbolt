@@ -16,7 +16,7 @@ interface SessionInsightsPanelProps {
 }
 
 export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ liveSession = true }) => {
-  const { insights, addUserStatement, addUserPreference, addUserFriction, addUserDecision, setHypothesis } = useSession();
+  const { insights, addUserStatement, addUserPreference, addUserFriction, addUserDecision, setHypothesis, analyzeTranscript } = useSession();
   
   const handleCopyInsights = () => {
     // Create a formatted string of all insights
@@ -94,7 +94,7 @@ ${insights.decisions.length > 0
             </p>
             
             {liveSession && (
-              <Button className="mt-4">
+              <Button className="mt-4" onClick={analyzeTranscript}>
                 <Search className="mr-2 h-4 w-4" />
                 Analyze Transcript
               </Button>
