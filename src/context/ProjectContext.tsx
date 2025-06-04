@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Project } from '../types';
+import { Project, Session } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 
@@ -25,6 +25,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  const mapSession = (row: Record<string, unknown>): Session => ({
+    id: row.id as string,
+    projectId: row.project_id as string,
+    name: row.name as string,
+    description: row.description as string,
+    status: row.status as string,
+    startTime: row.start_time ? new Date(row.start_time as string) : null,
+    endTime: row.end_time ? new Date(row.end_time as string) : null,
+    duration: row.duration as number,
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string),
+  });
+
   const mapProject = (row: Record<string, unknown>): Project => ({
     id: row.id as string,
     name: row.name as string,
@@ -32,6 +45,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
     userId: row.user_id as string,
+    sessions: Array.isArray(row.sessions) ? row.sessions.map(mapSession) : [],
   });
 
   const fetchProjects = useCallback(async () => {
@@ -40,7 +54,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('*')
+        .select('*, sessions(*)')
         .order('created_at', { ascending: false });
       
       if (projectsError) throw projectsError;
@@ -63,7 +77,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('*, sessions(*)')
         .eq('id', id)
         .single();
 
@@ -91,7 +105,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           description,
           user_id: user.id 
         })
-        .select()
+        .select('*, sessions(*)')
         .single();
       if (error) throw error;
 
@@ -114,7 +128,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .from('projects')
         .update({ ...updateData, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select()
+        .select('*, sessions(*)')
         .single();
       if (error) throw error;
 
