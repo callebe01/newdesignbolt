@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Project } from '../types';
+import { supabase } from '../services/supabase';
 
 interface ProjectContextType {
   projects: Project[];
@@ -22,96 +23,36 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProjects = async () => {
+  const mapProject = (row: Record<string, unknown>): Project => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    sessions: [],
+  });
+
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Mock data
-      const mockProjects: Project[] = [
-        {
-          id: '1',
-          name: 'E-commerce Redesign',
-          description: 'Redesigning the checkout flow for better conversion',
-          createdAt: new Date('2025-05-20'),
-          updatedAt: new Date('2025-06-01'),
-          sessions: [
-            {
-              id: '101',
-              projectId: '1',
-              name: 'Initial User Testing',
-              status: 'completed',
-              startTime: new Date('2025-05-25T10:00:00'),
-              endTime: new Date('2025-05-25T11:15:00'),
-              duration: 75 * 60, // 75 minutes in seconds
-              insights: {
-                statements: [],
-                preferences: [],
-                frictions: [],
-                decisions: [],
-              },
-              createdAt: new Date('2025-05-23'),
-              updatedAt: new Date('2025-05-25'),
-            },
-            {
-              id: '102',
-              projectId: '1',
-              name: 'E-commerce checkout flow',
-              status: 'active',
-              startTime: new Date(),
-              insights: {
-                statements: [],
-                preferences: [],
-                frictions: [],
-                decisions: [],
-              },
-              createdAt: new Date('2025-06-01'),
-              updatedAt: new Date('2025-06-02'),
-            }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Mobile Banking App',
-          description: 'Streamlining the transaction history view',
-          createdAt: new Date('2025-04-15'),
-          updatedAt: new Date('2025-05-28'),
-          sessions: [
-            {
-              id: '201',
-              projectId: '2',
-              name: 'Transaction History UX Test',
-              status: 'completed',
-              startTime: new Date('2025-05-10T14:00:00'),
-              endTime: new Date('2025-05-10T15:30:00'),
-              duration: 90 * 60, // 90 minutes in seconds
-              insights: {
-                statements: [],
-                preferences: [],
-                frictions: [],
-                decisions: [],
-              },
-              createdAt: new Date('2025-05-08'),
-              updatedAt: new Date('2025-05-10'),
-            }
-          ]
-        }
-      ];
-      
-      setProjects(mockProjects);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setProjects(data.map(mapProject));
     } catch (err) {
       setError('Failed to fetch projects');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [fetchProjects]);
 
   const getProject = async (id: string): Promise<Project | null> => {
     try {
@@ -126,20 +67,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createProject = async (name: string, description: string): Promise<Project> => {
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const newProject: Project = {
-        id: Date.now().toString(),
-        name,
-        description,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        sessions: []
-      };
-      
-      setProjects(prev => [...prev, newProject]);
-      return newProject;
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({ name, description })
+        .select()
+        .single();
+      if (error) throw error;
+
+      const project = mapProject(data);
+      setProjects(prev => [...prev, project]);
+      return project;
     } catch (err) {
       setError('Failed to create project');
       console.error(err);
@@ -149,33 +86,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateProject = async (id: string, data: Partial<Project>): Promise<Project> => {
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const updatedProjects = projects.map(project => {
-        if (project.id === id) {
-          return {
-            ...project,
-            ...data,
-            updatedAt: new Date()
-          };
-        }
-        return project;
-      });
-      
-      const updatedProject = updatedProjects.find(p => p.id === id);
-      
-      if (!updatedProject) {
-        throw new Error('Project not found');
-      }
-      
-      setProjects(updatedProjects);
-      
+      const { data: updated, error } = await supabase
+        .from('projects')
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+
+      const project = mapProject(updated);
+      setProjects(prev => prev.map(p => (p.id === id ? project : p)));
+
       if (currentProject && currentProject.id === id) {
-        setCurrentProject(updatedProject);
+        setCurrentProject(project);
       }
-      
-      return updatedProject;
+
+      return project;
     } catch (err) {
       setError('Failed to update project');
       console.error(err);
@@ -185,11 +111,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteProject = async (id: string): Promise<void> => {
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) throw error;
+
       setProjects(prev => prev.filter(project => project.id !== id));
-      
+
       if (currentProject && currentProject.id === id) {
         setCurrentProject(null);
       }

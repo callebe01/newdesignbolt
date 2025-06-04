@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import { supabase } from '../services/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -16,31 +17,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking for stored authentication
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const init = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setUser({
+          id: data.user.id,
+          name: data.user.user_metadata?.name || '',
+          email: data.user.email || '',
+          avatar: data.user.user_metadata?.avatar_url,
+        });
+      }
+      setLoading(false);
+    };
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.name || '',
+          email: session.user.email || '',
+          avatar: session.user.user_metadata?.avatar_url,
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    // This would be replaced with actual authentication logic
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data
-      const mockUser: User = {
-        id: '1',
-        name: 'Demo User',
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
-        avatar: 'https://i.pravatar.cc/300',
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+        password,
+      });
+      if (error) throw error;
+      if (data.user) {
+        setUser({
+          id: data.user.id,
+          name: data.user.user_metadata?.name || '',
+          email: data.user.email || '',
+          avatar: data.user.user_metadata?.avatar_url,
+        });
+      }
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -52,19 +77,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (name: string, email: string, password: string) => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data
-      const mockUser: User = {
-        id: Date.now().toString(),
-        name,
+      const { error, data } = await supabase.auth.signUp({
         email,
-        avatar: 'https://i.pravatar.cc/300',
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+        password,
+        options: { data: { name } },
+      });
+      if (error) throw error;
+      if (data.user) {
+        setUser({
+          id: data.user.id,
+          name,
+          email: data.user.email || '',
+          avatar: data.user.user_metadata?.avatar_url,
+        });
+      }
     } catch (error) {
       console.error('Signup failed:', error);
       throw error;
@@ -73,9 +99,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('user');
   };
 
   return (
