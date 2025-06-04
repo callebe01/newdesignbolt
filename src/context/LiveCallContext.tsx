@@ -5,7 +5,7 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAILive } from '@google/generative-ai/live';
 import { LiveCallStatus } from '../types';
 
 interface LiveCallContextType {
@@ -72,14 +72,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env file.');
       }
 
-      const genAI = new GoogleGenerativeAI({ apiKey });
+      const genAILive = new GoogleGenerativeAILive({ apiKey });
       const model = 'gemini-2.0-flash-live-001';
       const config = { 
         responseModalities: ['TEXT'],
         inputAudioTranscription: {},
       };
 
-      const session = await genAI.live.connect({
+      const session = await genAILive.connect({
         model,
         callbacks: {
           onopen: () => {
