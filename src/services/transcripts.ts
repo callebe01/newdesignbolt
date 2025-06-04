@@ -64,10 +64,8 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
   }
 }
 
-export async function analyzeTranscripts(transcriptionIds: string[], count: number = 5): Promise<AnalysisResult> {
-  const { data: session } = await supabase.auth.getSession();
-  
-  if (!session?.access_token) {
+export async function analyzeTranscripts(transcriptionIds: string[], accessToken: string, count: number = 5): Promise<AnalysisResult> {
+  if (!accessToken) {
     throw new Error('Authentication required');
   }
 
@@ -76,7 +74,7 @@ export async function analyzeTranscripts(transcriptionIds: string[], count: numb
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ transcriptionIds, count })

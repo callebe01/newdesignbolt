@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
+import { useAuth } from '../../context/AuthContext';
 import { Agent } from '../../types';
 import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
 
@@ -22,6 +23,7 @@ export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const { getAgent } = useAgents();
+  const { accessToken } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +67,13 @@ export const AgentDetails: React.FC = () => {
   }, [agentId, getAgent]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length) return;
+    if (!transcripts.length || !accessToken) return;
     
     try {
       setAnalyzing(true);
       const result = await analyzeTranscripts(
         transcripts.map(t => t.id),
+        accessToken,
         5 // Analyze last 5 transcripts
       );
       setAnalysisResults([result, ...analysisResults]);
@@ -228,7 +231,7 @@ export const AgentDetails: React.FC = () => {
           <h2 className="text-xl font-semibold">Conversation History</h2>
           <Button 
             onClick={handleAnalyze}
-            disabled={analyzing || transcripts.length === 0}
+            disabled={analyzing || transcripts.length === 0 || !accessToken}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
             {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
