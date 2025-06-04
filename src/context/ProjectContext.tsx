@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Project } from '../types';
 import { supabase } from '../services/supabase';
+import { useAuth } from './AuthContext';
 
 interface ProjectContextType {
   projects: Project[];
@@ -22,13 +23,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const mapProject = (row: Record<string, unknown>): Project => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
+    id: row.id as string,
+    name: row.name as string,
+    description: row.description as string,
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string),
+    userId: row.user_id as string,
     sessions: [],
   });
 
@@ -66,10 +69,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const createProject = async (name: string, description: string): Promise<Project> => {
+    if (!user) {
+      throw new Error('User must be authenticated to create a project');
+    }
+
     try {
       const { data, error } = await supabase
         .from('projects')
-        .insert({ name, description })
+        .insert({ 
+          name, 
+          description,
+          user_id: user.id 
+        })
         .select()
         .single();
       if (error) throw error;

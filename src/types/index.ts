@@ -11,6 +11,7 @@ export interface Project {
   description: string;
   createdAt: Date;
   updatedAt: Date;
+  userId: string;
   sessions: Session[];
 }
 
