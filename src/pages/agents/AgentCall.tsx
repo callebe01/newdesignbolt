@@ -4,7 +4,7 @@ import { Mic, MicOff, X, ArrowLeft } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
-import { saveTranscript } from '../../services/transcripts';
+import { saveTranscript, generateAndSaveReport } from '../../services/transcripts';
 import { Button } from '../../components/ui/Button';
 
 export const AgentCall: React.FC = () => {
@@ -48,6 +48,7 @@ export const AgentCall: React.FC = () => {
     endCall();
     if (agentId) {
       await saveTranscript(agentId, transcript);
+      await generateAndSaveReport(agentId, transcript);
     }
     navigate('/agents');
   };

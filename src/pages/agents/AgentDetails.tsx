@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
+import { getAgentReports, AgentReport } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -14,6 +15,7 @@ export const AgentDetails: React.FC = () => {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<AgentReport[]>([]);
 
   useEffect(() => {
     const fetch = async () => {
@@ -24,6 +26,15 @@ export const AgentDetails: React.FC = () => {
     };
     fetch();
   }, [agentId, getAgent]);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!agentId) return;
+      const r = await getAgentReports(agentId);
+      setReports(r);
+    };
+    fetchReports();
+  }, [agentId]);
 
   const shareLink = `${window.location.origin}/agent/${agentId}`;
 
@@ -144,68 +155,54 @@ export const AgentDetails: React.FC = () => {
         <TabsContent value="insights" selectedValue={activeTab}>
           <Card>
             <CardContent className="p-6 space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">AI Summary</h3>
-                <p className="text-sm">
-                  Most users interacted with the pricing page. Several hesitated before signup. 
-                  Many asked about feature limitations.
-                </p>
-              </div>
+              {reports.length > 0 ? (
+                <>
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">AI Summary</h3>
+                    <p className="text-sm whitespace-pre-wrap">{reports[0].summary}</p>
+                  </div>
 
-              <div>
-                <h3 className="text-lg font-medium mb-2">Sentiment Breakdown</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="text-2xl font-semibold">40%</p>
-                    <p className="text-sm text-muted-foreground">Neutral</p>
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Sentiment Breakdown</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {Object.entries(reports[0].sentimentBreakdown).map(([k, v]) => (
+                        <div key={k} className="bg-muted p-4 rounded-lg">
+                          <p className="text-2xl font-semibold">{v}%</p>
+                          <p className="text-sm text-muted-foreground capitalize">{k}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="text-2xl font-semibold">35%</p>
-                    <p className="text-sm text-muted-foreground">Confused</p>
-                  </div>
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="text-2xl font-semibold">15%</p>
-                    <p className="text-sm text-muted-foreground">Frustrated</p>
-                  </div>
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="text-2xl font-semibold">10%</p>
-                    <p className="text-sm text-muted-foreground">Excited</p>
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <h3 className="text-lg font-medium mb-2">Friction Quotes</h3>
-                <div className="space-y-3">
-                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
-                    "I don't know where to go after this screen."
-                  </blockquote>
-                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
-                    "Why is the trial asking for a credit card?"
-                  </blockquote>
-                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
-                    "I'm stuck. Do I need to start over?"
-                  </blockquote>
-                </div>
-              </div>
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Friction Quotes</h3>
+                    <div className="space-y-3">
+                      {reports[0].frictionQuotes.map((q, idx) => (
+                        <blockquote
+                          key={idx}
+                          className="text-sm italic text-muted-foreground border-l-2 pl-4"
+                        >
+                          {`"${q}"`}
+                        </blockquote>
+                      ))}
+                    </div>
+                  </div>
 
-              <div>
-                <h3 className="text-lg font-medium mb-2">Recommended Actions</h3>
-                <ul className="space-y-2">
-                  <li className="text-sm flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                    Add tooltip to "Free plan" button
-                  </li>
-                  <li className="text-sm flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                    Clarify feature differences in plan comparison
-                  </li>
-                  <li className="text-sm flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                    Consider simplifying the onboarding flow
-                  </li>
-                </ul>
-              </div>
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Recommended Actions</h3>
+                    <ul className="space-y-2">
+                      {reports[0].recommendedActions.map((a, idx) => (
+                        <li key={idx} className="text-sm flex items-center">
+                          <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No reports yet</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
