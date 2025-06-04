@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
-import { getAgentReports, AgentReport } from '../../services/transcripts';
+import { getAgentReports, AgentReport, getAgentTranscripts, Transcript } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -16,6 +16,7 @@ export const AgentDetails: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<AgentReport[]>([]);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
   useEffect(() => {
     const fetch = async () => {
@@ -28,12 +29,16 @@ export const AgentDetails: React.FC = () => {
   }, [agentId, getAgent]);
 
   useEffect(() => {
-    const fetchReports = async () => {
+    const fetchData = async () => {
       if (!agentId) return;
-      const r = await getAgentReports(agentId);
+      const [r, t] = await Promise.all([
+        getAgentReports(agentId),
+        getAgentTranscripts(agentId)
+      ]);
       setReports(r);
+      setTranscripts(t);
     };
-    fetchReports();
+    fetchData();
   }, [agentId]);
 
   const shareLink = `${window.location.origin}/agent/${agentId}`;
@@ -42,6 +47,22 @@ export const AgentDetails: React.FC = () => {
     navigator.clipboard.writeText(shareLink);
     alert('Link copied to clipboard');
   };
+
+  // Calculate metrics from reports
+  const totalConversations = transcripts.length;
+  
+  const commonGoals = reports.reduce((acc, report) => {
+    const goal = report.summary.split('.')[0]; // Take first sentence as main goal
+    acc[goal] = (acc[goal] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const mostCommonGoal = Object.entries(commonGoals)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'No data';
+
+  const topFriction = reports.length > 0 
+    ? reports[0].recommendedActions[0] 
+    : 'No data';
 
   if (loading) {
     return <div>Loading...</div>;
@@ -115,15 +136,15 @@ export const AgentDetails: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">Total Conversations</h4>
-                  <p className="text-2xl font-semibold">18</p>
+                  <p className="text-2xl font-semibold">{totalConversations}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">Most Common Goal</h4>
-                  <p className="text-2xl font-semibold">Understand pricing</p>
+                  <p className="text-2xl font-semibold">{mostCommonGoal}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">Top Friction</h4>
-                  <p className="text-2xl font-semibold">Signup flow</p>
+                  <p className="text-2xl font-semibold">{topFriction}</p>
                 </div>
               </div>
             </CardContent>
@@ -132,18 +153,20 @@ export const AgentDetails: React.FC = () => {
 
         <TabsContent value="sessions" selectedValue={activeTab}>
           <div className="space-y-4">
-            {[1, 2, 3].map((_, idx) => (
-              <Card key={idx}>
+            {transcripts.map((transcript, idx) => (
+              <Card key={transcript.id}>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="font-medium">User #{idx + 1}</h3>
-                      <p className="text-sm text-muted-foreground">3 minutes ago</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(transcript.createdAt).toLocaleString()}
+                      </p>
                     </div>
                     <Badge>Completed</Badge>
                   </div>
                   <p className="text-sm italic text-muted-foreground mb-4">
-                    "I don't understand what's included in the free plan."
+                    {transcript.content.slice(0, 100)}...
                   </p>
                   <Button variant="outline" size="sm">View Full Transcript</Button>
                 </CardContent>

@@ -1,6 +1,13 @@
 import { supabase } from './supabase';
 import { generateAgentReport, AgentReport } from './openai';
 
+export interface Transcript {
+  id: string;
+  agentId: string;
+  content: string;
+  createdAt: string;
+}
+
 export async function saveTranscript(agentId: string, content: string) {
   if (!content.trim()) return;
   try {
@@ -50,6 +57,26 @@ export async function getAgentReports(agentId: string): Promise<AgentReport[]> {
     return (data || []).map((row: Record<string, unknown>) => row.report as AgentReport);
   } catch (err) {
     console.error('Failed to fetch agent reports:', err);
+    return [];
+  }
+}
+
+export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
+  try {
+    const { data, error } = await supabase
+      .from('transcripts')
+      .select('*')
+      .eq('agent_id', agentId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      agentId: row.agent_id,
+      content: row.content,
+      createdAt: row.created_at
+    }));
+  } catch (err) {
+    console.error('Failed to fetch transcripts:', err);
     return [];
   }
 }
