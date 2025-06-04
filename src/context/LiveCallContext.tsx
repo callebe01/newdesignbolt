@@ -5,7 +5,7 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
-import { GoogleGenerativeAILive } from '@google/generative-ai/live';
+import { GoogleGenerativeAILive } from '@google/generative-ai';
 import { LiveCallStatus } from '../types';
 
 interface LiveCallContextType {
