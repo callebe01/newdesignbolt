@@ -166,6 +166,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             generationConfig: {
               responseModalities: ['AUDIO'],
             },
+            outputAudioTranscription: {},
+            inputAudioTranscription: {},
             systemInstruction: {
               parts: [
                 {
@@ -232,6 +234,16 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             // B) serverContent.modelTurn.parts → may contain text or inlineData
             // ────────────────────────────────────────────────
             if (parsed.serverContent) {
+              if (parsed.serverContent.outputTranscription?.text) {
+                setTranscript(
+                  (prev) => prev + parsed.serverContent.outputTranscription.text
+                );
+              }
+              if (parsed.serverContent.inputTranscription?.text) {
+                setTranscript(
+                  (prev) => prev + parsed.serverContent.inputTranscription.text
+                );
+              }
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn && Array.isArray(modelTurn.parts)) {
                 for (const part of modelTurn.parts) {
