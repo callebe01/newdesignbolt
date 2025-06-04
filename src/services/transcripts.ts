@@ -41,45 +41,6 @@ export async function saveTranscript(agentId: string, content: string, metadata:
   }
 }
 
-export async function generateAndSaveReport(agentId: string, transcriptContent: string) {
-  try {
-    const { data, error } = await supabase
-      .from('agent_reports')
-      .insert({
-        agent_id: agentId,
-        report: {
-          content: transcriptContent,
-          summary: 'Transcript analysis pending',
-          sentiment: 'neutral',
-          key_points: [],
-          recommendations: []
-        }
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    // Trigger async analysis through edge function
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcript`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        reportId: data.id,
-        content: transcriptContent
-      })
-    }).catch(console.error); // Non-blocking
-
-    return data;
-  } catch (err) {
-    console.error('Failed to generate and save report:', err);
-    throw err;
-  }
-}
-
 export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
   try {
     const { data, error } = await supabase
