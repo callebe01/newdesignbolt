@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, ArrowLeft, X } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
+import { saveTranscript } from '../../services/transcripts';
 import { Button } from '../../components/ui/Button';
 
 export const AgentCall: React.FC = () => {
@@ -43,8 +44,11 @@ export const AgentCall: React.FC = () => {
     }
   }, [agent, startCall]);
 
-  const handleEnd = () => {
+  const handleEnd = async () => {
     endCall();
+    if (agentId) {
+      await saveTranscript(agentId, transcript);
+    }
     navigate('/agents');
   };
 
@@ -85,6 +89,14 @@ export const AgentCall: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleEnd}
+        >
+          <X className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Chat Area */}
