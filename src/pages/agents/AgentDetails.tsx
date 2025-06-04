@@ -82,35 +82,23 @@ export const AgentDetails: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" className="w-full" value={activeTab}>
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger 
-            value="overview" 
-            active={activeTab === 'overview'}
-            onClick={() => setActiveTab('overview')}
-          >
+          <TabsTrigger value="overview">
             <Activity className="mr-2 h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger 
-            value="sessions"
-            active={activeTab === 'sessions'}
-            onClick={() => setActiveTab('sessions')}
-          >
+          <TabsTrigger value="sessions">
             <MessageSquare className="mr-2 h-4 w-4" />
             Sessions
           </TabsTrigger>
-          <TabsTrigger 
-            value="insights"
-            active={activeTab === 'insights'}
-            onClick={() => setActiveTab('insights')}
-          >
+          <TabsTrigger value="insights">
             <Brain className="mr-2 h-4 w-4" />
             Insights
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
+        <TabsContent value="overview" parentValue={activeTab}>
           <Card>
             <CardContent className="p-6 space-y-4">
               <div>
@@ -136,7 +124,7 @@ export const AgentDetails: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="sessions">
+        <TabsContent value="sessions" parentValue={activeTab}>
           <div className="space-y-4">
             {[1, 2, 3].map((_, idx) => (
               <Card key={idx}>
@@ -158,7 +146,7 @@ export const AgentDetails: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="insights">
+        <TabsContent value="insights" parentValue={activeTab}>
           <Card>
             <CardContent className="p-6 space-y-6">
               <div>
