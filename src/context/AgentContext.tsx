@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Agent } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
@@ -23,7 +23,17 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const mapAgent = (data: any): Agent => ({
+  interface AgentRow {
+    id: string;
+    name: string;
+    instructions: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    user_id: string;
+  }
+
+  const mapAgent = (data: AgentRow): Agent => ({
     id: data.id,
     name: data.name,
     instructions: data.instructions,
@@ -33,7 +43,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     userId: data.user_id,
   });
 
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -52,13 +62,13 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (user) {
       fetchAgents();
     }
-  }, [user]);
+  }, [user, fetchAgents]);
 
   const getAgent = async (id: string): Promise<Agent | null> => {
     try {
