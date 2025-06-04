@@ -27,8 +27,8 @@ export const AgentsList: React.FC = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">AI Agents</h1>
-        <Button asChild>
-          <Link to="/agents/new">
+        <Button>
+          <Link to="/agents/new" className="flex items-center">
             <Plus className="mr-2 h-4 w-4" />
             New Agent
           </Link>
@@ -74,8 +74,8 @@ export const AgentsList: React.FC = () => {
             {searchTerm ? 'No agents match your search' : 'Create your first AI agent'}
           </p>
           {!searchTerm && (
-            <Button asChild>
-              <Link to="/agents/new">
+            <Button>
+              <Link to="/agents/new" className="flex items-center">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Agent
               </Link>
@@ -138,10 +138,10 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
 
       <CardFooter className="pt-3">
         <div className="flex justify-between w-full">
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline">
             <Link to={`/agents/${agent.id}`}>View Details</Link>
           </Button>
-          <Button variant="primary" size="sm" asChild>
+          <Button variant="primary">
             <Link to={`/agent/${agent.id}`}>Start Chat</Link>
           </Button>
         </div>
