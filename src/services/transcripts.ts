@@ -36,13 +36,15 @@ export async function saveAgentReport(agentId: string, report: AgentReport) {
 export async function generateAndSaveReport(
   agentId: string,
   transcript: string
-): Promise<void> {
-  if (!transcript.trim()) return;
+): Promise<Error | boolean> {
+  if (!transcript.trim()) return false;
   try {
     const report = await generateAgentReport(transcript);
     await saveAgentReport(agentId, report);
+    return true;
   } catch (err) {
     console.error('Failed to generate agent report:', err);
+    return err instanceof Error ? err : new Error(String(err));
   }
 }
 
