@@ -24,7 +24,7 @@ export async function saveTranscript(agentId: string, content: string, metadata:
   
   try {
     const { data, error } = await supabase
-      .from('transcripts')
+      .from('transcriptions')
       .insert({
         agent_id: agentId,
         content,
@@ -36,7 +36,7 @@ export async function saveTranscript(agentId: string, content: string, metadata:
     if (error) throw error;
     return data;
   } catch (err) {
-    console.error('Failed to save transcript:', err);
+    console.error('Failed to save transcription:', err);
     throw err;
   }
 }
@@ -44,7 +44,7 @@ export async function saveTranscript(agentId: string, content: string, metadata:
 export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
   try {
     const { data, error } = await supabase
-      .from('transcripts')
+      .from('transcriptions')
       .select('*')
       .eq('agent_id', agentId)
       .order('created_at', { ascending: false });
@@ -58,7 +58,7 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
       createdAt: row.created_at
     }));
   } catch (err) {
-    console.error('Failed to fetch transcripts:', err);
+    console.error('Failed to fetch transcriptions:', err);
     throw err;
   }
 }
