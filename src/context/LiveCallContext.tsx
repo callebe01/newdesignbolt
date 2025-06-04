@@ -135,6 +135,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const startCall = async (systemInstruction?: string): Promise<void> => {
     try {
       setErrorMessage(null);
+      setTranscript('');
 
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
