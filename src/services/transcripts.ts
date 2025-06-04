@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { generateAgentReport, AgentReport } from './openai';
+import { AgentReport } from './openai';
 
 export interface Transcript {
   id: string;
@@ -38,8 +38,26 @@ export async function generateAndSaveReport(
   transcript: string
 ): Promise<Error | boolean> {
   if (!transcript.trim()) return false;
+  
   try {
-    const report = await generateAgentReport(transcript);
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcript`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transcript }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error);
+    }
+
+    const report = await response.json();
     await saveAgentReport(agentId, report);
     return true;
   } catch (err) {
