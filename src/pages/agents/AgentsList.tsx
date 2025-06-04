@@ -4,37 +4,16 @@ import { Plus, Search, Filter, Bot, Activity, Users, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Agent, AgentMetrics } from '../../types/agent';
-import { getAgent, getAgentMetrics } from '../../services/agent';
 import { useAgents } from '../../context/AgentContext';
 
 export const AgentsList: React.FC = () => {
   const { agents, fetchAgents, loading } = useAgents();
-  const [metrics, setMetrics] = useState<Record<string, AgentMetrics>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
+  const [filteredAgents, setFilteredAgents] = useState(agents);
 
   useEffect(() => {
     fetchAgents();
   }, [fetchAgents]);
-
-  useEffect(() => {
-    const loadMetrics = async () => {
-      const metricsData: Record<string, AgentMetrics> = {};
-      for (const agent of agents) {
-        try {
-          metricsData[agent.id] = await getAgentMetrics(agent.id);
-        } catch (err) {
-          console.error(`Failed to load metrics for agent ${agent.id}:`, err);
-        }
-      }
-      setMetrics(metricsData);
-    };
-    
-    if (agents.length > 0) {
-      loadMetrics();
-    }
-  }, [agents]);
 
   useEffect(() => {
     const filtered = agents.filter(agent => 
@@ -48,12 +27,12 @@ export const AgentsList: React.FC = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">AI Agents</h1>
-        <Link to="/agents/new">
-          <Button>
+        <Button asChild>
+          <Link to="/agents/new">
             <Plus className="mr-2 h-4 w-4" />
             New Agent
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -82,11 +61,7 @@ export const AgentsList: React.FC = () => {
       ) : filteredAgents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAgents.map(agent => (
-            <AgentCard 
-              key={agent.id} 
-              agent={agent}
-              metrics={metrics[agent.id]}
-            />
+            <AgentCard key={agent.id} agent={agent} />
           ))}
         </div>
       ) : (
@@ -99,12 +74,12 @@ export const AgentsList: React.FC = () => {
             {searchTerm ? 'No agents match your search' : 'Create your first AI agent'}
           </p>
           {!searchTerm && (
-            <Link to="/agents/new">
-              <Button>
+            <Button asChild>
+              <Link to="/agents/new">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Agent
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
         </div>
       )}
@@ -114,10 +89,9 @@ export const AgentsList: React.FC = () => {
 
 interface AgentCardProps {
   agent: Agent;
-  metrics?: AgentMetrics;
 }
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
+const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
   return (
     <Card className="transition-all hover:shadow-md">
       <CardHeader className="pb-3">
@@ -142,31 +116,21 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
           <div className="space-y-2">
             <div className="flex items-center text-sm">
               <Activity className="mr-2 h-4 w-4 text-primary" />
-              <span>
-                {metrics?.totalConversations || 0} conversations
-              </span>
+              <span>0 conversations</span>
             </div>
             <div className="flex items-center text-sm">
               <Users className="mr-2 h-4 w-4 text-accent" />
-              <span>
-                {metrics?.activeConversations || 0} active now
-              </span>
+              <span>0 active now</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center text-sm">
               <Clock className="mr-2 h-4 w-4 text-secondary" />
-              <span>
-                {metrics?.avgDuration ? `${Math.round(metrics.avgDuration / 60)}m avg` : 'No data'}
-              </span>
+              <span>No data</span>
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
-              <span>
-                Last active: {metrics?.lastActivity 
-                  ? new Date(metrics.lastActivity).toLocaleDateString() 
-                  : 'Never'}
-              </span>
+              <span>Last active: Never</span>
             </div>
           </div>
         </div>
