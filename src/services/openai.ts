@@ -6,6 +6,17 @@ export interface AnalysisResult {
   hypothesis: string;
 }
 
+export interface AgentReport {
+  summary: string;
+  sentimentBreakdown: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
+  frictionQuotes: string[];
+  recommendedActions: string[];
+}
+
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
 async function callOpenAI(messages: { role: string; content: string }[]) {
@@ -39,7 +50,21 @@ export async function analyzeTranscript(text: string): Promise<AnalysisResult> {
   const raw = await callOpenAI([{ role: 'user', content }]);
   try {
     return JSON.parse(raw) as AnalysisResult;
-  } catch (err) {
+  } catch {
+    throw new Error('Failed to parse OpenAI response');
+  }
+}
+
+export async function generateAgentReport(text: string): Promise<AgentReport> {
+  const prompt = `You are a UX research assistant summarizing an agent conversation. ` +
+    `Return JSON with keys summary (string), sentimentBreakdown (object with positive, neutral, and negative percentages as numbers), ` +
+    `frictionQuotes (array of the most notable user quotes demonstrating friction) and ` +
+    `recommendedActions (array of short actionable items).`;
+  const content = `${prompt}\n\nTRANSCRIPT:\n${text}`;
+  const raw = await callOpenAI([{ role: 'user', content }]);
+  try {
+    return JSON.parse(raw) as AgentReport;
+  } catch {
     throw new Error('Failed to parse OpenAI response');
   }
 }
