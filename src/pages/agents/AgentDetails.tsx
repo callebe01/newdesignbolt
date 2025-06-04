@@ -98,14 +98,9 @@ export const AgentDetails: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" parentValue={activeTab}>
+        <TabsContent value="overview" selectedValue={activeTab}>
           <Card>
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="font-medium mb-2">Instructions</h3>
-                <p className="text-sm whitespace-pre-wrap">{agent.instructions}</p>
-              </div>
-
+            <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">Total Conversations</h4>
@@ -124,7 +119,7 @@ export const AgentDetails: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="sessions" parentValue={activeTab}>
+        <TabsContent value="sessions" selectedValue={activeTab}>
           <div className="space-y-4">
             {[1, 2, 3].map((_, idx) => (
               <Card key={idx}>
@@ -146,7 +141,7 @@ export const AgentDetails: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="insights" parentValue={activeTab}>
+        <TabsContent value="insights" selectedValue={activeTab}>
           <Card>
             <CardContent className="p-6 space-y-6">
               <div>
@@ -155,30 +150,6 @@ export const AgentDetails: React.FC = () => {
                   Most users interacted with the pricing page. Several hesitated before signup. 
                   Many asked about feature limitations.
                 </p>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium mb-2">Top Questions Asked</h3>
-                <ul className="space-y-2">
-                  <li className="text-sm flex items-center">
-                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
-                      1
-                    </span>
-                    "How does the free plan work?" (12 mentions)
-                  </li>
-                  <li className="text-sm flex items-center">
-                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
-                      2
-                    </span>
-                    "Can I use this with a team?" (6 mentions)
-                  </li>
-                  <li className="text-sm flex items-center">
-                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
-                      3
-                    </span>
-                    "What happens after the trial?" (3 mentions)
-                  </li>
-                </ul>
               </div>
 
               <div>

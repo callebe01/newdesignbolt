@@ -24,11 +24,11 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   return (
-    <div className={`tabs ${className}`} data-state={value}>
+    <div className={className}>
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child, {
-            value,
+          return React.cloneElement(child as React.ReactElement<any>, {
+            selectedValue: value,
             onValueChange: handleValueChange,
           });
         }
@@ -41,22 +41,22 @@ export const Tabs: React.FC<TabsProps> = ({
 interface TabsListProps {
   children: React.ReactNode;
   className?: string;
-  value?: string;
+  selectedValue?: string;
   onValueChange?: (value: string) => void;
 }
 
 export const TabsList: React.FC<TabsListProps> = ({ 
   children, 
   className = '',
-  value,
+  selectedValue,
   onValueChange
 }) => {
   return (
     <div className={`inline-flex p-1 bg-muted rounded-lg mb-4 ${className}`}>
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child, {
-            active: child.props.value === value,
+          return React.cloneElement(child as React.ReactElement<any>, {
+            active: child.props.value === selectedValue,
             onClick: () => onValueChange?.(child.props.value),
           });
         }
@@ -89,6 +89,7 @@ export const TabsTrigger: React.FC<TabsTriggerProps> = ({
           : 'text-muted-foreground hover:bg-background/50'
         } ${className}`}
       onClick={onClick}
+      type="button"
     >
       {children}
     </button>
@@ -99,19 +100,19 @@ interface TabsContentProps {
   value: string;
   children: React.ReactNode;
   className?: string;
-  parentValue?: string;
+  selectedValue?: string;
 }
 
 export const TabsContent: React.FC<TabsContentProps> = ({ 
   value,
   children,
   className = '',
-  parentValue
+  selectedValue
 }) => {
-  const isSelected = value === parentValue;
-  
-  if (!isSelected) return null;
-  
+  if (value !== selectedValue) {
+    return null;
+  }
+
   return (
     <div className={`animate-fade-in ${className}`}>
       {children}
