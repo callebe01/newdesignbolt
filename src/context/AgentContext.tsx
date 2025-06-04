@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Agent } from '../types';
+import { supabase } from '../services/supabase';
+import { useAuth } from './AuthContext';
 
 interface AgentContextType {
   agents: Agent[];
@@ -19,32 +21,57 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  const mapAgent = (data: any): Agent => ({
+    id: data.id,
+    name: data.name,
+    instructions: data.instructions,
+    status: data.status,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+    userId: data.user_id,
+  });
 
   const fetchAgents = async () => {
     setLoading(true);
     setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const mockAgents: Agent[] = [];
-      setAgents(mockAgents);
+      const { data, error: fetchError } = await supabase
+        .from('agents')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      const mappedAgents = data.map(mapAgent);
+      setAgents(mappedAgents);
     } catch (err) {
+      console.error('Failed to fetch agents:', err);
       setError('Failed to fetch agents');
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAgents();
-  }, []);
+    if (user) {
+      fetchAgents();
+    }
+  }, [user]);
 
   const getAgent = async (id: string): Promise<Agent | null> => {
     try {
-      const agent = agents.find((a) => a.id === id) || null;
-      return agent;
+      const { data, error: fetchError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      return data ? mapAgent(data) : null;
     } catch (err) {
-      console.error(err);
+      console.error('Failed to get agent:', err);
       setError('Failed to get agent');
       return null;
     }
@@ -52,21 +79,29 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const createAgent = async (name: string, instructions: string): Promise<Agent> => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      const newAgent: Agent = {
-        id: crypto.randomUUID(),
-        name,
-        instructions,
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setAgents((prev) => [...prev, newAgent]);
+      if (!user) {
+        throw new Error('User must be authenticated to create an agent');
+      }
+
+      const { data, error: createError } = await supabase
+        .from('agents')
+        .insert({
+          name,
+          instructions,
+          status: 'active',
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      const newAgent = mapAgent(data);
+      setAgents(prev => [newAgent, ...prev]);
       return newAgent;
     } catch (err) {
-      console.error(err);
-      setError('Failed to create agent');
-      throw err;
+      console.error('Failed to create agent:', err);
+      throw new Error('Failed to create agent');
     }
   };
 
