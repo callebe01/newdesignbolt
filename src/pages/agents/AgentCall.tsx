@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Mic, MicOff, X } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Mic, MicOff, ArrowLeft } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
 import { Button } from '../../components/ui/Button';
 
 export const AgentCall: React.FC = () => {
+  const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const { getAgent } = useAgents();
   const { 
@@ -44,6 +45,7 @@ export const AgentCall: React.FC = () => {
 
   const handleEnd = () => {
     endCall();
+    navigate('/agents');
   };
 
   if (notFound) {
@@ -59,23 +61,30 @@ export const AgentCall: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
-          </div>
-          <div className="ml-3">
-            <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
-            <p className="text-sm text-muted-foreground">
-              {status === 'active' ? 'Listening...' : status}
-            </p>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleEnd}
+            className="mr-2"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
+            </div>
+            <div className="ml-3">
+              <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {status === 'active' ? 'Listening...' : status}
+              </p>
+            </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={handleEnd}>
-          <X className="h-5 w-5" />
-        </Button>
       </div>
 
       {/* Chat Area */}
@@ -96,12 +105,12 @@ export const AgentCall: React.FC = () => {
       </div>
 
       {/* Controls */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t bg-card">
         <div className="max-w-2xl mx-auto flex justify-center">
           <Button
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16"
+            className="rounded-full w-16 h-16 shadow-lg"
             onClick={toggleMicrophone}
           >
             {isMicrophoneActive ? (
