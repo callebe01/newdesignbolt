@@ -1,4 +1,3 @@
-```tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, Bot, Activity, Users, Clock } from 'lucide-react';
@@ -26,7 +25,7 @@ export const AgentsList: React.FC = () => {
         try {
           metricsData[agent.id] = await getAgentMetrics(agent.id);
         } catch (err) {
-          console.error(\`Failed to load metrics for agent ${agent.id}:`, err);
+          console.error(`Failed to load metrics for agent ${agent.id}:`, err);
         }
       }
       setMetrics(metricsData);
@@ -124,7 +123,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl">{agent.name}</CardTitle>
-          <div className={\`px-2 py-1 text-xs rounded-full font-medium ${
+          <div className={`px-2 py-1 text-xs rounded-full font-medium ${
             agent.status === 'active' 
               ? 'bg-success/10 text-success' 
               : 'bg-muted text-muted-foreground'
@@ -159,7 +158,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
             <div className="flex items-center text-sm">
               <Clock className="mr-2 h-4 w-4 text-secondary" />
               <span>
-                {metrics?.avgDuration ? \`${Math.round(metrics.avgDuration / 60)}m avg` : 'No data'}
+                {metrics?.avgDuration ? `${Math.round(metrics.avgDuration / 60)}m avg` : 'No data'}
               </span>
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
@@ -186,4 +185,3 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
     </Card>
   );
 };
-```

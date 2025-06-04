@@ -1,4 +1,3 @@
-```tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, Bot } from 'lucide-react';
@@ -115,4 +114,3 @@ export const NewAgent: React.FC = () => {
     </div>
   );
 };
-```
