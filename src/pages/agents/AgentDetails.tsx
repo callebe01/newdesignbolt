@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Copy } from 'lucide-react';
+import { ChevronLeft, Copy, Activity, MessageSquare, Brain } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
 
@@ -10,6 +12,7 @@ export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const { getAgent } = useAgents();
   const [agent, setAgent] = useState<Agent | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +47,7 @@ export const AgentDetails: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground">
           <ChevronLeft className="mr-1 h-4 w-4" />
@@ -52,28 +55,202 @@ export const AgentDetails: React.FC = () => {
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{agent.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-medium mb-2">Instructions</h3>
-            <p className="whitespace-pre-wrap">{agent.instructions}</p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">{agent.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {agent.status === 'active' ? 'Active • Last active 2h ago' : 'Inactive'}
+          </p>
+        </div>
+        <Badge variant={agent.status === 'active' ? 'success' : 'default'}>
+          {agent.status.toUpperCase()}
+        </Badge>
+      </div>
 
-          <div className="bg-muted p-4 rounded-md flex items-center justify-between">
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Shareable Link</p>
-              <p className="text-sm font-medium break-all">{shareLink}</p>
+              <h3 className="font-medium mb-1">Shareable Link</h3>
+              <p className="text-sm text-muted-foreground break-all">{shareLink}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleCopy}>
+            <Button variant="outline" onClick={handleCopy}>
               <Copy className="mr-2 h-4 w-4" />
-              Copy
+              Copy Link
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      <Tabs defaultValue="overview" className="w-full" value={activeTab}>
+        <TabsList>
+          <TabsTrigger 
+            value="overview" 
+            active={activeTab === 'overview'}
+            onClick={() => setActiveTab('overview')}
+          >
+            <Activity className="mr-2 h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="sessions"
+            active={activeTab === 'sessions'}
+            onClick={() => setActiveTab('sessions')}
+          >
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Sessions
+          </TabsTrigger>
+          <TabsTrigger 
+            value="insights"
+            active={activeTab === 'insights'}
+            onClick={() => setActiveTab('insights')}
+          >
+            <Brain className="mr-2 h-4 w-4" />
+            Insights
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="font-medium mb-2">Instructions</h3>
+                <p className="text-sm whitespace-pre-wrap">{agent.instructions}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Total Conversations</h4>
+                  <p className="text-2xl font-semibold">18</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Most Common Goal</h4>
+                  <p className="text-2xl font-semibold">Understand pricing</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Top Friction</h4>
+                  <p className="text-2xl font-semibold">Signup flow</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sessions">
+          <div className="space-y-4">
+            {[1, 2, 3].map((_, idx) => (
+              <Card key={idx}>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-medium">User #{idx + 1}</h3>
+                      <p className="text-sm text-muted-foreground">3 minutes ago</p>
+                    </div>
+                    <Badge>Completed</Badge>
+                  </div>
+                  <p className="text-sm italic text-muted-foreground mb-4">
+                    "I don't understand what's included in the free plan."
+                  </p>
+                  <Button variant="outline" size="sm">View Full Transcript</Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="insights">
+          <Card>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2">AI Summary</h3>
+                <p className="text-sm">
+                  Most users interacted with the pricing page. Several hesitated before signup. 
+                  Many asked about feature limitations.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Top Questions Asked</h3>
+                <ul className="space-y-2">
+                  <li className="text-sm flex items-center">
+                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                      1
+                    </span>
+                    "How does the free plan work?" (12 mentions)
+                  </li>
+                  <li className="text-sm flex items-center">
+                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                      2
+                    </span>
+                    "Can I use this with a team?" (6 mentions)
+                  </li>
+                  <li className="text-sm flex items-center">
+                    <span className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                      3
+                    </span>
+                    "What happens after the trial?" (3 mentions)
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Sentiment Breakdown</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-2xl font-semibold">40%</p>
+                    <p className="text-sm text-muted-foreground">Neutral</p>
+                  </div>
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-2xl font-semibold">35%</p>
+                    <p className="text-sm text-muted-foreground">Confused</p>
+                  </div>
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-2xl font-semibold">15%</p>
+                    <p className="text-sm text-muted-foreground">Frustrated</p>
+                  </div>
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-2xl font-semibold">10%</p>
+                    <p className="text-sm text-muted-foreground">Excited</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Friction Quotes</h3>
+                <div className="space-y-3">
+                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
+                    "I don't know where to go after this screen."
+                  </blockquote>
+                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
+                    "Why is the trial asking for a credit card?"
+                  </blockquote>
+                  <blockquote className="text-sm italic text-muted-foreground border-l-2 pl-4">
+                    "I'm stuck. Do I need to start over?"
+                  </blockquote>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Recommended Actions</h3>
+                <ul className="space-y-2">
+                  <li className="text-sm flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                    Add tooltip to "Free plan" button
+                  </li>
+                  <li className="text-sm flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                    Clarify feature differences in plan comparison
+                  </li>
+                  <li className="text-sm flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                    Consider simplifying the onboarding flow
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
