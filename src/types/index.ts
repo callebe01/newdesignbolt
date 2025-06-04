@@ -62,3 +62,9 @@ export interface UserDecision {
 }
 
 export type LiveCallStatus = 'idle' | 'connecting' | 'active' | 'ended' | 'error';
+
+export interface Agent {
+  id: string;
+  name: string;
+  systemInstruction: string;
+}

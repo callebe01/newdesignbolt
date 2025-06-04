@@ -17,6 +17,7 @@ import { Login } from './pages/auth/Login';
 import { Signup } from './pages/auth/Signup';
 import { TeamMembers } from './pages/team/TeamMembers';
 import { Settings } from './pages/settings/Settings';
+import { AgentCall } from './pages/agent/AgentCall';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
+                    <Route path="/agent/:agentId" element={<AgentCall />} />
                     
                     {/* Protected routes */}
                     <Route element={<ProtectedRoute />}>
