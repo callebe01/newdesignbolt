@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
+import { generateAgentReport } from './openai';
 
 export interface Transcript {
   id: string;
   agentId: string;
   content: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -18,7 +19,7 @@ export interface AnalysisResult {
   createdAt: string;
 }
 
-export async function saveTranscript(agentId: string, content: string, metadata: Record<string, any> = {}) {
+export async function saveTranscript(agentId: string, content: string, metadata: Record<string, unknown> = {}) {
   if (!content.trim()) return;
   
   try {
@@ -112,6 +113,24 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
     }));
   } catch (err) {
     console.error('Failed to fetch analysis results:', err);
+    throw err;
+  }
+}
+
+export async function generateAndSaveReport(agentId: string, text: string) {
+  if (!text.trim()) return;
+  try {
+    const report = await generateAgentReport(text);
+    const { error } = await supabase
+      .from('agent_reports')
+      .insert({
+        agent_id: agentId,
+        report
+      });
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Failed to generate and save agent report:', err);
     throw err;
   }
 }
