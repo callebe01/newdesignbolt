@@ -104,7 +104,7 @@ export const LiveSession: React.FC = () => {
           <SessionInsightsPanel liveSession={true} />
         </div>
 
-        {/* Right: Controls (no ChatWindow in audio-only mode) */}
+        {/* Right: Controls */}
         <div className="space-y-6">
           <div>
             <SessionControls onEndSession={handleEndSession} />
