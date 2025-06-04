@@ -21,13 +21,14 @@ export interface AnalysisResult {
 
 export async function saveTranscript(agentId: string, content: string, metadata: Record<string, unknown> = {}) {
   if (!content.trim()) return;
-  
+
   try {
     const { data, error } = await supabase
-      .from('transcripts')
+      .from('transcriptions')
       .insert({
         agent_id: agentId,
         content,
+        metadata,
         created_at: new Date().toISOString()
       })
       .select()
@@ -44,7 +45,7 @@ export async function saveTranscript(agentId: string, content: string, metadata:
 export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
   try {
     const { data, error } = await supabase
-      .from('transcripts')
+      .from('transcriptions')
       .select('*')
       .eq('agent_id', agentId)
       .order('created_at', { ascending: false });
@@ -54,7 +55,7 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
       id: row.id,
       agentId: row.agent_id,
       content: row.content,
-      metadata: {},
+      metadata: row.metadata,
       createdAt: row.created_at
     }));
   } catch (err) {
