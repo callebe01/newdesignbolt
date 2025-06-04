@@ -481,10 +481,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         microphoneStream.current.getTracks().forEach((t) => t.stop());
         microphoneStream.current = null;
         setIsMicrophoneActive(false);
+      } else if (!isMicrophoneActive) {
+        startMicStreaming().catch((err) => {
+          console.error('[Live] toggleMicrophone start error:', err);
+          setErrorMessage('Failed to start microphone.');
+        });
       }
     } catch (err) {
       console.error('[Live] toggleMicrophone error:', err);
-      setErrorMessage('Failed to stop microphone.');
+      setErrorMessage('Failed to toggle microphone.');
     }
   };
 
