@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../comp
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAgents } from '../../context/AgentContext';
+import { Agent } from '../../types';
 
 export const AgentsList: React.FC = () => {
-  const { agents, fetchAgents, loading } = useAgents();
+  const { agents, fetchAgents, loading, error } = useAgents();
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredAgents, setFilteredAgents] = useState(agents);
 
@@ -51,6 +52,12 @@ export const AgentsList: React.FC = () => {
           Filter
         </Button>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
