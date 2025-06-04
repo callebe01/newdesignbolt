@@ -103,10 +103,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // 4) Create or reuse AudioContext
-      if (!audioContextRef.current) {
-        audioContextRef.current =
-          new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
+        if (!audioContextRef.current) {
+          const AC =
+            window.AudioContext ||
+            (window as Window & { webkitAudioContext?: typeof AudioContext })
+              .webkitAudioContext;
+          audioContextRef.current = new AC();
+        }
       const audioCtx = audioContextRef.current!;
 
       // 5) Make an AudioBuffer: mono, float32.length frames, 24000 Hz
@@ -326,11 +329,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         setStatus('ended');
         websocketRef.current = null;
       };
-    } catch (err: any) {
-      console.error('[Live] Failed to start call:', err);
-      setErrorMessage(err.message ?? 'Failed to start call.');
-      setStatus('error');
-    }
+      } catch (err: unknown) {
+        console.error('[Live] Failed to start call:', err);
+        const message = err instanceof Error ? err.message : 'Failed to start call.';
+        setErrorMessage(message);
+        setStatus('error');
+      }
   };
 
   // ─── startMicStreaming(): capture mic, downsample to 16 kHz PCM16, send JSON ──
@@ -343,8 +347,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Create a fresh AudioContext if needed (we already have one for playback)
       if (!audioContextRef.current) {
-        audioContextRef.current =
-          new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AC =
+          window.AudioContext ||
+          (window as Window & { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
+        audioContextRef.current = new AC();
       }
       const audioCtx = audioContextRef.current!;
 

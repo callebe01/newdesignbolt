@@ -7,8 +7,6 @@ import {
   FolderKanban,
   Bot,
   Phone,
-  ChevronLeft, 
-  ChevronRight, 
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
