@@ -165,7 +165,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
             generationConfig: {
-              responseModalities: ['AUDIO'],
+              // Request both audio and text so the UI can display transcripts
+              responseModalities: ['AUDIO', 'TEXT'],
             },
             systemInstruction: {
               parts: [
