@@ -1,82 +1,125 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Copy, Activity, MessageSquare, Brain } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { 
+  Phone, 
+  Clock, 
+  Calendar, 
+  Edit2, 
+  Trash2, 
+  MoreVertical,
+  ChevronLeft,
+  Plus,
+  RefreshCw 
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
-import { getAgentReports, AgentReport, getAgentTranscripts, Transcript } from '../../services/transcripts';
+import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
   const { getAgent } = useAgents();
   const [agent, setAgent] = useState<Agent | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<AgentReport[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-
-  useEffect(() => {
-    const fetch = async () => {
-      if (!agentId) return;
-      const a = await getAgent(agentId);
-      setAgent(a);
-      setLoading(false);
-    };
-    fetch();
-  }, [agentId, getAgent]);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!agentId) return;
-      const [r, t] = await Promise.all([
-        getAgentReports(agentId),
-        getAgentTranscripts(agentId)
-      ]);
-      setReports(r);
-      setTranscripts(t);
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [fetchedAgent, fetchedTranscripts] = await Promise.all([
+          getAgent(agentId),
+          getAgentTranscripts(agentId)
+        ]);
+        
+        if (fetchedAgent) {
+          setAgent(fetchedAgent);
+          setTranscripts(fetchedTranscripts);
+          
+          if (fetchedTranscripts.length > 0) {
+            const results = await getAnalysisResults(fetchedTranscripts.map(t => t.id));
+            setAnalysisResults(results);
+          }
+        } else {
+          setError('Agent not found');
+        }
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load agent details');
+      } finally {
+        setLoading(false);
+      }
     };
+    
     fetchData();
-  }, [agentId]);
+  }, [agentId, getAgent]);
 
-  const shareLink = `${window.location.origin}/agent/${agentId}`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareLink);
-    alert('Link copied to clipboard');
+  const handleAnalyze = async () => {
+    if (!transcripts.length) return;
+    
+    try {
+      setAnalyzing(true);
+      const result = await analyzeTranscripts(
+        transcripts.map(t => t.id),
+        5 // Analyze last 5 transcripts
+      );
+      setAnalysisResults([result, ...analysisResults]);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setError('Failed to analyze transcripts');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
-  // Calculate metrics from reports
-  const totalConversations = transcripts.length;
-  
-  const commonGoals = reports.reduce((acc, report) => {
-    const goal = report.summary.split('.')[0]; // Take first sentence as main goal
-    acc[goal] = (acc[goal] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  const mostCommonGoal = Object.entries(commonGoals)
-    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'No data';
-
-  const topFriction = reports.length > 0 
-    ? reports[0].recommendedActions[0] 
-    : 'No data';
+  const handleDeleteAgent = async () => {
+    if (!agent) return;
+    
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${agent.name}"? This action cannot be undone.`
+    );
+    
+    if (confirmDelete) {
+      try {
+        await deleteAgent(agent.id);
+        navigate('/agents');
+      } catch (err) {
+        console.error('Failed to delete agent:', err);
+      }
+    }
+  };
 
   if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!agent) {
     return (
-      <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
-        <h2 className="text-xl font-semibold mb-2">Error</h2>
-        <p>Agent not found</p>
-        <Link to="/agents" className="underline">Back to Agents</Link>
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-pulse-subtle text-lg">Loading agent details...</div>
       </div>
     );
   }
+
+  if (error || !agent) {
+    return (
+      <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
+        <h2 className="text-xl font-semibold mb-2">Error</h2>
+        <p>{error || 'Agent not found'}</p>
+        <Link to="/agents" className="underline">
+          Back to Agents
+        </Link>
+      </div>
+    );
+  }
+
+  const latestAnalysis = analysisResults[0];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -94,9 +137,18 @@ export const AgentDetails: React.FC = () => {
             {agent.status === 'active' ? 'Active • Last active 2h ago' : 'Inactive'}
           </p>
         </div>
-        <Badge variant={agent.status === 'active' ? 'success' : 'default'}>
-          {agent.status.toUpperCase()}
-        </Badge>
+        
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate(`/agents/${agent.id}/edit`)}>
+            <Edit2 className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          
+          <Button variant="destructive" onClick={handleDeleteAgent}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -104,132 +156,149 @@ export const AgentDetails: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium mb-1">Shareable Link</h3>
-              <p className="text-sm text-muted-foreground break-all">{shareLink}</p>
+              <p className="text-sm text-muted-foreground break-all">
+                {`${window.location.origin}/agent/${agent.id}`}
+              </p>
             </div>
-            <Button variant="outline" onClick={handleCopy}>
-              <Copy className="mr-2 h-4 w-4" />
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/agent/${agent.id}`);
+                alert('Link copied to clipboard!');
+              }}
+            >
               Copy Link
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">
-            <Activity className="mr-2 h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="sessions">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Sessions
-          </TabsTrigger>
-          <TabsTrigger value="insights">
-            <Brain className="mr-2 h-4 w-4" />
-            Insights
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" selectedValue={activeTab}>
-          <Card>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Total Conversations</h4>
-                  <p className="text-2xl font-semibold">{totalConversations}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Most Common Goal</h4>
-                  <p className="text-2xl font-semibold">{mostCommonGoal}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Top Friction</h4>
-                  <p className="text-2xl font-semibold">{topFriction}</p>
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
+                <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="p-2 bg-muted rounded-md">
+                <Phone className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="sessions" selectedValue={activeTab}>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
+                <h3 className="text-3xl font-bold mt-1">
+                  {latestAnalysis?.sentimentScores?.average || 'N/A'}
+                </h3>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <Clock className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
+                <h3 className="text-3xl font-bold mt-1">
+                  {transcripts[0] 
+                    ? formatDateTime(transcripts[0].createdAt)
+                    : 'Never'}
+                </h3>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <Calendar className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Conversation History</h2>
+          <Button 
+            onClick={handleAnalyze}
+            disabled={analyzing || transcripts.length === 0}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
+          </Button>
+        </div>
+
+        {transcripts.length > 0 ? (
           <div className="space-y-4">
             {transcripts.map((transcript, idx) => (
               <Card key={transcript.id}>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-medium">User #{idx + 1}</h3>
+                      <h3 className="font-medium">Conversation #{transcripts.length - idx}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(transcript.createdAt).toLocaleString()}
+                        {formatDateTime(transcript.createdAt)}
                       </p>
                     </div>
-                    <Badge>Completed</Badge>
                   </div>
-                  <p className="text-sm italic text-muted-foreground mb-4">
-                    {transcript.content.slice(0, 100)}...
-                  </p>
-                  <Button variant="outline" size="sm">View Full Transcript</Button>
+                  <p className="text-sm whitespace-pre-wrap">{transcript.content}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </TabsContent>
-
-        <TabsContent value="insights" selectedValue={activeTab}>
+        ) : (
           <Card>
-            <CardContent className="p-6 space-y-6">
-              {reports.length > 0 ? (
-                <>
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">AI Summary</h3>
-                    <p className="text-sm whitespace-pre-wrap">{reports[0].summary}</p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Sentiment Breakdown</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {Object.entries(reports[0].sentimentBreakdown).map(([k, v]) => (
-                        <div key={k} className="bg-muted p-4 rounded-lg">
-                          <p className="text-2xl font-semibold">{v}%</p>
-                          <p className="text-sm text-muted-foreground capitalize">{k}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Friction Quotes</h3>
-                    <div className="space-y-3">
-                      {reports[0].frictionQuotes.map((q, idx) => (
-                        <blockquote
-                          key={idx}
-                          className="text-sm italic text-muted-foreground border-l-2 pl-4"
-                        >
-                          {`"${q}"`}
-                        </blockquote>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Recommended Actions</h3>
-                    <ul className="space-y-2">
-                      {reports[0].recommendedActions.map((a, idx) => (
-                        <li key={idx} className="text-sm flex items-center">
-                          <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                          {a}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">No reports yet</p>
-              )}
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground">No conversations yet</p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
+
+      {latestAnalysis && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Latest Analysis</h2>
+          <Card>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Summary</h3>
+                <p className="text-sm whitespace-pre-wrap">{latestAnalysis.summary}</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Key Points</h3>
+                <ul className="space-y-2">
+                  {latestAnalysis.keyPoints.map((point, idx) => (
+                    <li key={idx} className="text-sm flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                <ul className="space-y-2">
+                  {latestAnalysis.recommendations.map((rec, idx) => (
+                    <li key={idx} className="text-sm flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-accent mr-2" />
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
