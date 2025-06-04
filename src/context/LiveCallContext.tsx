@@ -1,5 +1,3 @@
-// src/context/LiveCallContext.tsx
-
 import React, {
   createContext,
   useContext,
@@ -40,11 +38,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const DEFAULT_SYSTEM_INSTRUCTION =
     'You are roleplaying a real person testing a new interface while talking to a designer.' +
-    "Speak casually, like you're figuring things out out loud. This isn’t a polished review — it's a live reaction." +
-    'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It’s okay to feel stuck or ramble a bit—don’t tidy your sentences.Use natural phrases: “Hmm…”, “Let me read this…”, “Not sure what that means…” Focus on what your eyes land on first . don’t describe everything at once. Don’t try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don’t explain unless it feels obvious. Keep answers short. You don’t need to keep the conversation going unless you have a reaction.' +
-    'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. “Okay… first thing I see is…” Pause to read or scan — You should react like someone figuring it out in real time. “Let me read this real quick…” ” “Wait — what’s this down here…” Guess or think aloud — Share your thoughts as they form. Don’t rush to a final answer. ' +
-    'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you’d take. 2. Say why you chose it (brief). Only list other ideas if the designer asks “anything else?"' +
-    'Important: You are not supposed to summarize or label the tool right away. You’re reacting moment by moment, like someone thinking out loud in a real usability session.';
+    "Speak casually, like you're figuring things out out loud. This isn't a polished review — it's a live reaction." +
+    'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It's okay to feel stuck or ramble a bit—don't tidy your sentences.Use natural phrases: "Hmm…", "Let me read this…", "Not sure what that means…" Focus on what your eyes land on first . don't describe everything at once. Don't try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don't explain unless it feels obvious. Keep answers short. You don't need to keep the conversation going unless you have a reaction.' +
+    'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. "Okay… first thing I see is…" Pause to read or scan — You should react like someone figuring it out in real time. "Let me read this real quick…" " "Wait — what's this down here…" Guess or think aloud — Share your thoughts as they form. Don't rush to a final answer. ' +
+    'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you'd take. 2. Say why you chose it (brief). Only list other ideas if the designer asks "anything else?"' +
+    'Important: You are not supposed to summarize or label the tool right away. You're reacting moment by moment, like someone thinking out loud in a real usability session.';
 
   // ─── Refs ───────────────────────────────────────────────────────────────────
   const websocketRef = useRef<WebSocket | null>(null);
@@ -54,7 +52,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // We create/hold onto a single AudioContext for the entire session:
   const audioContextRef = useRef<AudioContext | null>(null);
-  // This tracks “when to schedule the next chunk” (in seconds of AudioContext.currentTime)
+  // This tracks "when to schedule the next chunk" (in seconds of AudioContext.currentTime)
   const audioQueueTimeRef = useRef<number>(0);
   // Ensures we only send the greeting once:
   const greetingSentRef = useRef(false);
@@ -103,13 +101,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // 4) Create or reuse AudioContext
-        if (!audioContextRef.current) {
-          const AC =
-            window.AudioContext ||
-            (window as Window & { webkitAudioContext?: typeof AudioContext })
-              .webkitAudioContext;
-          audioContextRef.current = new AC();
-        }
+      if (!audioContextRef.current) {
+        const AC = window.AudioContext || 
+          (window as Window & { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
+        audioContextRef.current = new AC();
+      }
       const audioCtx = audioContextRef.current!;
 
       // 5) Make an AudioBuffer: mono, float32.length frames, 24000 Hz
@@ -121,7 +118,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      // Decide when to start: either “now” (if the queue is empty) or at queue‐time
+      // Decide when to start: either "now" (if the queue is empty) or at queue‐time
       let startAt = audioCtx.currentTime;
       if (audioQueueTimeRef.current > audioCtx.currentTime) {
         startAt = audioQueueTimeRef.current;
@@ -163,11 +160,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
-        // 1) Send the “setup” message
+        // 1) Send the "setup" message
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
-            config: {
+            generationConfig: {
               responseModalities: ['AUDIO', 'TEXT'],
               outputAudioTranscription: {},
               inputAudioTranscription: {},
@@ -186,7 +183,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       ws.onmessage = async (ev) => {
-        // We only care about Blob frames. If it’s text, ignore.
+        // We only care about Blob frames. If it's text, ignore.
         if (!(ev.data instanceof Blob)) {
           return;
         }
@@ -329,12 +326,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         setStatus('ended');
         websocketRef.current = null;
       };
-      } catch (err: unknown) {
-        console.error('[Live] Failed to start call:', err);
-        const message = err instanceof Error ? err.message : 'Failed to start call.';
-        setErrorMessage(message);
-        setStatus('error');
-      }
+    } catch (err: unknown) {
+      console.error('[Live] Failed to start call:', err);
+      const message = err instanceof Error ? err.message : 'Failed to start call.';
+      setErrorMessage(message);
+      setStatus('error');
+    }
   };
 
   // ─── startMicStreaming(): capture mic, downsample to 16 kHz PCM16, send JSON ──
@@ -386,7 +383,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         const base64Audio = btoa(binary);
 
-        // Wrap in JSON as “realtime_input.audio”
+        // Wrap in JSON as "realtime_input.audio"
         const payload = {
           realtime_input: {
             audio: {
