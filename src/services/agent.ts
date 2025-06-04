@@ -52,11 +52,36 @@ export async function getAgentMetrics(agentId: string): Promise<AgentMetrics> {
   const { data: analytics, error: analyticsError } = await supabase
     .from('agent_analytics')
     .select('*')
-    .eq('agent_id', agentId)
-    .single();
+    .eq('agent_id', agentId);
 
   if (analyticsError) throw analyticsError;
 
+  // Provide default metrics if no analytics data exists
+  const defaultMetrics: AgentMetrics = {
+    totalConversations: 0,
+    activeConversations: 0,
+    avgDuration: 0,
+    avgSentiment: 0,
+    lastActivity: null,
+  };
+
+  // If no analytics data exists, return default metrics with active conversations count
+  if (!analytics || analytics.length === 0) {
+    const { data: activeConversations, error: conversationsError } = await supabase
+      .from('agent_conversations')
+      .select('id')
+      .eq('agent_id', agentId)
+      .eq('status', 'active');
+
+    if (conversationsError) throw conversationsError;
+
+    return {
+      ...defaultMetrics,
+      activeConversations: activeConversations?.length || 0,
+    };
+  }
+
+  // If analytics data exists, use it along with active conversations count
   const { data: activeConversations, error: conversationsError } = await supabase
     .from('agent_conversations')
     .select('id')
@@ -66,11 +91,11 @@ export async function getAgentMetrics(agentId: string): Promise<AgentMetrics> {
   if (conversationsError) throw conversationsError;
 
   return {
-    totalConversations: analytics.total_conversations,
-    activeConversations: activeConversations.length,
-    avgDuration: analytics.avg_duration,
-    avgSentiment: analytics.avg_sentiment,
-    lastActivity: analytics.updated_at,
+    totalConversations: analytics[0].total_conversations || 0,
+    activeConversations: activeConversations?.length || 0,
+    avgDuration: analytics[0].avg_duration || 0,
+    avgSentiment: analytics[0].avg_sentiment || 0,
+    lastActivity: analytics[0].updated_at ? new Date(analytics[0].updated_at) : null,
   };
 }
 
