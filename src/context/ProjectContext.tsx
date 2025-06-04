@@ -32,19 +32,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
     userId: row.user_id as string,
-    sessions: [],
   });
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      setProjects(data.map(mapProject));
+      
+      if (projectsError) throw projectsError;
+
+      const projects = projectsData.map(mapProject);
+      setProjects(projects);
     } catch (err) {
       setError('Failed to fetch projects');
       console.error(err);
@@ -59,8 +61,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const getProject = async (id: string): Promise<Project | null> => {
     try {
-      const project = projects.find(p => p.id === id) || null;
-      return project;
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      return mapProject(data);
     } catch (err) {
       setError('Failed to get project');
       console.error(err);
@@ -97,9 +107,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateProject = async (id: string, data: Partial<Project>): Promise<Project> => {
     try {
+      // Remove any non-column properties before sending to Supabase
+      const { sessions, ...updateData } = data;
+      
       const { data: updated, error } = await supabase
         .from('projects')
-        .update({ ...data, updated_at: new Date().toISOString() })
+        .update({ ...updateData, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();

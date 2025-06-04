@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Session, SessionInsights, UserStatement, UserPreference, UserFriction, UserDecision } from '../types';
 import { useProjects } from './ProjectContext';
+import { supabase } from '../services/supabase';
 
 interface SessionContextType {
   currentSession: Session | null;
@@ -20,7 +21,7 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { updateProject, projects } = useProjects();
+  const { currentProject } = useProjects();
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -33,90 +34,127 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [timerInterval, setTimerInterval] = useState<number | null>(null);
 
   const startSession = async (projectId: string, name: string, description?: string): Promise<Session> => {
-    // Find the project
-    const project = projects.find(p => p.id === projectId);
-    if (!project) {
-      throw new Error('Project not found');
+    try {
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert({
+          project_id: projectId,
+          name,
+          description,
+          status: 'active',
+          start_time: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newSession: Session = {
+        id: data.id,
+        projectId: data.project_id,
+        name: data.name,
+        description: data.description,
+        status: data.status,
+        startTime: new Date(data.start_time),
+        insights: {
+          statements: [],
+          preferences: [],
+          frictions: [],
+          decisions: [],
+        },
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      };
+
+      setCurrentSession(newSession);
+      setSessionActive(true);
+      setInsights(newSession.insights);
+      setSessionDuration(0);
+
+      const interval = window.setInterval(() => {
+        setSessionDuration(prev => prev + 1);
+      }, 1000);
+      setTimerInterval(interval as unknown as number);
+
+      return newSession;
+    } catch (err) {
+      console.error('Failed to start session:', err);
+      throw new Error('Failed to start session');
     }
-
-    // Create a new session
-    const newSession: Session = {
-      id: Date.now().toString(),
-      projectId,
-      name,
-      description,
-      status: 'active',
-      startTime: new Date(),
-      insights: {
-        statements: [],
-        preferences: [],
-        frictions: [],
-        decisions: [],
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Update the project with the new session
-    const updatedSessions = [...project.sessions, newSession];
-    await updateProject(projectId, { sessions: updatedSessions });
-
-    // Set the current session
-    setCurrentSession(newSession);
-    setSessionActive(true);
-    setInsights(newSession.insights);
-    setSessionDuration(0);
-
-    // Start the timer
-    const interval = window.setInterval(() => {
-      setSessionDuration(prev => prev + 1);
-    }, 1000);
-    setTimerInterval(interval as unknown as number);
-
-    return newSession;
   };
 
   const endSession = async (): Promise<void> => {
     if (!currentSession) return;
 
-    // Clear the timer
     if (timerInterval) {
       clearInterval(timerInterval);
       setTimerInterval(null);
     }
 
-    // Update session status
-    const updatedSession: Session = {
-      ...currentSession,
-      status: 'completed',
-      endTime: new Date(),
-      duration: sessionDuration,
-      insights,
-      updatedAt: new Date(),
-    };
+    try {
+      const { error } = await supabase
+        .from('sessions')
+        .update({
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          duration: sessionDuration,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentSession.id);
 
-    // Find the project
-    const project = projects.find(p => p.id === currentSession.projectId);
-    if (!project) {
-      throw new Error('Project not found');
+      if (error) throw error;
+
+      // Save insights
+      for (const statement of insights.statements) {
+        await supabase.from('session_insights').insert({
+          session_id: currentSession.id,
+          type: 'statement',
+          content: statement.content,
+          timestamp: statement.timestamp.toISOString(),
+        });
+      }
+
+      for (const preference of insights.preferences) {
+        await supabase.from('session_insights').insert({
+          session_id: currentSession.id,
+          type: 'preference',
+          content: preference.content,
+          timestamp: preference.timestamp.toISOString(),
+        });
+      }
+
+      for (const friction of insights.frictions) {
+        await supabase.from('session_insights').insert({
+          session_id: currentSession.id,
+          type: 'friction',
+          content: friction.content,
+          severity: friction.severity,
+          timestamp: friction.timestamp.toISOString(),
+        });
+      }
+
+      for (const decision of insights.decisions) {
+        await supabase.from('session_insights').insert({
+          session_id: currentSession.id,
+          type: 'decision',
+          content: decision.content,
+          timestamp: decision.timestamp.toISOString(),
+        });
+      }
+
+      setCurrentSession(null);
+      setSessionActive(false);
+      setSessionDuration(0);
+      setInsights({
+        statements: [],
+        preferences: [],
+        frictions: [],
+        decisions: [],
+      });
+    } catch (err) {
+      console.error('Failed to end session:', err);
+      throw new Error('Failed to end session');
     }
-
-    // Update the project's sessions
-    const updatedSessions = project.sessions.map(session => 
-      session.id === currentSession.id ? updatedSession : session
-    );
-    await updateProject(project.id, { sessions: updatedSessions });
-
-    // Reset state
-    setCurrentSession(null);
-    setSessionActive(false);
-    setSessionDuration(0);
-    setInsights({
-      statements: [],
-      preferences: [],
-      frictions: [],
-      decisions: [],
-    });
   };
 
   const updateSessionInsights = (newInsights: Partial<SessionInsights>) => {
