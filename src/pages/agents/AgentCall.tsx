@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -10,6 +10,7 @@ export const AgentCall: React.FC = () => {
   const { getAgent } = useAgents();
   const { startCall, endCall, status, transcript, toggleMicrophone, toggleVideo, toggleScreenShare, isMicrophoneActive, isVideoActive, isScreenSharing } = useLiveCall();
   const agentRef = useRef<Agent | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -17,6 +18,9 @@ export const AgentCall: React.FC = () => {
       if (!agentId) return;
       const a = await getAgent(agentId);
       agentRef.current = a;
+      if (!a) {
+        setNotFound(true);
+      }
     };
     init();
   }, [agentId, getAgent]);
@@ -31,6 +35,18 @@ export const AgentCall: React.FC = () => {
   const handleEnd = () => {
     endCall();
   };
+
+  if (notFound) {
+    return (
+      <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
+        <h2 className="text-xl font-semibold mb-2">Error</h2>
+        <p>Agent not found</p>
+        <Link to="/agents" className="underline">
+          Back to Agents
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
