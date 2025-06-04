@@ -1,6 +1,7 @@
+```tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Bot } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
@@ -53,7 +54,10 @@ export const NewAgent: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Create New Agent</CardTitle>
+          <CardTitle className="flex items-center">
+            <Bot className="mr-2 h-5 w-5" />
+            Create New Agent
+          </CardTitle>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
@@ -66,7 +70,7 @@ export const NewAgent: React.FC = () => {
 
             <Input
               label="Agent Name"
-              placeholder="E.g., UX Researcher Bot"
+              placeholder="E.g., UX Research Assistant"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -74,22 +78,35 @@ export const NewAgent: React.FC = () => {
             />
 
             <div>
-              <label className="text-sm font-medium leading-none mb-2 block">Agent Instructions</label>
+              <label className="text-sm font-medium leading-none mb-2 block">
+                Agent Instructions
+              </label>
               <textarea
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                placeholder="Explain how this agent should behave during a call"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[200px]"
+                placeholder="Provide detailed instructions for how this agent should behave and interact with users..."
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 required
               />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Be specific about the agent's role, tone, and how it should handle different scenarios.
+              </p>
             </div>
           </CardContent>
 
           <CardFooter className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate('/agents')} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/agents')}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading}
+            >
               {isLoading ? 'Creating...' : 'Create Agent'}
             </Button>
           </CardFooter>
@@ -98,3 +115,4 @@ export const NewAgent: React.FC = () => {
     </div>
   );
 };
+```

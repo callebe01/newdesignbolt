@@ -1,21 +1,54 @@
-import React, { useEffect } from 'react';
+```tsx
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Filter, Bot, Activity, Users, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Agent, AgentMetrics } from '../../types/agent';
+import { getAgent, getAgentMetrics } from '../../services/agent';
 import { useAgents } from '../../context/AgentContext';
 
 export const AgentsList: React.FC = () => {
   const { agents, fetchAgents, loading } = useAgents();
+  const [metrics, setMetrics] = useState<Record<string, AgentMetrics>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
 
   useEffect(() => {
     fetchAgents();
   }, [fetchAgents]);
 
+  useEffect(() => {
+    const loadMetrics = async () => {
+      const metricsData: Record<string, AgentMetrics> = {};
+      for (const agent of agents) {
+        try {
+          metricsData[agent.id] = await getAgentMetrics(agent.id);
+        } catch (err) {
+          console.error(`Failed to load metrics for agent ${agent.id}:`, err);
+        }
+      }
+      setMetrics(metricsData);
+    };
+    
+    if (agents.length > 0) {
+      loadMetrics();
+    }
+  }, [agents]);
+
+  useEffect(() => {
+    const filtered = agents.filter(agent => 
+      agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      agent.instructions.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredAgents(filtered);
+  }, [agents, searchTerm]);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Agents</h1>
+        <h1 className="text-3xl font-bold">AI Agents</h1>
         <Link to="/agents/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
@@ -24,44 +57,133 @@ export const AgentsList: React.FC = () => {
         </Link>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search agents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+            fullWidth
+          />
+        </div>
+        <Button variant="outline" className="sm:w-auto w-full">
+          <Filter className="mr-2 h-4 w-4" />
+          Filter
+        </Button>
+      </div>
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3].map(i => (
-            <div key={i} className="h-32 bg-muted rounded-lg animate-pulse-subtle"></div>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-64 bg-muted rounded-lg animate-pulse-subtle"></div>
           ))}
         </div>
-      ) : agents.length > 0 ? (
+      ) : filteredAgents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {agents.map(agent => (
-            <Card key={agent.id} className="transition-all hover:shadow-md h-full">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-xl">{agent.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {agent.instructions}
-                </p>
-              </CardContent>
-              <CardFooter className="pt-3">
-                <Button variant="outline" size="sm" asChild>
-                  <Link to={`/agents/${agent.id}`}>View Details</Link>
-                </Button>
-              </CardFooter>
-            </Card>
+          {filteredAgents.map(agent => (
+            <AgentCard 
+              key={agent.id} 
+              agent={agent}
+              metrics={metrics[agent.id]}
+            />
           ))}
         </div>
       ) : (
         <div className="text-center py-16">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Bot className="h-8 w-8 text-muted-foreground" />
+          </div>
           <h3 className="text-xl font-semibold mb-2">No agents found</h3>
-          <p className="text-muted-foreground mb-6">Create your first AI agent</p>
-          <Link to="/agents/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Agent
-            </Button>
-          </Link>
+          <p className="text-muted-foreground mb-6">
+            {searchTerm ? 'No agents match your search' : 'Create your first AI agent'}
+          </p>
+          {!searchTerm && (
+            <Link to="/agents/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Agent
+              </Button>
+            </Link>
+          )}
         </div>
       )}
     </div>
   );
 };
+
+interface AgentCardProps {
+  agent: Agent;
+  metrics?: AgentMetrics;
+}
+
+const AgentCard: React.FC<AgentCardProps> = ({ agent, metrics }) => {
+  return (
+    <Card className="transition-all hover:shadow-md">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl">{agent.name}</CardTitle>
+          <div className={`px-2 py-1 text-xs rounded-full font-medium ${
+            agent.status === 'active' 
+              ? 'bg-success/10 text-success' 
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            {agent.status.toUpperCase()}
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+          {agent.instructions}
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center text-sm">
+              <Activity className="mr-2 h-4 w-4 text-primary" />
+              <span>
+                {metrics?.totalConversations || 0} conversations
+              </span>
+            </div>
+            <div className="flex items-center text-sm">
+              <Users className="mr-2 h-4 w-4 text-accent" />
+              <span>
+                {metrics?.activeConversations || 0} active now
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center text-sm">
+              <Clock className="mr-2 h-4 w-4 text-secondary" />
+              <span>
+                {metrics?.avgDuration ? `${Math.round(metrics.avgDuration / 60)}m avg` : 'No data'}
+              </span>
+            </div>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <span>
+                Last active: {metrics?.lastActivity 
+                  ? new Date(metrics.lastActivity).toLocaleDateString() 
+                  : 'Never'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+
+      <CardFooter className="pt-3">
+        <div className="flex justify-between w-full">
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/agents/${agent.id}`}>View Details</Link>
+          </Button>
+          <Button variant="primary" size="sm" asChild>
+            <Link to={`/agent/${agent.id}`}>Start Chat</Link>
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+};
+```
