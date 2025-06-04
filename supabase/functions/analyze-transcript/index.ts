@@ -1,4 +1,3 @@
-import { serve } from "npm:@supabase/functions-js@2.1.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

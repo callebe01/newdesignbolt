@@ -27,7 +27,7 @@ export const Tabs: React.FC<TabsProps> = ({
     <div className={className}>
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<any>, {
+          return React.cloneElement(child as React.ReactElement, {
             selectedValue: value,
             onValueChange: handleValueChange,
           });
@@ -55,7 +55,7 @@ export const TabsList: React.FC<TabsListProps> = ({
     <div className={`inline-flex p-1 bg-muted rounded-lg mb-4 ${className}`}>
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<any>, {
+          return React.cloneElement(child as React.ReactElement, {
             active: child.props.value === selectedValue,
             onClick: () => onValueChange?.(child.props.value),
           });
@@ -74,8 +74,7 @@ interface TabsTriggerProps {
   onClick?: () => void;
 }
 
-export const TabsTrigger: React.FC<TabsTriggerProps> = ({ 
-  value,
+export const TabsTrigger: React.FC<TabsTriggerProps> = ({
   children,
   className = '',
   active,
