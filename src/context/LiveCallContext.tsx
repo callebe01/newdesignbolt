@@ -349,12 +349,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         const base64Audio = btoa(binary);
 
-        // Wrap in JSON as “realtimeInput.audio”
+        // Wrap in JSON as “realtime_input.audio”
         const payload = {
-          realtimeInput: {
+          realtime_input: {
             audio: {
               data: base64Audio,
-              mimeType: 'audio/pcm;rate=16000',
+              mime_type: 'audio/pcm;rate=16000',
             },
           },
         };
@@ -426,8 +426,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               const base64 = dataUrl.split(',')[1];
               const payload = {
                 // See https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
-                realtimeInput: {
-                  screen: { data: base64, mimeType: blob.type },
+                realtime_input: {
+                  screen: { data: base64, mime_type: blob.type },
                 },
               };
               try {
