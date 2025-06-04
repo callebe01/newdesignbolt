@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, X } from 'lucide-react';
+import { Mic, MicOff, X, ArrowLeft } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -65,39 +65,77 @@ export const AgentCall: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-background">
-      <div className="flex-1 flex items-center justify-center w-full">
-        <div className={`w-40 h-40 rounded-full bg-gradient-to-b from-sky-200 to-sky-500 flex items-center justify-center ${status === 'active' ? 'animate-pulse-subtle' : ''}`}></div>
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-card">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleEnd}
+            className="mr-2"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
+            </div>
+            <div className="ml-3">
+              <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {status === 'active' ? 'Listening...' : status}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {errorMessage && (
-        <div className="mb-4 bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
-          {errorMessage}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <div className={`w-32 h-32 rounded-full bg-gradient-to-b from-sky-200 to-sky-500 flex items-center justify-center mb-8 ${
+          status === 'active' ? 'animate-pulse-subtle' : ''
+        }`} />
+
+        {transcript ? (
+          <div className="max-w-2xl w-full bg-card border rounded-lg p-4 mb-8">
+            <p className="whitespace-pre-wrap">{transcript}</p>
+          </div>
+        ) : (
+          <p className="text-muted-foreground mb-8">
+            Start speaking to begin the conversation
+          </p>
+        )}
+
+        {errorMessage && (
+          <div className="mb-8 w-full max-w-2xl bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="flex items-center space-x-4">
+          <Button
+            size="lg"
+            variant={isMicrophoneActive ? 'primary' : 'outline'}
+            className="rounded-full w-16 h-16 shadow-lg"
+            onClick={toggleMicrophone}
+          >
+            {isMicrophoneActive ? (
+              <Mic className="h-6 w-6" />
+            ) : (
+              <MicOff className="h-6 w-6" />
+            )}
+          </Button>
+
+          <Button
+            size="lg"
+            variant="destructive"
+            className="rounded-full w-16 h-16 shadow-lg"
+            onClick={handleEnd}
+          >
+            <X className="h-6 w-6" />
+          </Button>
         </div>
-      )}
-
-      <div className="flex space-x-6">
-        <Button
-          size="lg"
-          variant={isMicrophoneActive ? 'primary' : 'outline'}
-          className="rounded-full w-16 h-16 shadow-lg"
-          onClick={toggleMicrophone}
-        >
-          {isMicrophoneActive ? (
-            <Mic className="h-6 w-6" />
-          ) : (
-            <MicOff className="h-6 w-6" />
-          )}
-        </Button>
-
-        <Button
-          size="lg"
-          variant="secondary"
-          className="rounded-full w-16 h-16 shadow-lg"
-          onClick={handleEnd}
-        >
-          <X className="h-6 w-6" />
-        </Button>
       </div>
     </div>
   );
