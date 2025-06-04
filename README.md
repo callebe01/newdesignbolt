@@ -17,13 +17,26 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 `VITE_OPENAI_API_KEY` is used for transcript analysis via OpenAI.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` connect the app to your Supabase backend for persistence.
 
-2. Install dependencies:
+
+2. Initialize the Supabase schema:
+
+```bash
+# Install the Supabase CLI if you don't have it
+npm install -g supabase
+
+# Apply migrations from supabase/migrations
+supabase db push
+```
+
+This will create required tables such as `transcriptions` and `analysis_results`.
+
+3. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. Start the development server:
+4. Start the development server:
 
 ```bash
 npm run dev
