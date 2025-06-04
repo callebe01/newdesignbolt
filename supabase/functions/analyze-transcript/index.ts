@@ -14,6 +14,10 @@ serve(async (req) => {
   try {
     const { text } = await req.json();
 
+    if (!text?.trim()) {
+      throw new Error("Text is required");
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -24,7 +28,7 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "Analyze this transcript and extract user statements, preferences, frictions (with severity), decisions, and generate a testable hypothesis."
+          content: "You are a UX research assistant. Analyze the transcript and return JSON with this structure: { statements: string[], preferences: string[], frictions: Array<{ content: string, severity: 'low' | 'medium' | 'high' }>, decisions: string[], hypothesis: string }"
         }, {
           role: "user",
           content: text
@@ -34,16 +38,24 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      throw new Error("OpenAI API error");
+      const error = await response.json();
+      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
     }
 
     const data = await response.json();
+    const analysis = JSON.parse(data.choices[0].message.content);
+
+    // Validate the response structure
+    if (!analysis.statements || !analysis.preferences || !analysis.frictions || !analysis.decisions || !analysis.hypothesis) {
+      throw new Error("Invalid analysis format from OpenAI");
+    }
 
     return new Response(
-      JSON.stringify(data.choices[0].message.content),
+      JSON.stringify(analysis),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    console.error("Analyze transcript error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
