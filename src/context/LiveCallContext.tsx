@@ -5,6 +5,7 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
+import { GoogleGenerativeAI, Modality } from '@google/generative-ai';
 import { LiveCallStatus } from '../types';
 
 interface LiveCallContextType {
@@ -43,13 +44,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     'If something confuses you, just say so. Don\'t explain unless it feels obvious. Keep answers short. ' +
     'You don\'t need to keep the conversation going unless you have a reaction.';
 
-  const websocketRef = useRef<WebSocket | null>(null);
+  const sessionRef = useRef<any>(null);
   const screenStream = useRef<MediaStream | null>(null);
   const microphoneStream = useRef<MediaStream | null>(null);
   const videoStream = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueTimeRef = useRef<number>(0);
-  const greetingSentRef = useRef(false);
+  const responseQueueRef = useRef<any[]>([]);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -57,177 +58,68 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     return () => {
-      if (websocketRef.current) {
-        websocketRef.current.close();
-        websocketRef.current = null;
-      }
-      [screenStream.current, microphoneStream.current, videoStream.current].forEach(
-        (stream) => {
-          if (stream) {
-            stream.getTracks().forEach((t) => t.stop());
-          }
-        }
-      );
-      stopScreenStreaming();
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
+      endCall();
     };
   }, []);
-
-  const playAudioBuffer = async (pcmBlob: Blob) => {
-    try {
-      const arrayBuffer = await pcmBlob.arrayBuffer();
-      const pcm16 = new Int16Array(arrayBuffer);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 32768;
-      }
-
-      if (!audioContextRef.current) {
-        const AC = window.AudioContext || 
-          (window as Window & { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext;
-        audioContextRef.current = new AC();
-      }
-      const audioCtx = audioContextRef.current!;
-
-      const buffer = audioCtx.createBuffer(1, float32.length, 24000);
-      buffer.copyToChannel(float32, 0, 0);
-
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioCtx.destination);
-
-      let startAt = audioCtx.currentTime;
-      if (audioQueueTimeRef.current > audioCtx.currentTime) {
-        startAt = audioQueueTimeRef.current;
-      }
-      source.start(startAt);
-      audioQueueTimeRef.current = startAt + buffer.duration;
-    } catch (err) {
-      console.error('[Live] playAudioBuffer() error:', err);
-    }
-  };
 
   const startCall = async (systemInstruction?: string): Promise<void> => {
     try {
       setErrorMessage(null);
       setTranscript('');
 
-      if (websocketRef.current) {
-        console.warn('[Live] startCall() called but WebSocket already exists.');
-        return;
-      }
-
       const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
       if (!apiKey) {
         throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env file.');
       }
 
-      // Using REST API endpoint instead of WebSocket
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}`;
-      
-      // Test the API key with a simple request first
-      try {
-        const testResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+      const genAI = new GoogleGenerativeAI({ apiKey });
+      const model = 'gemini-2.0-flash-live-001';
+      const config = { 
+        responseModalities: [Modality.TEXT],
+        inputAudioTranscription: {},
+      };
+
+      const session = await genAI.live.connect({
+        model,
+        callbacks: {
+          onopen: () => {
+            console.log('[Live] Connection opened');
+            setStatus('active');
           },
-          body: JSON.stringify({
-            contents: [{
-              role: 'user',
-              parts: [{ text: 'Test connection' }]
-            }]
-          })
-        });
-
-        if (!testResponse.ok) {
-          const error = await testResponse.json();
-          throw new Error(error.error?.message || 'API connection failed');
-        }
-      } catch (error) {
-        throw new Error(`Failed to connect to Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-
-      // Now establish WebSocket connection
-      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}`);
-      websocketRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('[Live] WebSocket connection established');
-        setStatus('connecting');
-
-        const setupMsg = {
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: systemInstruction || DEFAULT_SYSTEM_INSTRUCTION
-            }]
-          }],
-          generation_config: {
-            candidate_count: 1,
-            max_output_tokens: 1024,
-            temperature: 0.9,
-            top_p: 0.8,
-            top_k: 40
+          onmessage: (message) => {
+            console.log('[Live] Message received:', message);
+            responseQueueRef.current.push(message);
+            
+            if (message.text) {
+              setTranscript(prev => prev + 'AI: ' + message.text + '\n');
+            }
+            if (message.serverContent?.inputTranscription?.text) {
+              setTranscript(prev => prev + 'User: ' + message.serverContent.inputTranscription.text + '\n');
+            }
           },
-          safety_settings: [{
-            category: 'HARM_CATEGORY_HARASSMENT',
-            threshold: 'BLOCK_NONE'
-          }]
-        };
+          onerror: (error) => {
+            console.error('[Live] Error:', error);
+            setErrorMessage(error.message);
+            setStatus('error');
+          },
+          onclose: (event) => {
+            console.log('[Live] Connection closed:', event);
+            setStatus('ended');
+          },
+        },
+        config,
+      });
 
-        ws.send(JSON.stringify(setupMsg));
-        console.log('[Live] Setup message sent');
-      };
+      sessionRef.current = session;
 
-      ws.onmessage = async (ev) => {
-        try {
-          const data = JSON.parse(ev.data);
-          
-          if (data.error) {
-            console.error('[Live] Server error:', data.error);
-            setErrorMessage(data.error.message || 'Server error');
-            return;
-          }
+      // Send initial system instruction
+      session.sendClientContent({
+        turns: [{
+          role: 'user',
+          parts: [{ text: systemInstruction || DEFAULT_SYSTEM_INSTRUCTION }]
+        }]
+      });
 
-          if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            const text = data.candidates[0].content.parts[0].text;
-            console.log('[Live] AI response:', text);
-            setTranscript(prev => prev + 'AI: ' + text + '\n');
-          }
-
-        } catch (err) {
-          console.error('[Live] Message parsing error:', err);
-          setErrorMessage('Failed to parse server response');
-        }
-      };
-
-      ws.onerror = (err) => {
-        console.error('[Live] WebSocket error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Connection error';
-        setErrorMessage(`Failed to establish connection: ${errorMessage}`);
-        setStatus('error');
-        
-        // Attempt to reconnect
-        setTimeout(() => {
-          if (websocketRef.current?.readyState === WebSocket.CLOSED) {
-            console.log('[Live] Attempting to reconnect...');
-            startCall(systemInstruction).catch(console.error);
-          }
-        }, 5000);
-      };
-
-      ws.onclose = () => {
-        console.log('[Live] WebSocket closed');
-        setStatus('ended');
-        websocketRef.current = null;
-      };
-
-      setStatus('active');
       startMicStreaming();
 
     } catch (err) {
@@ -244,10 +136,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       microphoneStream.current = stream;
 
       if (!audioContextRef.current) {
-        const AC = window.AudioContext || 
-          (window as Window & { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext;
-        audioContextRef.current = new AC();
+        audioContextRef.current = new (window.AudioContext || 
+          (window as any).webkitAudioContext)();
       }
 
       const audioCtx = audioContextRef.current;
@@ -258,9 +148,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       processor.connect(audioCtx.destination);
 
       processor.onaudioprocess = (e) => {
-        if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
-          return;
-        }
+        if (!sessionRef.current) return;
 
         const inputData = e.inputBuffer.getChannelData(0);
         const pcm16 = new Int16Array(inputData.length);
@@ -269,20 +157,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
         }
 
-        const msg = {
-          contents: [{
-            role: 'user',
-            parts: [{
-              audio: {
-                data: Array.from(pcm16),
-                encoding: 'LINEAR16',
-                sampleRate: audioCtx.sampleRate
-              }
-            }]
-          }]
-        };
-
-        websocketRef.current.send(JSON.stringify(msg));
+        sessionRef.current.sendRealtimeInput({
+          audio: {
+            data: Array.from(pcm16),
+            mimeType: 'audio/pcm;rate=16000'
+          }
+        });
       };
 
       setIsMicrophoneActive(true);
@@ -323,7 +203,51 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const startScreenStreaming = () => {
-    // Implementation omitted for brevity
+    if (!screenStream.current || screenIntervalRef.current) return;
+
+    let video = screenVideoRef.current;
+    if (!video) {
+      video = document.createElement('video');
+      video.playsInline = true;
+      video.muted = true;
+      screenVideoRef.current = video;
+    }
+    video.srcObject = screenStream.current;
+    video.play().catch(() => {});
+
+    let canvas = screenCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      screenCanvasRef.current = canvas;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const capture = () => {
+      if (!screenStream.current || !sessionRef.current) return;
+      if (!video!.videoWidth || !video!.videoHeight) return;
+
+      canvas!.width = video!.videoWidth;
+      canvas!.height = video!.videoHeight;
+      ctx.drawImage(video!, 0, 0, canvas!.width, canvas!.height);
+
+      canvas!.toBlob((blob) => {
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          sessionRef.current.sendRealtimeInput({
+            video: { 
+              data: base64,
+              mimeType: blob.type
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg');
+    };
+
+    screenIntervalRef.current = window.setInterval(capture, 500);
   };
 
   const stopScreenStreaming = () => {
@@ -356,9 +280,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const endCall = () => {
-    if (websocketRef.current) {
-      websocketRef.current.close();
-      websocketRef.current = null;
+    if (sessionRef.current) {
+      sessionRef.current.close();
+      sessionRef.current = null;
     }
 
     [screenStream.current, microphoneStream.current, videoStream.current].forEach(
@@ -378,6 +302,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       audioContextRef.current = null;
     }
 
+    stopScreenStreaming();
     setIsScreenSharing(false);
     setIsMicrophoneActive(false);
     setIsVideoActive(false);
