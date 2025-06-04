@@ -5,7 +5,7 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
-import { GoogleGenerativeAI, Modality } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LiveCallStatus } from '../types';
 
 interface LiveCallContextType {
@@ -75,7 +75,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const genAI = new GoogleGenerativeAI({ apiKey });
       const model = 'gemini-2.0-flash-live-001';
       const config = { 
-        responseModalities: [Modality.TEXT],
+        responseModalities: ['TEXT'],
         inputAudioTranscription: {},
       };
 
