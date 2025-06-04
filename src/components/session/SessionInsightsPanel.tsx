@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useSession } from '../../context/SessionContext';
+import { analyzeTranscript as analyzeTranscriptAPI, AnalysisResult } from '../../services/openai';
 
 interface SessionInsightsPanelProps {
   liveSession?: boolean;
@@ -57,6 +58,58 @@ ${insights.decisions.length > 0
       });
   };
 
+  // Placeholder transcript. Replace with real session transcript when available.
+  const transcript = '';
+
+  const analyzeTranscript = async () => {
+    try {
+      const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
+      setHypothesis(result.hypothesis);
+      result.statements.forEach((s) => addUserStatement(s));
+      result.preferences.forEach((p) => addUserPreference(p));
+      result.frictions.forEach((f) => addUserFriction(f.content, f.severity));
+      result.decisions.forEach((d) => addUserDecision(d));
+    } catch (err) {
+      console.error('Transcript analysis failed:', err);
+    }
+  };
+
+  const extractStatements = async () => {
+    try {
+      const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
+      result.statements.forEach((s) => addUserStatement(s));
+    } catch (err) {
+      console.error('Failed to extract statements:', err);
+    }
+  };
+
+  const findPreferences = async () => {
+    try {
+      const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
+      result.preferences.forEach((p) => addUserPreference(p));
+    } catch (err) {
+      console.error('Failed to find preferences:', err);
+    }
+  };
+
+  const identifyFriction = async () => {
+    try {
+      const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
+      result.frictions.forEach((f) => addUserFriction(f.content, f.severity));
+    } catch (err) {
+      console.error('Failed to identify friction:', err);
+    }
+  };
+
+  const recordDecisions = async () => {
+    try {
+      const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
+      result.decisions.forEach((d) => addUserDecision(d));
+    } catch (err) {
+      console.error('Failed to record decisions:', err);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -94,7 +147,7 @@ ${insights.decisions.length > 0
             </p>
             
             {liveSession && (
-              <Button className="mt-4">
+              <Button className="mt-4" onClick={analyzeTranscript}>
                 <Search className="mr-2 h-4 w-4" />
                 Analyze Transcript
               </Button>
@@ -104,44 +157,44 @@ ${insights.decisions.length > 0
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <InsightSection 
+        <InsightSection
           title="User Statements"
           icon={<MessageSquare className="h-5 w-5" />}
           count={insights.statements.length}
           emptyMessage="No statements extracted yet"
           emptySubMessage="Extract user quotes and reactions from transcript"
           actionLabel={liveSession ? "Extract Statements" : undefined}
-          onAction={() => liveSession && addUserStatement("This checkout flow is confusing me")}
+          onAction={liveSession ? extractStatements : undefined}
         />
         
-        <InsightSection 
+        <InsightSection
           title="Stated Preferences"
           icon={<Heart className="h-5 w-5" />}
           count={insights.preferences.length}
           emptyMessage="No preferences identified yet"
           emptySubMessage="Find explicitly stated user preferences"
           actionLabel={liveSession ? "Find Preferences" : undefined}
-          onAction={() => liveSession && addUserPreference("I prefer a simpler checkout form")}
+          onAction={liveSession ? findPreferences : undefined}
         />
         
-        <InsightSection 
+        <InsightSection
           title="Expressed Friction"
           icon={<AlertTriangle className="h-5 w-5" />}
           count={insights.frictions.length}
           emptyMessage="No friction points identified yet"
           emptySubMessage="Identify pain points in the user experience"
           actionLabel={liveSession ? "Identify Friction" : undefined}
-          onAction={() => liveSession && addUserFriction("Can't find the checkout button", "medium")}
+          onAction={liveSession ? identifyFriction : undefined}
         />
         
-        <InsightSection 
+        <InsightSection
           title="Stated Decisions"
           icon={<CheckSquare className="h-5 w-5" />}
           count={insights.decisions.length}
           emptyMessage="No decisions mentioned yet"
           emptySubMessage="Track user decision points and choices"
           actionLabel={liveSession ? "Record Decisions" : undefined}
-          onAction={() => liveSession && addUserDecision("Chose to abandon cart after seeing shipping costs")}
+          onAction={liveSession ? recordDecisions : undefined}
         />
       </div>
     </div>
