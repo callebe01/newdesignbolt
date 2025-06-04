@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Users, 
-  Settings, 
-  FolderKanban, 
-  Phone, 
+  LayoutDashboard,
+  Users,
+  Settings,
+  FolderKanban,
+  Bot,
+  Phone,
   ChevronLeft, 
   ChevronRight, 
   PanelLeftClose,
@@ -42,6 +43,7 @@ export const Sidebar: React.FC = () => {
         <NavItem to="/" icon={<LayoutDashboard size={20} />} text="Dashboard" collapsed={collapsed} />
         <NavItem to="/projects" icon={<FolderKanban size={20} />} text="Projects" collapsed={collapsed} />
         <NavItem to="/sessions" icon={<Phone size={20} />} text="Sessions" collapsed={collapsed} />
+        <NavItem to="/agents" icon={<Bot size={20} />} text="Agents" collapsed={collapsed} />
         <NavItem to="/team" icon={<Users size={20} />} text="Team" collapsed={collapsed} />
         
         <div className="mt-auto">
