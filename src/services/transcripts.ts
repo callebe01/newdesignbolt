@@ -11,25 +11,29 @@ export interface Transcript {
 export async function saveTranscript(agentId: string, content: string) {
   if (!content.trim()) return;
   try {
-    await supabase.from('transcripts').insert({
+    const { error } = await supabase.from('transcripts').insert({
       agent_id: agentId,
       content,
       created_at: new Date().toISOString(),
     });
+    if (error) throw error;
   } catch (err) {
     console.error('Failed to save transcript:', err);
+    throw err;
   }
 }
 
 export async function saveAgentReport(agentId: string, report: AgentReport) {
   try {
-    await supabase.from('agent_reports').insert({
+    const { error } = await supabase.from('agent_reports').insert({
       agent_id: agentId,
       report,
       created_at: new Date().toISOString(),
     });
+    if (error) throw error;
   } catch (err) {
     console.error('Failed to save agent report:', err);
+    throw err;
   }
 }
 
@@ -58,6 +62,10 @@ export async function generateAndSaveReport(
     }
 
     const report = await response.json();
+    if (report.error) {
+      throw new Error(report.error);
+    }
+
     await saveAgentReport(agentId, report);
     return true;
   } catch (err) {
