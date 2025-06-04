@@ -24,11 +24,10 @@ export async function saveTranscript(agentId: string, content: string, metadata:
   
   try {
     const { data, error } = await supabase
-      .from('transcriptions')
+      .from('transcripts')
       .insert({
         agent_id: agentId,
         content,
-        metadata,
         created_at: new Date().toISOString()
       })
       .select()
@@ -45,7 +44,7 @@ export async function saveTranscript(agentId: string, content: string, metadata:
 export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
   try {
     const { data, error } = await supabase
-      .from('transcriptions')
+      .from('transcripts')
       .select('*')
       .eq('agent_id', agentId)
       .order('created_at', { ascending: false });
@@ -55,7 +54,7 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
       id: row.id,
       agentId: row.agent_id,
       content: row.content,
-      metadata: row.metadata,
+      metadata: {},
       createdAt: row.created_at
     }));
   } catch (err) {
