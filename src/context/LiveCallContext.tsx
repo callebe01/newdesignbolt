@@ -376,7 +376,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // ─── startScreenStreaming(): capture screen frames and send via WebSocket ──
-  // This follows the Gemini Live API spec for realtimeInput.screen
+  // This follows the Gemini Live API spec for realtimeInputScreen
   // https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
   const startScreenStreaming = () => {
     try {
@@ -427,7 +427,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               const payload = {
                 // See https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
                 realtime_input: {
-                  screen: { data: base64, mime_type: blob.type },
+                  video: { data: base64, mime_type: blob.type },
                 },
               };
               try {
