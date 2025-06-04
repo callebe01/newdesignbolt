@@ -234,7 +234,28 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             // B) serverContent.modelTurn.parts → may contain text or inlineData
             // ────────────────────────────────────────────────
             if (parsed.serverContent) {
-              const modelTurn = parsed.serverContent.modelTurn;
+              // Handle live transcriptions if present
+              const { outputTranscription, inputTranscription, modelTurn } =
+                parsed.serverContent;
+
+              if (outputTranscription) {
+                const txt =
+                  outputTranscription.text ?? outputTranscription.transcript;
+                if (typeof txt === 'string') {
+                  console.log('[Live] output transcription:', txt);
+                  setTranscript((prev) => prev + txt + '\n');
+                }
+              }
+
+              if (inputTranscription) {
+                const txt =
+                  inputTranscription.text ?? inputTranscription.transcript;
+                if (typeof txt === 'string') {
+                  console.log('[Live] user said:', txt);
+                  setTranscript((prev) => prev + txt + '\n');
+                }
+              }
+
               if (modelTurn && Array.isArray(modelTurn.parts)) {
                 for (const part of modelTurn.parts) {
                   // 1) If part.text exists, log or store it
