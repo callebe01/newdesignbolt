@@ -62,7 +62,7 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "Analyze these conversation transcripts and provide: summary, sentiment scores, key points, and recommendations."
+          content: "Analyze these conversation transcripts and provide the analysis as a JSON object containing: summary, sentiment scores, key points, and recommendations."
         }, {
           role: "user",
           content: combinedText
