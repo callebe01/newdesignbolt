@@ -123,13 +123,37 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
       if (!apiKey) {
-        throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
+        throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env file.');
       }
 
-      const wsUrl = `wss://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}`;
-      console.log('[Live] WebSocket URL:', wsUrl);
+      // Using REST API endpoint instead of WebSocket
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}`;
+      
+      // Test the API key with a simple request first
+      try {
+        const testResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              role: 'user',
+              parts: [{ text: 'Test connection' }]
+            }]
+          })
+        });
 
-      const ws = new WebSocket(wsUrl);
+        if (!testResponse.ok) {
+          const error = await testResponse.json();
+          throw new Error(error.error?.message || 'API connection failed');
+        }
+      } catch (error) {
+        throw new Error(`Failed to connect to Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      // Now establish WebSocket connection
+      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}`);
       websocketRef.current = ws;
 
       ws.onopen = () => {
@@ -178,13 +202,23 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
         } catch (err) {
           console.error('[Live] Message parsing error:', err);
+          setErrorMessage('Failed to parse server response');
         }
       };
 
       ws.onerror = (err) => {
         console.error('[Live] WebSocket error:', err);
-        setErrorMessage('Connection error');
+        const errorMessage = err instanceof Error ? err.message : 'Connection error';
+        setErrorMessage(`Failed to establish connection: ${errorMessage}`);
         setStatus('error');
+        
+        // Attempt to reconnect
+        setTimeout(() => {
+          if (websocketRef.current?.readyState === WebSocket.CLOSED) {
+            console.log('[Live] Attempting to reconnect...');
+            startCall(systemInstruction).catch(console.error);
+          }
+        }, 5000);
       };
 
       ws.onclose = () => {
