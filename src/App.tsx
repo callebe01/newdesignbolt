@@ -34,11 +34,11 @@ function App() {
               <LiveCallProvider>
               <Router>
                 <Routes>
+                  <Route path="/agent/:agentId" element={<AgentCall />} />
                   <Route element={<MainLayout />}>
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/agent/:agentId" element={<AgentCall />} />
                     
                     {/* Protected routes */}
                     <Route element={<ProtectedRoute />}>
@@ -69,6 +69,7 @@ function App() {
                     {/* Fallback route */}
                     <Route path="*" element={<Navigate to="/" />} />
                   </Route>
+                  <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
               </Router>
             </LiveCallProvider>
