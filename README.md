@@ -31,10 +31,3 @@ npm run dev
 
 This will launch Vite in development mode.
 
-## Transcript Analysis
-
-When ending a call, the app saves the transcript and analyzes it. If the
-transcript is empty, analysis is skipped and you'll see a message
-"No transcript recorded—skipping analysis." The app then returns to the Agents
-list.
-

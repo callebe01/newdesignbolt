@@ -21,8 +21,7 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentProject: _currentProject } = useProjects();
-  void _currentProject;
+  const { currentProject } = useProjects();
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);

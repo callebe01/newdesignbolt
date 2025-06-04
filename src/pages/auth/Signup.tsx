@@ -31,7 +31,7 @@ export const Signup: React.FC = () => {
     try {
       await signup(name, email, password);
       navigate('/');
-    } catch {
+    } catch (err) {
       setError('Failed to create account');
     } finally {
       setIsLoading(false);

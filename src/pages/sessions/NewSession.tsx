@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { useProjects } from '../../context/ProjectContext';
-import { Project } from '../../types';
 import { useSession } from '../../context/SessionContext';
 
 export const NewSession: React.FC = () => {
@@ -14,7 +13,7 @@ export const NewSession: React.FC = () => {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<any>(null);
   
   const { getProject } = useProjects();
   const { startSession } = useSession();

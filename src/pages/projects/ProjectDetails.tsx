@@ -11,7 +11,7 @@ import {
   Plus 
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Card, CardContent } from '../../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useProjects } from '../../context/ProjectContext';
 import { Project, Session } from '../../types';
@@ -19,7 +19,7 @@ import { Project, Session } from '../../types';
 export const ProjectDetails: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { getProject, deleteProject } = useProjects();
+  const { getProject, updateProject, deleteProject } = useProjects();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

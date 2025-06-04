@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, BarChart2, Activity, Users, Calendar } from 'lucide-react';
 import { ProjectCard } from '../components/dashboard/ProjectCard';
-import { Card, CardHeader, CardContent } from '../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useProjects } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';

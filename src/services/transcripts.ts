@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AgentReport } from './openai';
+import { generateAgentReport, AgentReport } from './openai';
 
 export interface Transcript {
   id: string;
@@ -11,66 +11,38 @@ export interface Transcript {
 export async function saveTranscript(agentId: string, content: string) {
   if (!content.trim()) return;
   try {
-    const { error } = await supabase.from('transcripts').insert({
+    await supabase.from('transcripts').insert({
       agent_id: agentId,
       content,
       created_at: new Date().toISOString(),
     });
-    if (error) throw error;
   } catch (err) {
     console.error('Failed to save transcript:', err);
-    throw err;
   }
 }
 
 export async function saveAgentReport(agentId: string, report: AgentReport) {
   try {
-    const { error } = await supabase.from('agent_reports').insert({
+    await supabase.from('agent_reports').insert({
       agent_id: agentId,
       report,
       created_at: new Date().toISOString(),
     });
-    if (error) throw error;
   } catch (err) {
     console.error('Failed to save agent report:', err);
-    throw err;
   }
 }
 
 export async function generateAndSaveReport(
   agentId: string,
   transcript: string
-): Promise<Error | boolean> {
-  if (!transcript.trim()) return false;
-  
+): Promise<void> {
+  if (!transcript.trim()) return;
   try {
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcript`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ transcript }),
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error);
-    }
-
-    const report = await response.json();
-    if (report.error) {
-      throw new Error(report.error);
-    }
-
+    const report = await generateAgentReport(transcript);
     await saveAgentReport(agentId, report);
-    return true;
   } catch (err) {
     console.error('Failed to generate agent report:', err);
-    return err instanceof Error ? err : new Error(String(err));
   }
 }
 

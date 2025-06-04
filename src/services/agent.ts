@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Agent, AgentConversation, ConversationMessage, AgentMetrics } from '../types/agent';
+import { Agent, AgentConversation, ConversationMessage, AgentAnalytics, AgentMetrics } from '../types/agent';
 
 export async function createAgent(name: string, instructions: string): Promise<Agent> {
   const { data, error } = await supabase
@@ -154,7 +154,7 @@ export async function getConversationMessages(conversationId: string): Promise<C
   return data.map(mapMessage);
 }
 
-function mapAgent(row: Record<string, unknown>): Agent {
+function mapAgent(row: Record<string, any>): Agent {
   return {
     id: row.id,
     name: row.name,
@@ -166,7 +166,7 @@ function mapAgent(row: Record<string, unknown>): Agent {
   };
 }
 
-function mapConversation(row: Record<string, unknown>): AgentConversation {
+function mapConversation(row: Record<string, any>): AgentConversation {
   return {
     id: row.id,
     agentId: row.agent_id,
@@ -180,7 +180,7 @@ function mapConversation(row: Record<string, unknown>): AgentConversation {
   };
 }
 
-function mapMessage(row: Record<string, unknown>): ConversationMessage {
+function mapMessage(row: Record<string, any>): ConversationMessage {
   return {
     id: row.id,
     conversationId: row.conversation_id,

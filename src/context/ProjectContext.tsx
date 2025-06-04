@@ -123,7 +123,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       // Remove any non-column properties before sending to Supabase
       const { sessions, ...updateData } = data;
-      void sessions;
       
       const { data: updated, error } = await supabase
         .from('projects')

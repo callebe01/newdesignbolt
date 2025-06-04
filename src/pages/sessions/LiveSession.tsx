@@ -18,7 +18,7 @@ export const LiveSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { projects } = useProjects();
-  const { endSession } = useSession();
+  const { currentSession, endSession } = useSession();
   const { status, startCall, errorMessage } = useLiveCall();
 
   const [session, setSession] = useState<Session | null>(null);

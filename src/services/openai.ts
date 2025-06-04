@@ -30,6 +30,7 @@ async function callOpenAI(messages: { role: string; content: string }[]) {
       model: 'gpt-3.5-turbo',
       messages,
       temperature: 0,
+      // Ensure the response is valid JSON
       response_format: { type: 'json_object' },
     }),
   });
