@@ -48,7 +48,11 @@ export const AgentCall: React.FC = () => {
     endCall();
     if (agentId) {
       await saveTranscript(agentId, transcript);
-      await generateAndSaveReport(agentId, transcript);
+      const result = await generateAndSaveReport(agentId, transcript);
+      if (result !== true) {
+        const message = result instanceof Error ? result.message : 'Unknown error';
+        alert('Analysis failed: ' + message);
+      }
     }
     navigate('/agents');
   };
