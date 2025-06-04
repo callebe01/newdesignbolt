@@ -54,9 +54,10 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       await new Promise((resolve) => setTimeout(resolve, 300));
       const newAgent: Agent = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         name,
         instructions,
+        status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
       };

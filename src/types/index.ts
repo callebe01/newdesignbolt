@@ -68,6 +68,7 @@ export interface Agent {
   id: string;
   name: string;
   instructions: string;
+  status: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
