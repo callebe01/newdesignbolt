@@ -48,10 +48,14 @@ export const AgentCall: React.FC = () => {
     endCall();
     if (agentId) {
       await saveTranscript(agentId, transcript);
-      const result = await generateAndSaveReport(agentId, transcript);
-      if (result !== true) {
-        const message = result instanceof Error ? result.message : 'Unknown error';
-        alert('Analysis failed: ' + message);
+      if (transcript.trim()) {
+        const result = await generateAndSaveReport(agentId, transcript);
+        if (result !== true) {
+          const message = result instanceof Error ? result.message : 'Unknown error';
+          alert('Analysis failed: ' + message);
+        }
+      } else {
+        alert('No transcript recorded—skipping analysis.');
       }
     }
     navigate('/agents');
