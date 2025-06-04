@@ -1,82 +1,117 @@
 import { supabase } from './supabase';
-import { generateAgentReport, AgentReport } from './openai';
 
 export interface Transcript {
   id: string;
   agentId: string;
   content: string;
+  metadata: Record<string, any>;
   createdAt: string;
 }
 
-export async function saveTranscript(agentId: string, content: string) {
+export interface AnalysisResult {
+  id: string;
+  transcriptionIds: string[];
+  summary: string;
+  sentimentScores: Record<string, number>;
+  keyPoints: string[];
+  recommendations: string[];
+  createdAt: string;
+}
+
+export async function saveTranscript(agentId: string, content: string, metadata: Record<string, any> = {}) {
   if (!content.trim()) return;
-  try {
-    await supabase.from('transcripts').insert({
-      agent_id: agentId,
-      content,
-      created_at: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error('Failed to save transcript:', err);
-  }
-}
-
-export async function saveAgentReport(agentId: string, report: AgentReport) {
-  try {
-    await supabase.from('agent_reports').insert({
-      agent_id: agentId,
-      report,
-      created_at: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error('Failed to save agent report:', err);
-  }
-}
-
-export async function generateAndSaveReport(
-  agentId: string,
-  transcript: string
-): Promise<void> {
-  if (!transcript.trim()) return;
-  try {
-    const report = await generateAgentReport(transcript);
-    await saveAgentReport(agentId, report);
-  } catch (err) {
-    console.error('Failed to generate agent report:', err);
-  }
-}
-
-export async function getAgentReports(agentId: string): Promise<AgentReport[]> {
+  
   try {
     const { data, error } = await supabase
-      .from('agent_reports')
-      .select('report')
-      .eq('agent_id', agentId)
-      .order('created_at', { ascending: false });
+      .from('transcriptions')
+      .insert({
+        agent_id: agentId,
+        content,
+        metadata,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
     if (error) throw error;
-    return (data || []).map((row: Record<string, unknown>) => row.report as AgentReport);
+    return data;
   } catch (err) {
-    console.error('Failed to fetch agent reports:', err);
-    return [];
+    console.error('Failed to save transcript:', err);
+    throw err;
   }
 }
 
 export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
   try {
     const { data, error } = await supabase
-      .from('transcripts')
+      .from('transcriptions')
       .select('*')
       .eq('agent_id', agentId)
       .order('created_at', { ascending: false });
+
     if (error) throw error;
     return data.map(row => ({
       id: row.id,
       agentId: row.agent_id,
       content: row.content,
+      metadata: row.metadata,
       createdAt: row.created_at
     }));
   } catch (err) {
     console.error('Failed to fetch transcripts:', err);
-    return [];
+    throw err;
+  }
+}
+
+export async function analyzeTranscripts(transcriptionIds: string[], count: number = 5): Promise<AnalysisResult> {
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ transcriptionIds, count })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to analyze transcripts');
+  }
+
+  const data = await response.json();
+  return {
+    id: data.id,
+    transcriptionIds: data.transcription_ids,
+    summary: data.summary,
+    sentimentScores: data.sentiment_scores,
+    keyPoints: data.key_points,
+    recommendations: data.recommendations,
+    createdAt: data.created_at
+  };
+}
+
+export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
+  try {
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('*')
+      .contains('transcription_ids', transcriptionIds)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      transcriptionIds: row.transcription_ids,
+      summary: row.summary,
+      sentimentScores: row.sentiment_scores,
+      keyPoints: row.key_points,
+      recommendations: row.recommendations,
+      createdAt: row.created_at
+    }));
+  } catch (err) {
+    console.error('Failed to fetch analysis results:', err);
+    throw err;
   }
 }
