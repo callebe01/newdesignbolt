@@ -51,6 +51,9 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
     .map(t => t.content)
     .join('\n\n');
 
+  // Get the current session
+  const { data: { session } } = await supabase.auth.getSession();
+  
   // Call OpenAI API through our Edge Function
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
@@ -58,7 +61,7 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
+        'Authorization': `Bearer ${session?.access_token}`,
       },
       body: JSON.stringify({ 
         text: combinedContent,
