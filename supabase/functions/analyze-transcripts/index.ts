@@ -46,8 +46,8 @@ serve(async (req) => {
     const analysis = JSON.parse(data.choices[0].message.content);
 
     // Store the analysis result
-    const { supabaseClient } = await import("npm:@supabase/supabase-js@2.39.3");
-    const supabase = supabaseClient(
+    const { createClient } = await import("npm:@supabase/supabase-js@2.39.3");
+    const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
