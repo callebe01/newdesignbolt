@@ -16,7 +16,7 @@ import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { useAuth } from '../../context/AuthContext';
 import { Agent } from '../../types';
-import { getTranscripts, analyzeTranscripts, AnalysisResult } from '../../services/transcripts';
+import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -46,6 +46,11 @@ export const AgentDetails: React.FC = () => {
         if (fetchedAgent) {
           setAgent(fetchedAgent);
           setTranscripts(fetchedTranscripts);
+          
+          if (fetchedTranscripts.length > 0) {
+            const results = await getAnalysisResults(fetchedTranscripts.map(t => t.id));
+            setAnalysisResults(results);
+          }
         } else {
           setError('Agent not found');
         }
@@ -67,24 +72,34 @@ export const AgentDetails: React.FC = () => {
   }, [agentId, getAgent, logout, navigate]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length || !accessToken) return;
+    if (!transcripts.length || !accessToken) {
+      setError('No transcripts to analyze or not authenticated');
+      return;
+    }
     
     try {
       setAnalyzing(true);
       setError(null);
-      const transcriptIds = transcripts.map(t => t.id);
-      const result = await analyzeTranscripts(transcriptIds);
+      console.log('Starting analysis with token:', accessToken.substring(0, 10) + '...');
+      
+      const transcriptIds = transcripts.map(t => t.id).slice(0, 5); // Analyze last 5 transcripts
+      const result = await analyzeTranscripts(transcriptIds, accessToken);
+      
+      console.log('Analysis completed successfully');
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
+      console.error('Analysis error:', err);
+      
       if (err instanceof Error) {
-        if (err.message === 'Unauthorized') {
+        if (err.message.includes('Unauthorized')) {
           setError('Your session expired. Please log in again.');
           await logout();
           navigate('/login');
           return;
         }
-        console.error('Unexpected error during analysis:', err);
-        setError('Failed to analyze transcripts. Please try again later.');
+        setError(`Analysis failed: ${err.message}`);
+      } else {
+        setError('An unexpected error occurred during analysis');
       }
     } finally {
       setAnalyzing(false);
@@ -213,7 +228,7 @@ export const AgentDetails: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
                 <h3 className="text-3xl font-bold mt-1">
-                  {latestAnalysis?.sentiment_scores?.average || 'N/A'}
+                  {latestAnalysis?.sentimentScores?.average || 'N/A'}
                 </h3>
               </div>
               <div className="p-2 bg-muted rounded-md">
@@ -230,7 +245,7 @@ export const AgentDetails: React.FC = () => {
                 <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
                 <h3 className="text-3xl font-bold mt-1">
                   {transcripts[0] 
-                    ? formatDateTime(transcripts[0].createdAt)
+                    ? formatDateTime(transcripts[0].created_at)
                     : 'Never'}
                 </h3>
               </div>
@@ -294,7 +309,7 @@ export const AgentDetails: React.FC = () => {
               <div>
                 <h3 className="text-lg font-medium mb-2">Key Points</h3>
                 <ul className="space-y-2">
-                  {latestAnalysis.key_points.map((point, idx) => (
+                  {latestAnalysis.keyPoints.map((point, idx) => (
                     <li key={idx} className="text-sm flex items-center">
                       <span className="w-2 h-2 rounded-full bg-primary mr-2" />
                       {point}
