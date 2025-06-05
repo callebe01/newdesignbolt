@@ -9,6 +9,7 @@ export interface Agent {
   updatedAt: Date;
   userId: string;
   canSeeScreenshare: boolean;
+  callDuration: number;
 }
 
 export interface AgentConversation {

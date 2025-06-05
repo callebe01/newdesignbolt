@@ -46,7 +46,12 @@ export const NewAgent: React.FC = () => {
     setError(null);
 
     try {
-      const agent = await createAgent(name, instructions, canSeeScreenshare);
+      const agent = await createAgent(
+        name,
+        instructions,
+        canSeeScreenshare,
+        duration
+      );
       navigate(`/agents/${agent.id}`);
     } catch (err) {
       console.error('Failed to create agent:', err);
