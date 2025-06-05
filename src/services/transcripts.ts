@@ -46,14 +46,12 @@ export async function saveTranscript(agentId: string, content: string) {
 }
 
 export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
-  // Combine all transcript content
-  const combinedContent = transcripts
-    .map(t => t.content)
-    .join('\n\n');
-
   // Get the current session
   const { data: { session } } = await supabase.auth.getSession();
-  
+  if (!session?.access_token) {
+    throw new Error('Authentication required');
+  }
+
   // Call OpenAI API through our Edge Function
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
@@ -61,11 +59,11 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ 
-        text: combinedContent,
-        transcriptionIds: transcripts.map(t => t.id)
+        transcriptionIds: transcripts.map(t => t.id),
+        text: transcripts.map(t => t.content).join('\n\n')
       })
     }
   );
@@ -75,7 +73,8 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
     throw new Error(error.error || 'Analysis failed');
   }
 
-  return response.json();
+  const result = await response.json();
+  return result;
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
