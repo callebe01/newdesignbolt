@@ -62,6 +62,25 @@ export interface UserDecision {
   timestamp: Date;
 }
 
+export interface AnalysisResult {
+  id: string;
+  transcriptionIds: string[];
+  summary: string;
+  sentimentScores: Record<string, number>;
+  keyPoints: string[];
+  recommendations: string[];
+  userIntent: Record<string, number>;
+  workflowPatterns: string[];
+  featureRequests: string[];
+  resolutionRate: {
+    resolved: number;
+    unresolved: number;
+  };
+  engagementScore: number;
+  repetitiveQuestions: string[];
+  createdAt: string;
+}
+
 export type LiveCallStatus = 'idle' | 'connecting' | 'active' | 'ended' | 'error';
 
 export interface Agent {

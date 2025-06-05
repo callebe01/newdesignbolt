@@ -32,7 +32,20 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "You are a conversation analyst. Analyze the provided transcripts and return a JSON object with: summary (brief overview), sentimentScores (object with positive/negative/neutral percentages), keyPoints (array of main takeaways), and recommendations (array of actionable insights)."
+          content: `You are a conversation analyst. Analyze the provided transcripts and return a JSON object with:
+            - summary (brief overview)
+            - sentimentScores (object with positive/negative/neutral percentages)
+            - keyPoints (array of main takeaways)
+            - recommendations (array of actionable insights)
+            - userIntent (object categorizing user intents like onboarding, troubleshooting, feature discovery)
+            - workflowPatterns (array of identified workflow patterns and bottlenecks)
+            - uxIssues (array of UX issues mentioned)
+            - featureRequests (array of feature requests or suggestions)
+            - resolutionRate (object with resolved and unresolved percentages)
+            - engagementScore (number from 0-100 indicating user engagement level)
+            - repetitiveQuestions (array of questions that came up multiple times)
+            
+            Focus on extracting actionable insights and patterns.`
         }, {
           role: "user",
           content: text
@@ -49,14 +62,18 @@ serve(async (req) => {
     const data = await response.json();
     const analysis = JSON.parse(data.choices[0].message.content);
 
-    // Ensure sentiment_scores is a valid JSON object
-    if (typeof analysis.sentimentScores !== 'object' || Array.isArray(analysis.sentimentScores)) {
-      throw new Error("Invalid sentiment scores format");
-    }
-
-    // Ensure keyPoints and recommendations are arrays
-    if (!Array.isArray(analysis.keyPoints) || !Array.isArray(analysis.recommendations)) {
-      throw new Error("keyPoints and recommendations must be arrays");
+    // Validate analysis structure
+    if (
+      typeof analysis.sentimentScores !== 'object' || 
+      !Array.isArray(analysis.keyPoints) || 
+      !Array.isArray(analysis.recommendations) ||
+      typeof analysis.userIntent !== 'object' ||
+      !Array.isArray(analysis.workflowPatterns) ||
+      !Array.isArray(analysis.featureRequests) ||
+      typeof analysis.resolutionRate !== 'object' ||
+      typeof analysis.engagementScore !== 'number'
+    ) {
+      throw new Error("Invalid analysis format");
     }
 
     // Store the analysis result
@@ -71,9 +88,15 @@ serve(async (req) => {
       .insert({
         transcription_ids: transcriptionIds,
         summary: analysis.summary,
-        sentiment_scores: analysis.sentimentScores, // This should be a JSONB object
+        sentiment_scores: analysis.sentimentScores,
         key_points: analysis.keyPoints,
-        recommendations: analysis.recommendations
+        recommendations: analysis.recommendations,
+        user_intent: analysis.userIntent,
+        workflow_patterns: analysis.workflowPatterns,
+        feature_requests: analysis.featureRequests,
+        resolution_rate: analysis.resolutionRate,
+        engagement_score: analysis.engagementScore,
+        repetitive_questions: analysis.repetitiveQuestions || []
       })
       .select()
       .single();

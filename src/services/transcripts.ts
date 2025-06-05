@@ -1,20 +1,11 @@
 import { supabase } from './supabase';
+import { AnalysisResult } from '../types';
 
 export interface Transcript {
   id: string;
   agentId: string;
   content: string;
   metadata: Record<string, unknown>;
-  createdAt: string;
-}
-
-export interface AnalysisResult {
-  id: string;
-  transcriptionIds: string[];
-  summary: string;
-  sentimentScores: Record<string, number>;
-  keyPoints: string[] | null;
-  recommendations: string[] | null;
   createdAt: string;
 }
 
@@ -92,6 +83,12 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
     sentimentScores: row.sentiment_scores,
     keyPoints: row.key_points,
     recommendations: row.recommendations,
+    userIntent: row.user_intent,
+    workflowPatterns: row.workflow_patterns,
+    featureRequests: row.feature_requests,
+    resolutionRate: row.resolution_rate,
+    engagementScore: row.engagement_score,
+    repetitiveQuestions: row.repetitive_questions,
     createdAt: row.created_at
   }));
 }
