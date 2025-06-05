@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Input } from '../../components/ui/Input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
 import { Dialog } from '../../components/ui/Dialog';
@@ -76,6 +77,14 @@ export const AgentDetails: React.FC = () => {
     engagementScore: 0,
     avgDuration: 0
   });
+  const [linkCopied, setLinkCopied] = useState(false);
+  const shareUrl = `https://voicepilot.live/agent/${agentId}`;
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -648,6 +657,20 @@ export const AgentDetails: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Share Link</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-2">
+                <Input value={shareUrl} readOnly className="flex-1" />
+                <Button type="button" variant="outline" size="sm" onClick={handleCopyLink}>
+                  {linkCopied ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
