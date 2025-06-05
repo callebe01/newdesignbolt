@@ -262,29 +262,33 @@ export const AgentDetails: React.FC = () => {
                 <p className="text-sm whitespace-pre-wrap">{latestAnalysis.summary}</p>
               </div>
 
-              <div>
-                <h3 className="text-lg font-medium mb-2">Key Points</h3>
-                <ul className="space-y-2">
-                  {latestAnalysis.keyPoints.map((point, idx) => (
-                    <li key={idx} className="text-sm flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {latestAnalysis.keyPoints?.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Key Points</h3>
+                  <ul className="space-y-2">
+                    {latestAnalysis.keyPoints.map((point, idx) => (
+                      <li key={idx} className="text-sm flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-              <div>
-                <h3 className="text-lg font-medium mb-2">Recommendations</h3>
-                <ul className="space-y-2">
-                  {latestAnalysis.recommendations.map((rec, idx) => (
-                    <li key={idx} className="text-sm flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-accent mr-2" />
-                      {rec}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {latestAnalysis.recommendations?.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                  <ul className="space-y-2">
+                    {latestAnalysis.recommendations.map((rec, idx) => (
+                      <li key={idx} className="text-sm flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-accent mr-2" />
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

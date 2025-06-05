@@ -13,8 +13,8 @@ export interface AnalysisResult {
   transcriptionIds: string[];
   summary: string;
   sentimentScores: Record<string, number>;
-  keyPoints: string[];
-  recommendations: string[];
+  keyPoints: string[] | null;
+  recommendations: string[] | null;
   createdAt: string;
 }
 
