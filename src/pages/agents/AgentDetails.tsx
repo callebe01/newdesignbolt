@@ -1,124 +1,323 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { getTranscripts, analyzeTranscripts, type AnalysisResult } from '../../services/transcripts';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { 
+  Phone, 
+  Clock, 
+  Calendar, 
+  Edit2, 
+  Trash2, 
+  MoreVertical,
+  ChevronLeft,
+  RefreshCw
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { formatDateTime, formatDuration } from '../../utils/format';
+import { useAgents } from '../../context/AgentContext';
+import { useAuth } from '../../context/AuthContext';
+import { Agent } from '../../types';
+import { getTranscripts, analyzeTranscripts, AnalysisResult } from '../../services/transcripts';
 
-export default function AgentDetails() {
-  const { id } = useParams<{ id: string }>();
-  const [transcripts, setTranscripts] = useState<any[]>([]);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [loading, setLoading] = useState(false);
+export const AgentDetails: React.FC = () => {
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+  const { getAgent, deleteAgent } = useAgents();
+  const { accessToken, logout } = useAuth();
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transcripts, setTranscripts] = useState<any[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-
-    async function fetchTranscripts() {
+    const fetchData = async () => {
+      if (!agentId) return;
+      
       try {
-        const data = await getTranscripts(id);
-        setTranscripts(data);
+        setLoading(true);
+        setError(null);
+        
+        const [fetchedAgent, fetchedTranscripts] = await Promise.all([
+          getAgent(agentId),
+          getTranscripts(agentId)
+        ]);
+        
+        if (fetchedAgent) {
+          setAgent(fetchedAgent);
+          setTranscripts(fetchedTranscripts);
+        } else {
+          setError('Agent not found');
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch transcripts');
+        if (err instanceof Error && err.message === 'Unauthorized') {
+          setError('Your session expired. Please log in again.');
+          await logout();
+          navigate('/login');
+        } else {
+          console.error('Error fetching data:', err);
+          setError('Failed to load agent details');
+        }
+      } finally {
+        setLoading(false);
       }
-    }
-
-    fetchTranscripts();
-  }, [id]);
+    };
+    
+    fetchData();
+  }, [agentId, getAgent, logout, navigate]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length) {
-      setError('No transcripts available to analyze');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+    if (!transcripts.length || !accessToken) return;
+    
     try {
+      setAnalyzing(true);
+      setError(null);
       const transcriptIds = transcripts.map(t => t.id);
       const result = await analyzeTranscripts(transcriptIds);
-      setAnalysis(result);
+      setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      if (err instanceof Error) {
+        if (err.message === 'Unauthorized') {
+          setError('Your session expired. Please log in again.');
+          await logout();
+          navigate('/login');
+          return;
+        }
+        console.error('Unexpected error during analysis:', err);
+        setError('Failed to analyze transcripts. Please try again later.');
+      }
     } finally {
-      setLoading(false);
+      setAnalyzing(false);
     }
   };
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Agent Details</h1>
-      
-      <Card className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Transcripts</h2>
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
+  const handleDeleteAgent = async () => {
+    if (!agent) return;
+    
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${agent.name}"? This action cannot be undone.`
+    );
+    
+    if (confirmDelete) {
+      try {
+        await deleteAgent(agent.id);
+        navigate('/agents');
+      } catch (err) {
+        console.error('Failed to delete agent:', err);
+      }
+    }
+  };
+  
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-pulse-subtle text-lg">Loading agent details...</div>
+      </div>
+    );
+  }
+  
+  if (error || !agent) {
+    return (
+      <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
+        <h2 className="text-xl font-semibold mb-2">Error</h2>
+        {error === 'Your session expired. Please log in again.' ? (
+          <p>
+            Your session expired. Please{' '}
+            <Link to="/login" className="underline">
+              log in
+            </Link>{' '}
+            again.
+          </p>
+        ) : (
+          <p>{error || 'Agent not found'}</p>
         )}
+        <Link to="/agents" className="underline">
+          Back to Agents
+        </Link>
+      </div>
+    );
+  }
+
+  const latestAnalysis = analysisResults[0];
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          Back to Agents
+        </Link>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">{agent.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {agent.status === 'active' ? 'Active • Last active 2h ago' : 'Inactive'}
+          </p>
+        </div>
         
-        <div className="mb-4">
-          <Button
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate(`/agents/${agent.id}/edit`)}>
+            <Edit2 className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          
+          <Button variant="destructive" onClick={handleDeleteAgent}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium mb-1">Shareable Link</h3>
+              <p className="text-sm text-muted-foreground break-all">
+                {`${window.location.origin}/agent/${agent.id}`}
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/agent/${agent.id}`);
+                alert('Link copied to clipboard!');
+              }}
+            >
+              Copy Link
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
+                <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <Phone className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
+                <h3 className="text-3xl font-bold mt-1">
+                  {latestAnalysis?.sentiment_scores?.average || 'N/A'}
+                </h3>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <Clock className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
+                <h3 className="text-3xl font-bold mt-1">
+                  {transcripts[0] 
+                    ? formatDateTime(transcripts[0].createdAt)
+                    : 'Never'}
+                </h3>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <Calendar className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Conversation History</h2>
+          <Button 
             onClick={handleAnalyze}
-            disabled={loading || !transcripts.length}
+            disabled={analyzing || transcripts.length === 0 || !accessToken}
           >
-            {loading ? 'Analyzing...' : 'Analyze Transcripts'}
+            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
           </Button>
         </div>
 
-        {analysis && (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Analysis Results</h3>
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium">Summary</h4>
-                <p>{analysis.summary}</p>
-              </div>
-              
-              <div>
-                <h4 className="font-medium">Sentiment Scores</h4>
-                <ul>
-                  <li>Positive: {analysis.sentiment_scores.positive}</li>
-                  <li>Neutral: {analysis.sentiment_scores.neutral}</li>
-                  <li>Negative: {analysis.sentiment_scores.negative}</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h4 className="font-medium">Key Points</h4>
-                <ul className="list-disc pl-5">
-                  {analysis.key_points.map((point, i) => (
-                    <li key={i}>{point}</li>
-                  ))}
-                </ul>
-              </div>
-              
-              <div>
-                <h4 className="font-medium">Recommendations</h4>
-                <ul className="list-disc pl-5">
-                  {analysis.recommendations.map((rec, i) => (
-                    <li key={i}>{rec}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+        {transcripts.length > 0 ? (
+          <div className="space-y-4">
+            {transcripts.map((transcript, idx) => (
+              <Card key={transcript.id}>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-medium">Conversation #{transcripts.length - idx}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDateTime(transcript.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{transcript.content}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
+        ) : (
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground">No conversations yet</p>
+            </CardContent>
+          </Card>
         )}
+      </div>
 
-        <div className="mt-6">
-          {transcripts.map((transcript) => (
-            <div key={transcript.id} className="border-b py-4">
-              <p className="text-gray-600 text-sm">
-                {new Date(transcript.created_at).toLocaleString()}
-              </p>
-              <p className="mt-2">{transcript.content}</p>
-            </div>
-          ))}
+      {latestAnalysis && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Latest Analysis</h2>
+          <Card>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Summary</h3>
+                <p className="text-sm whitespace-pre-wrap">{latestAnalysis.summary}</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Key Points</h3>
+                <ul className="space-y-2">
+                  {latestAnalysis.key_points.map((point, idx) => (
+                    <li key={idx} className="text-sm flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-primary mr-2" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                <ul className="space-y-2">
+                  {latestAnalysis.recommendations.map((rec, idx) => (
+                    <li key={idx} className="text-sm flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-accent mr-2" />
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </Card>
+      )}
     </div>
   );
-}
-
-export { AgentDetails }
+};
