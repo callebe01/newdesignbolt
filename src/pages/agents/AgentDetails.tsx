@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   Workflow,
   Repeat,
-  UserCircle
+  UserCircle,
+  Inbox
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -159,23 +160,22 @@ export const AgentDetails: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <CheckCircle className="h-5 w-5 mr-2" />
-              Resolution Rate
+              Resolution
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex justify-around text-center">
-              <div>
-                <div className="text-3xl font-bold text-success">
-                  {analysis.resolutionRate?.resolved || 0}%
+            <div className="flex items-center justify-center h-24">
+              {analysis.resolutionRate?.resolved > 50 ? (
+                <div className="flex items-center text-success">
+                  <CheckCircle className="h-8 w-8 mr-3" />
+                  <span className="text-2xl font-bold">Yes</span>
                 </div>
-                <div className="text-sm text-muted-foreground">Resolved</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-destructive">
-                  {analysis.resolutionRate?.unresolved || 0}%
+              ) : (
+                <div className="flex items-center text-destructive">
+                  <XCircle className="h-8 w-8 mr-3" />
+                  <span className="text-2xl font-bold">No</span>
                 </div>
-                <div className="text-sm text-muted-foreground">Unresolved</div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -231,16 +231,23 @@ export const AgentDetails: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
-            {analysis.workflowPatterns?.map((pattern, index) => (
-              <li key={index} className="flex items-start">
-                <div className="h-6 w-6 flex-shrink-0 text-primary">
-                  <Workflow className="h-5 w-5" />
-                </div>
-                <span className="ml-2">{pattern}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.workflowPatterns?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.workflowPatterns.map((pattern, index) => (
+                <li key={index} className="flex items-start">
+                  <div className="h-6 w-6 flex-shrink-0 text-primary">
+                    <Workflow className="h-5 w-5" />
+                  </div>
+                  <span className="ml-2">{pattern}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8">
+              <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No workflow patterns identified</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -253,16 +260,23 @@ export const AgentDetails: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
-            {analysis.repetitiveQuestions?.map((question, index) => (
-              <li key={index} className="flex items-start">
-                <div className="h-6 w-6 flex-shrink-0 text-accent">
-                  <Repeat className="h-5 w-5" />
-                </div>
-                <span className="ml-2">{question}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.repetitiveQuestions?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.repetitiveQuestions.map((question, index) => (
+                <li key={index} className="flex items-start">
+                  <div className="h-6 w-6 flex-shrink-0 text-accent">
+                    <Repeat className="h-5 w-5" />
+                  </div>
+                  <span className="ml-2">{question}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8">
+              <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No repetitive questions found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -275,16 +289,23 @@ export const AgentDetails: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
-            {analysis.featureRequests?.map((request, index) => (
-              <li key={index} className="flex items-start">
-                <div className="h-6 w-6 flex-shrink-0 text-secondary">
-                  <GitPullRequest className="h-5 w-5" />
-                </div>
-                <span className="ml-2">{request}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.featureRequests?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.featureRequests.map((request, index) => (
+                <li key={index} className="flex items-start">
+                  <div className="h-6 w-6 flex-shrink-0 text-secondary">
+                    <GitPullRequest className="h-5 w-5" />
+                  </div>
+                  <span className="ml-2">{request}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8">
+              <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No feature requests identified</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -297,16 +318,23 @@ export const AgentDetails: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
-            {analysis.keyPoints?.map((point, index) => (
-              <li key={index} className="flex items-start">
-                <div className="h-6 w-6 flex-shrink-0 text-warning">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <span className="ml-2">{point}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.keyPoints?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.keyPoints.map((point, index) => (
+                <li key={index} className="flex items-start">
+                  <div className="h-6 w-6 flex-shrink-0 text-warning">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <span className="ml-2">{point}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8">
+              <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No key points or UX issues found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -319,16 +347,23 @@ export const AgentDetails: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-3">
-            {analysis.recommendations?.map((rec, index) => (
-              <li key={index} className="flex items-start">
-                <div className="h-6 w-6 flex-shrink-0 text-success">
-                  <CheckCircle className="h-5 w-5" />
-                </div>
-                <span className="ml-2">{rec}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.recommendations?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.recommendations.map((rec, index) => (
+                <li key={index} className="flex items-start">
+                  <div className="h-6 w-6 flex-shrink-0 text-success">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                  <span className="ml-2">{rec}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8">
+              <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No recommendations available</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
