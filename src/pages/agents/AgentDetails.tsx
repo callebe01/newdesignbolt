@@ -1,4 +1,7 @@
-// Update the renderAnalysisModal function in AgentDetails.tsx
+import { useState } from 'react';
+import type { AnalysisResult } from '@/types';
+
+// Render analysis modal component
 const renderAnalysisModal = (analysis: AnalysisResult) => (
   <div className="space-y-6">
     <div>
@@ -123,3 +126,14 @@ const renderAnalysisModal = (analysis: AnalysisResult) => (
     </div>
   </div>
 );
+
+// Main AgentDetails component
+export const AgentDetails = () => {
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+
+  return (
+    <div>
+      {analysis && renderAnalysisModal(analysis)}
+    </div>
+  );
+};
