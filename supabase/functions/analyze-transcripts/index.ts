@@ -18,6 +18,10 @@ serve(async (req) => {
       throw new Error("Text content is required");
     }
 
+    if (!Array.isArray(transcriptionIds)) {
+      throw new Error("transcriptionIds must be an array");
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -28,7 +32,7 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "You are a conversation analyst. Analyze the provided transcripts and return a JSON object with: summary (brief overview), sentimentScores (positive/negative/neutral percentages), keyPoints (main takeaways), and recommendations (actionable insights)."
+          content: "You are a conversation analyst. Analyze the provided transcripts and return a JSON object with: summary (brief overview), sentimentScores (object with positive/negative/neutral percentages), keyPoints (array of main takeaways), and recommendations (array of actionable insights)."
         }, {
           role: "user",
           content: text
@@ -45,6 +49,16 @@ serve(async (req) => {
     const data = await response.json();
     const analysis = JSON.parse(data.choices[0].message.content);
 
+    // Ensure sentiment_scores is a valid JSON object
+    if (typeof analysis.sentimentScores !== 'object' || Array.isArray(analysis.sentimentScores)) {
+      throw new Error("Invalid sentiment scores format");
+    }
+
+    // Ensure keyPoints and recommendations are arrays
+    if (!Array.isArray(analysis.keyPoints) || !Array.isArray(analysis.recommendations)) {
+      throw new Error("keyPoints and recommendations must be arrays");
+    }
+
     // Store the analysis result
     const { createClient } = await import("npm:@supabase/supabase-js@2.39.3");
     const supabase = createClient(
@@ -57,7 +71,7 @@ serve(async (req) => {
       .insert({
         transcription_ids: transcriptionIds,
         summary: analysis.summary,
-        sentiment_scores: analysis.sentimentScores,
+        sentiment_scores: analysis.sentimentScores, // This should be a JSONB object
         key_points: analysis.keyPoints,
         recommendations: analysis.recommendations
       })
