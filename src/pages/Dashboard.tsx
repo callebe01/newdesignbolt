@@ -1,26 +1,23 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, BarChart2, Activity, Users, Calendar } from 'lucide-react';
-import { ProjectCard } from '../components/dashboard/ProjectCard';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Plus, Bot, Activity, Clock, Calendar } from 'lucide-react';
+import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { useProjects } from '../context/ProjectContext';
+import { useAgents } from '../context/AgentContext';
 import { useAuth } from '../context/AuthContext';
+import { formatDateTime } from '../utils/format';
 
 export const Dashboard: React.FC = () => {
-  const { projects, loading, error, fetchProjects } = useProjects();
+  const { agents, loading, error, fetchAgents } = useAgents();
   const { user } = useAuth();
   
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
-  
-  const recentProjects = projects.slice(0, 3);
-  const totalSessions = projects.reduce((count, project) => count + project.sessions.length, 0);
-  const activeSessions = projects.reduce(
-    (count, project) => count + project.sessions.filter(s => s.status === 'active').length, 
-    0
-  );
+    fetchAgents();
+  }, [fetchAgents]);
+
+  const activeAgents = agents.filter(a => a.status === 'active');
+  const totalConversations = agents.reduce((sum, agent) => sum + (agent.analytics?.totalConversations || 0), 0);
+  const avgDuration = agents.reduce((sum, agent) => sum + (agent.analytics?.avgDuration || 0), 0) / (agents.length || 1);
   
   return (
     <div className="space-y-8">
@@ -32,51 +29,50 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         
-        <Link to="/projects/new">
+        <Link to="/agents/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            New Agent
           </Button>
         </Link>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Total Projects" 
-          value={projects.length.toString()} 
-          icon={<BarChart2 className="h-5 w-5" />} 
-          trend="+2 this month"
-          trendPositive
+          title="Total Agents" 
+          value={agents.length.toString()} 
+          icon={<Bot className="h-5 w-5" />} 
+          trend={`${activeAgents.length} active`}
+          trendPositive={activeAgents.length > 0}
         />
         
         <StatCard 
-          title="Total Sessions" 
-          value={totalSessions.toString()} 
+          title="Total Conversations" 
+          value={totalConversations.toString()} 
           icon={<Activity className="h-5 w-5" />} 
-          trend={`${activeSessions} active`}
-          trendPositive={activeSessions > 0}
+          trend="Last 30 days"
         />
         
         <StatCard 
-          title="Team Members" 
-          value="5" 
-          icon={<Users className="h-5 w-5" />} 
-          trend="Full team access"
+          title="Avg Duration" 
+          value={`${Math.round(avgDuration / 60)}m`}
+          icon={<Clock className="h-5 w-5" />} 
+          trend="Per conversation"
         />
         
         <StatCard 
-          title="Last Session" 
-          value="2 days ago" 
+          title="Last Active" 
+          value={agents.length > 0 ? "2h ago" : "Never"} 
           icon={<Calendar className="h-5 w-5" />} 
-          trend="E-commerce checkout"
+          trend={agents.length > 0 ? "Active today" : "No agents"}
         />
       </div>
       
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold">Recent Projects</h2>
-          <Link to="/projects">
-            <Button variant="outline">View All Projects</Button>
+          <h2 className="text-2xl font-semibold">Your Agents</h2>
+          <Link to="/agents">
+            <Button variant="outline">View All Agents</Button>
           </Link>
         </div>
         
@@ -84,14 +80,11 @@ export const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => (
               <Card key={i} className="opacity-70 animate-pulse-subtle">
-                <CardHeader className="pb-3">
+                <CardContent className="p-6">
                   <div className="h-7 bg-muted rounded-md"></div>
                   <div className="h-4 bg-muted rounded-md w-1/2 mt-2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-4 bg-muted rounded-md mb-4"></div>
-                  <div className="h-4 bg-muted rounded-md w-3/4 mb-4"></div>
-                  <div className="flex justify-between">
+                  <div className="h-4 bg-muted rounded-md mt-4"></div>
+                  <div className="flex justify-between mt-4">
                     <div className="h-4 bg-muted rounded-md w-1/4"></div>
                     <div className="h-4 bg-muted rounded-md w-1/4"></div>
                   </div>
@@ -101,78 +94,61 @@ export const Dashboard: React.FC = () => {
           </div>
         ) : error ? (
           <div className="bg-destructive/10 text-destructive p-4 rounded-md">
-            Failed to load projects. Please try again.
+            Failed to load agents. Please try again.
           </div>
-        ) : recentProjects.length > 0 ? (
+        ) : agents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentProjects.map(project => (
-              <ProjectCard key={project.id} project={project} />
+            {agents.slice(0, 3).map(agent => (
+              <Link key={agent.id} to={`/agents/${agent.id}`}>
+                <Card className="transition-all hover:shadow-md">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">{agent.name}</h3>
+                      <div className={`px-2 py-1 text-xs rounded-full font-medium ${
+                        agent.status === 'active' 
+                          ? 'bg-success/10 text-success' 
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {agent.status.toUpperCase()}
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                      {agent.instructions}
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Clock className="mr-2 h-4 w-4 text-primary" />
+                          <span>{agent.callDuration}s max</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm">
+                          <Activity className="mr-2 h-4 w-4 text-accent" />
+                          <span>0 calls today</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         ) : (
           <Card className="text-center p-8">
-            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
+            <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
             <p className="text-muted-foreground mb-4">
-              Start by creating your first design testing project
+              Start by creating your first AI agent
             </p>
-            <Link to="/projects/new">
+            <Link to="/agents/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Create Project
+                Create Agent
               </Button>
             </Link>
           </Card>
-        )}
-      </div>
-      
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold">Recent Sessions</h2>
-          <Link to="/sessions">
-            <Button variant="outline">View All Sessions</Button>
-          </Link>
-        </div>
-        
-        {loading ? (
-          <div className="opacity-70 animate-pulse-subtle">
-            <Card className="p-6">
-              <div className="h-6 bg-muted rounded-md w-1/4 mb-4"></div>
-              <div className="h-4 bg-muted rounded-md w-full mb-2"></div>
-              <div className="h-4 bg-muted rounded-md w-3/4"></div>
-            </Card>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {projects.flatMap(p => p.sessions)
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-              .slice(0, 3)
-              .map(session => {
-                const project = projects.find(p => p.id === session.projectId);
-                return (
-                  <Link to={`/sessions/${session.id}`} key={session.id}>
-                    <Card className="transition-all hover:shadow-md">
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-semibold">{session.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {project?.name}
-                            </p>
-                          </div>
-                          <div className={`px-2 py-1 text-xs rounded-full font-medium ${
-                            session.status === 'active' 
-                              ? 'bg-accent/10 text-accent' 
-                              : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {session.status.toUpperCase()}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                );
-              })}
-          </div>
         )}
       </div>
     </div>

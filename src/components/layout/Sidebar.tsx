@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard,
-  Users,
   Settings,
-  FolderKanban,
   Bot,
-  Phone,
   ChevronLeft, 
   ChevronRight, 
   PanelLeftClose,
@@ -41,10 +38,7 @@ export const Sidebar: React.FC = () => {
       
       <nav className="flex flex-col p-2 h-[calc(100vh-4rem)] overflow-y-auto">
         <NavItem to="/" icon={<LayoutDashboard size={20} />} text="Dashboard" collapsed={collapsed} />
-        <NavItem to="/projects" icon={<FolderKanban size={20} />} text="Projects" collapsed={collapsed} />
-        <NavItem to="/sessions" icon={<Phone size={20} />} text="Sessions" collapsed={collapsed} />
         <NavItem to="/agents" icon={<Bot size={20} />} text="Agents" collapsed={collapsed} />
-        <NavItem to="/team" icon={<Users size={20} />} text="Team" collapsed={collapsed} />
         
         <div className="mt-auto">
           <NavItem to="/settings" icon={<Settings size={20} />} text="Settings" collapsed={collapsed} />
