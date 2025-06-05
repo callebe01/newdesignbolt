@@ -108,12 +108,27 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Analyze transcripts error:", error);
+
+    const message = (error as { message?: string }).message || "";
+    if (
+      message.includes("Unauthorized") ||
+      message.includes("Missing or invalid Authorization header")
+    ) {
+      return new Response(
+        JSON.stringify({ error: message }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
+      JSON.stringify({ error: message }),
+      {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });

@@ -44,3 +44,26 @@ npm run dev
 
 This will launch Vite in development mode.
 
+## Manual Testing
+
+To verify the `analyze-transcripts` function rejects unauthorized requests, run:
+
+```bash
+curl -i -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"transcriptionIds":[1]}' \
+  "$VITE_SUPABASE_URL/functions/v1/analyze-transcripts"
+```
+
+The response should be `401 Unauthorized`.
+
+Sending a request with an invalid token should also return `401`:
+
+```bash
+curl -i -X POST \
+  -H "Authorization: Bearer invalid" \
+  -H "Content-Type: application/json" \
+  -d '{"transcriptionIds":[1]}' \
+  "$VITE_SUPABASE_URL/functions/v1/analyze-transcripts"
+```
+
