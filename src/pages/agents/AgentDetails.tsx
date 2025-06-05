@@ -54,12 +54,12 @@ export const AgentDetails: React.FC = () => {
           setError('Agent not found');
         }
       } catch (err) {
-        console.error('Error fetching data:', err);
         if (err instanceof Error && err.message === 'Unauthorized') {
           setError('Your session expired. Please log in again.');
           await logout();
           navigate('/login');
         } else {
+          console.error('Error fetching data:', err);
           setError('Failed to load agent details');
         }
       } finally {
@@ -75,6 +75,7 @@ export const AgentDetails: React.FC = () => {
     
     try {
       setAnalyzing(true);
+      setError(null);
       const result = await analyzeTranscripts(
         transcripts.map(t => t.id),
         accessToken,
@@ -82,13 +83,17 @@ export const AgentDetails: React.FC = () => {
       );
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
-      console.error('Analysis failed:', err);
-      if (err instanceof Error && err.message === 'Unauthorized') {
-        setError('Your session expired. Please log in again.');
-        await logout();
-        navigate('/login');
-      } else {
-        setError('Failed to analyze transcripts');
+      if (err instanceof Error) {
+        if (err.message === 'Unauthorized') {
+          // Handle unauthorized error gracefully
+          setError('Your session expired. Please log in again.');
+          await logout();
+          navigate('/login');
+          return;
+        }
+        // Log unexpected errors
+        console.error('Unexpected error during analysis:', err);
+        setError('Failed to analyze transcripts. Please try again later.');
       }
     } finally {
       setAnalyzing(false);
