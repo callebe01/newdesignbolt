@@ -21,13 +21,12 @@ serve(async (req) => {
 
     // Verify authentication
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("Missing Authorization header");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("Missing or invalid Authorization header");
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
       throw new Error("Unauthorized");
@@ -35,8 +34,8 @@ serve(async (req) => {
 
     const { transcriptionIds, count = 5 } = await req.json();
 
-    if (!transcriptionIds?.length) {
-      throw new Error("transcriptionIds are required");
+    if (!Array.isArray(transcriptionIds) || transcriptionIds.length === 0) {
+      throw new Error("transcriptionIds must be a non-empty array");
     }
 
     // Fetch transcriptions
@@ -48,6 +47,9 @@ serve(async (req) => {
       .order("created_at", { ascending: false });
 
     if (transcriptError) throw transcriptError;
+    if (!transcriptions?.length) {
+      throw new Error("No transcripts found for those IDs");
+    }
 
     // Analyze with OpenAI
     const combinedText = transcriptions.map(t => t.content).join("\n\n");
@@ -62,10 +64,10 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "You are a UX research assistant. Return your analysis as a JSON object with the following structure: { summary: string, sentiment: { positive: number, neutral: number, negative: number }, key_points: string[], recommendations: string[] }. Focus on extracting key insights and patterns from the transcripts."
+          content: "You are a UX research assistant. Analyze these transcripts and return a JSON object with the following structure: { summary: string, sentiment: { positive: number, neutral: number, negative: number }, key_points: string[], recommendations: string[] }. Include the word 'json' in your analysis to ensure proper formatting."
         }, {
           role: "user",
-          content: combinedText
+          content: `Please analyze these transcripts and provide a json response:\n\n${combinedText}`
         }],
         response_format: { type: "json_object" }
       })
@@ -76,8 +78,8 @@ serve(async (req) => {
       throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
     }
 
-    const analysis = await openAIResponse.json();
-    const result = JSON.parse(analysis.choices[0].message.content);
+    const openAIData = await openAIResponse.json();
+    const result = JSON.parse(openAIData.choices[0].message.content);
 
     // Store analysis results
     const { data: savedAnalysis, error: saveError } = await supabase
