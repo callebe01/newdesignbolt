@@ -80,28 +80,40 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
       sentiment_scores: result.sentiment_scores,
       key_points: result.key_points,
       recommendations: result.recommendations,
-      user_intent: result.user_intent,
-      workflow_patterns: result.workflow_patterns,
-      feature_requests: result.feature_requests,
-      resolution_rate: result.resolution_rate,
-      engagement_score: result.engagement_score,
+      user_intent: result.user_intent || {},
+      workflow_patterns: result.workflow_patterns || [],
+      feature_requests: result.feature_requests || [],
+      resolution_rate: result.resolution_rate || { resolved: 0, unresolved: 0 },
+      engagement_score: result.engagement_score || 0,
       repetitive_questions: result.repetitive_questions || []
     })
     .select()
     .single();
 
-  if (saveError) throw saveError;
+  if (saveError) {
+    console.error('Failed to save analysis:', saveError);
+    throw saveError;
+  }
+
   return savedAnalysis;
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
+  if (!transcriptionIds.length) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('analysis_results')
     .select('*')
     .contains('transcription_ids', transcriptionIds)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Failed to fetch analysis results:', error);
+    throw error;
+  }
+
   return data.map(row => ({
     id: row.id,
     transcriptionIds: row.transcription_ids,
@@ -109,12 +121,12 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
     sentimentScores: row.sentiment_scores,
     keyPoints: row.key_points,
     recommendations: row.recommendations,
-    userIntent: row.user_intent,
-    workflowPatterns: row.workflow_patterns,
-    featureRequests: row.feature_requests,
-    resolutionRate: row.resolution_rate,
-    engagementScore: row.engagement_score,
-    repetitiveQuestions: row.repetitive_questions,
+    userIntent: row.user_intent || {},
+    workflowPatterns: row.workflow_patterns || [],
+    featureRequests: row.feature_requests || [],
+    resolutionRate: row.resolution_rate || { resolved: 0, unresolved: 0 },
+    engagementScore: row.engagement_score || 0,
+    repetitiveQuestions: row.repetitive_questions || [],
     createdAt: row.created_at
   }));
 }
