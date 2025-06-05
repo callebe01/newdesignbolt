@@ -4,7 +4,6 @@ import { Mic, MicOff, Monitor, X } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
-import { saveTranscript } from '../../services/transcripts';
 import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
 
@@ -22,7 +21,8 @@ export const AgentCall: React.FC = () => {
     isScreenSharing,
     isMicrophoneActive,
     duration,
-    errorMessage 
+    errorMessage,
+    setTranscript
   } = useLiveCall();
   
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -44,20 +44,15 @@ export const AgentCall: React.FC = () => {
   useEffect(() => {
     if (!startedRef.current && agent) {
       startedRef.current = true;
+      // Clear transcript before starting new call
+      setTranscript('');
       startCall(agent.instructions, agent.callDuration).catch((err) =>
         console.error(err)
       );
     }
-  }, [agent, startCall]);
+  }, [agent, startCall, setTranscript]);
 
   const handleEnd = async () => {
-    if (agentId && transcript) {
-      try {
-        await saveTranscript(agentId, transcript);
-      } catch (err) {
-        console.error('Failed to save transcript:', err);
-      }
-    }
     endCall();
     navigate('/agents');
   };
