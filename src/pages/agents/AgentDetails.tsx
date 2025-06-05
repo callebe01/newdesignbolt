@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
-  Phone, 
-  Clock, 
-  Calendar, 
-  Edit2, 
-  Trash2, 
-  MoreVertical,
+  Phone,
+  Clock,
+  Calendar,
+  Edit2,
+  Trash2,
   ChevronLeft,
-  Plus,
-  RefreshCw 
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import { formatDateTime, formatDuration } from '../../utils/format';
+import { Card, CardContent } from '../../components/ui/Card';
+import { formatDateTime } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { useAuth } from '../../context/AuthContext';
 import { Agent } from '../../types';
@@ -23,7 +21,7 @@ export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const { getAgent } = useAgents();
-  const { accessToken } = useAuth();
+  const { accessToken, logout } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +55,20 @@ export const AgentDetails: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Failed to load agent details');
+        if (err instanceof Error && err.message === 'Unauthorized') {
+          setError('Your session expired. Please log in again.');
+          await logout();
+          navigate('/login');
+        } else {
+          setError('Failed to load agent details');
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, [agentId, getAgent]);
+  }, [agentId, getAgent, logout, navigate]);
 
   const handleAnalyze = async () => {
     if (!transcripts.length || !accessToken) return;
@@ -81,6 +85,7 @@ export const AgentDetails: React.FC = () => {
       console.error('Analysis failed:', err);
       if (err instanceof Error && err.message === 'Unauthorized') {
         setError('Your session expired. Please log in again.');
+        await logout();
         navigate('/login');
       } else {
         setError('Failed to analyze transcripts');
@@ -119,7 +124,17 @@ export const AgentDetails: React.FC = () => {
     return (
       <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
-        <p>{error || 'Agent not found'}</p>
+        {error === 'Your session expired. Please log in again.' ? (
+          <p>
+            Your session expired. Please{' '}
+            <Link to="/login" className="underline">
+              log in
+            </Link>{' '}
+            again.
+          </p>
+        ) : (
+          <p>{error || 'Agent not found'}</p>
+        )}
         <Link to="/agents" className="underline">
           Back to Agents
         </Link>
