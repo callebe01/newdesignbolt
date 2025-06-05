@@ -1,15 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Bot } from 'lucide-react';
+import { ChevronLeft, Bot, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { useAgents } from '../../context/AgentContext';
 
+interface DurationOption {
+  value: number;
+  label: string;
+}
+
+const DURATION_OPTIONS: DurationOption[] = [
+  { value: 60, label: '1 minute' },
+  { value: 180, label: '3 minutes' },
+  { value: 300, label: '5 minutes' },
+  { value: 600, label: '10 minutes' },
+];
+
 export const NewAgent: React.FC = () => {
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
   const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
+  const [duration, setDuration] = useState<number>(300); // Default to 5 minutes
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +104,33 @@ export const NewAgent: React.FC = () => {
               <p className="mt-2 text-sm text-muted-foreground">
                 Be specific about the agent's role, tone, and how it should handle different scenarios.
               </p>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-sm font-medium">Call Duration</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {DURATION_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border transition-all ${
+                      duration === option.value 
+                        ? 'border-primary bg-primary/5' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                    onClick={() => setDuration(option.value)}
+                  >
+                    <Clock className={`h-5 w-5 mb-2 ${
+                      duration === option.value ? 'text-primary' : 'text-muted-foreground'
+                    }`} />
+                    <span className={`text-sm font-medium ${
+                      duration === option.value ? 'text-primary' : ''
+                    }`}>
+                      {option.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
