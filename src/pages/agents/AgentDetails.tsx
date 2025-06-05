@@ -123,7 +123,7 @@ export const AgentDetails: React.FC = () => {
       <div>
         <h3 className="text-lg font-medium mb-2">Sentiment Analysis</h3>
         <div className="grid grid-cols-3 gap-4">
-          {Object.entries(analysis.sentimentScores).map(([key, value]) => (
+          {Object.entries(analysis.sentimentScores || {}).map(([key, value]) => (
             <div key={key} className="bg-muted p-4 rounded-lg">
               <div className="text-2xl font-bold">{Math.round(value * 100)}%</div>
               <div className="text-sm text-muted-foreground capitalize">{key}</div>
