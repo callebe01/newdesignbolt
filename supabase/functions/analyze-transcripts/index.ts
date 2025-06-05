@@ -62,7 +62,7 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "Analyze these conversation transcripts and provide the analysis as a JSON object containing: summary, sentiment scores, key points, and recommendations."
+          content: "You are a UX research assistant. Return your analysis as a JSON object with the following structure: { summary: string, sentiment: { positive: number, neutral: number, negative: number }, key_points: string[], recommendations: string[] }. Focus on extracting key insights and patterns from the transcripts."
         }, {
           role: "user",
           content: combinedText
