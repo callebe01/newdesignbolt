@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, X, Monitor } from 'lucide-react';
+import { Mic, MicOff, Monitor, X } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -124,15 +124,16 @@ export const AgentCall: React.FC = () => {
             )}
           </Button>
 
-          <Button
-            size="lg"
-            variant={isScreenSharing ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 shadow-lg"
-            onClick={toggleScreenShare}
-            disabled={!agent?.canSeeScreenshare}
-          >
-            <Monitor className="h-6 w-6" />
-          </Button>
+          {agent?.canSeeScreenshare && (
+            <Button
+              size="lg"
+              variant={isScreenSharing ? 'primary' : 'outline'}
+              className="rounded-full w-16 h-16 shadow-lg"
+              onClick={toggleScreenShare}
+            >
+              <Monitor className="h-6 w-6" />
+            </Button>
+          )}
 
           <Button
             size="lg"
