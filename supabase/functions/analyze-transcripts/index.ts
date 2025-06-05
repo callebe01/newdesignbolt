@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,54 +12,13 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication and initialize Supabase client with the user token
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw new Error("Missing or invalid Authorization header");
+    const { text, transcriptionIds } = await req.json();
+
+    if (!text?.trim()) {
+      throw new Error("Text content is required");
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-      },
-    );
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw new Error("Unauthorized");
-    }
-
-    const { transcriptionIds, count = 5 } = await req.json();
-
-    if (!Array.isArray(transcriptionIds) || transcriptionIds.length === 0) {
-      throw new Error("transcriptionIds must be a non-empty array");
-    }
-
-    // Fetch transcriptions
-    const { data: transcriptions, error: transcriptError } = await supabase
-      .from("transcriptions")
-      .select("content")
-      .in("id", transcriptionIds)
-      .limit(count)
-      .order("created_at", { ascending: false });
-
-    if (transcriptError) throw transcriptError;
-    if (!transcriptions?.length) {
-      throw new Error("No transcripts found for those IDs");
-    }
-
-    // Analyze with OpenAI
-    const combinedText = transcriptions.map(t => t.content).join("\n\n");
-    
-    const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -70,32 +28,38 @@ serve(async (req) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "system",
-          content: "You are a UX research assistant. Analyze these transcripts and return a JSON object with the following structure: { summary: string, sentiment: { positive: number, neutral: number, negative: number }, key_points: string[], recommendations: string[] }. Include the word 'json' in your analysis to ensure proper formatting."
+          content: "You are a conversation analyst. Analyze the provided transcripts and return a JSON object with: summary (brief overview), sentimentScores (positive/negative/neutral percentages), keyPoints (main takeaways), and recommendations (actionable insights)."
         }, {
           role: "user",
-          content: `Please analyze these transcripts and provide a json response:\n\n${combinedText}`
+          content: text
         }],
         response_format: { type: "json_object" }
       })
     });
 
-    if (!openAIResponse.ok) {
-      const error = await openAIResponse.json();
+    if (!response.ok) {
+      const error = await response.json();
       throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
     }
 
-    const openAIData = await openAIResponse.json();
-    const result = JSON.parse(openAIData.choices[0].message.content);
+    const data = await response.json();
+    const analysis = JSON.parse(data.choices[0].message.content);
 
-    // Store analysis results
+    // Store the analysis result
+    const { supabaseClient } = await import("npm:@supabase/supabase-js@2.39.3");
+    const supabase = supabaseClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const { data: savedAnalysis, error: saveError } = await supabase
       .from("analysis_results")
       .insert({
         transcription_ids: transcriptionIds,
-        summary: result.summary,
-        sentiment_scores: result.sentiment,
-        key_points: result.key_points,
-        recommendations: result.recommendations
+        summary: analysis.summary,
+        sentiment_scores: analysis.sentimentScores,
+        key_points: analysis.keyPoints,
+        recommendations: analysis.recommendations
       })
       .select()
       .single();
@@ -107,28 +71,13 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Analyze transcripts error:", error);
-
-    const message = (error as { message?: string }).message || "";
-    if (
-      message.includes("Unauthorized") ||
-      message.includes("Missing or invalid Authorization header")
-    ) {
-      return new Response(
-        JSON.stringify({ error: message }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
+    console.error("Analysis error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
-      {
+      JSON.stringify({ error: error.message }),
+      { 
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
   }
 });

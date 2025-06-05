@@ -22,7 +22,7 @@ export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const { getAgent, deleteAgent } = useAgents();
-  const { accessToken, logout } = useAuth();
+  const { user } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,52 +55,34 @@ export const AgentDetails: React.FC = () => {
           setError('Agent not found');
         }
       } catch (err) {
-        if (err instanceof Error && err.message === 'Unauthorized') {
-          setError('Your session expired. Please log in again.');
-          await logout();
-          navigate('/login');
-        } else {
-          console.error('Error fetching data:', err);
-          setError('Failed to load agent details');
-        }
+        console.error('Error fetching data:', err);
+        setError('Failed to load agent details');
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, [agentId, getAgent, logout, navigate]);
+  }, [agentId, getAgent]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length || !accessToken) {
-      setError('No transcripts to analyze or not authenticated');
+    if (!transcripts.length) {
+      setError('No conversations to analyze');
       return;
     }
     
     try {
       setAnalyzing(true);
       setError(null);
-      console.log('Starting analysis with token:', accessToken.substring(0, 10) + '...');
       
-      const transcriptIds = transcripts.map(t => t.id).slice(0, 5); // Analyze last 5 transcripts
-      const result = await analyzeTranscripts(transcriptIds, accessToken);
+      // Get the 5 most recent transcripts
+      const recentTranscripts = transcripts.slice(0, 5);
+      const result = await analyzeTranscripts(recentTranscripts);
       
-      console.log('Analysis completed successfully');
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
       console.error('Analysis error:', err);
-      
-      if (err instanceof Error) {
-        if (err.message.includes('Unauthorized')) {
-          setError('Your session expired. Please log in again.');
-          await logout();
-          navigate('/login');
-          return;
-        }
-        setError(`Analysis failed: ${err.message}`);
-      } else {
-        setError('An unexpected error occurred during analysis');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to analyze conversations');
     } finally {
       setAnalyzing(false);
     }
@@ -122,7 +104,7 @@ export const AgentDetails: React.FC = () => {
       }
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -135,17 +117,7 @@ export const AgentDetails: React.FC = () => {
     return (
       <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
-        {error === 'Your session expired. Please log in again.' ? (
-          <p>
-            Your session expired. Please{' '}
-            <Link to="/login" className="underline">
-              log in
-            </Link>{' '}
-            again.
-          </p>
-        ) : (
-          <p>{error || 'Agent not found'}</p>
-        )}
+        <p>{error || 'Agent not found'}</p>
         <Link to="/agents" className="underline">
           Back to Agents
         </Link>
@@ -184,28 +156,6 @@ export const AgentDetails: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium mb-1">Shareable Link</h3>
-              <p className="text-sm text-muted-foreground break-all">
-                {`${window.location.origin}/agent/${agent.id}`}
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/agent/${agent.id}`);
-                alert('Link copied to clipboard!');
-              }}
-            >
-              Copy Link
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -262,12 +212,18 @@ export const AgentDetails: React.FC = () => {
           <h2 className="text-xl font-semibold">Conversation History</h2>
           <Button 
             onClick={handleAnalyze}
-            disabled={analyzing || transcripts.length === 0 || !accessToken}
+            disabled={analyzing || transcripts.length === 0}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
             {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
           </Button>
         </div>
+
+        {error && (
+          <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+            {error}
+          </div>
+        )}
 
         {transcripts.length > 0 ? (
           <div className="space-y-4">

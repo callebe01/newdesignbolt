@@ -45,39 +45,34 @@ export async function saveTranscript(agentId: string, content: string) {
   return data;
 }
 
-export async function analyzeTranscripts(
-  transcriptionIds: string[], 
-  accessToken: string
-): Promise<AnalysisResult> {
-  if (!accessToken) {
-    throw new Error('Authentication required');
-  }
+export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
+  // Combine all transcript content
+  const combinedContent = transcripts
+    .map(t => t.content)
+    .join('\n\n');
 
-  console.log('Analyzing transcripts with token:', accessToken.substring(0, 10) + '...');
-
+  // Call OpenAI API through our Edge Function
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
       },
       body: JSON.stringify({ 
-        transcriptionIds,
-        count: 5 // Analyze last 5 transcripts
-      }),
+        text: combinedContent,
+        transcriptionIds: transcripts.map(t => t.id)
+      })
     }
   );
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Analysis failed: ${error.error}`);
+    throw new Error(error.error || 'Analysis failed');
   }
 
-  const result = await response.json();
-  console.log('Analysis result:', result);
-  return result;
+  return response.json();
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
