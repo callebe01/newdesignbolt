@@ -115,21 +115,3 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
     throw err;
   }
 }
-
-export async function generateAndSaveReport(agentId: string, text: string) {
-  if (!text.trim()) return;
-  try {
-    const report = await generateAgentReport(text);
-    const { error } = await supabase
-      .from('agent_reports')
-      .insert({
-        agent_id: agentId,
-        report
-      });
-
-    if (error) throw error;
-  } catch (err) {
-    console.error('Failed to generate and save agent report:', err);
-    throw err;
-  }
-}
