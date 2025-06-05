@@ -25,6 +25,22 @@ export async function getTranscripts(agentId: string) {
   return data;
 }
 
+export async function saveTranscript(agentId: string, content: string) {
+  const { data, error } = await supabase
+    .from('transcriptions')
+    .insert([
+      {
+        agent_id: agentId,
+        content: content,
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function analyzeTranscripts(transcriptionIds: string[]): Promise<AnalysisResult> {
   // Get the current session
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
