@@ -6,6 +6,7 @@ import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
 import { saveTranscript } from '../../services/transcripts';
 import { Button } from '../../components/ui/Button';
+import { formatTime } from '../../utils/format';
 
 export const AgentCall: React.FC = () => {
   const navigate = useNavigate();
@@ -16,10 +17,11 @@ export const AgentCall: React.FC = () => {
     endCall, 
     status, 
     transcript, 
-    toggleMicrophone, 
+    toggleMicrophone,
     toggleScreenShare,
     isScreenSharing,
     isMicrophoneActive,
+    duration,
     errorMessage 
   } = useLiveCall();
   
@@ -42,7 +44,7 @@ export const AgentCall: React.FC = () => {
   useEffect(() => {
     if (!startedRef.current && agent) {
       startedRef.current = true;
-      startCall(agent.instructions).catch((err) => console.error(err));
+      startCall(agent.instructions, 300).catch((err) => console.error(err));
     }
   }, [agent, startCall]);
 
@@ -89,7 +91,7 @@ export const AgentCall: React.FC = () => {
             <div className="ml-3">
               <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
               <p className="text-sm text-muted-foreground">
-                {status === 'active' ? 'Listening...' : status}
+                {status === 'active' ? `${formatTime(duration)} elapsed` : status}
               </p>
             </div>
           </div>

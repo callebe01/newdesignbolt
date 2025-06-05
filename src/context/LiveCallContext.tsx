@@ -1,5 +1,3 @@
-// src/context/LiveCallContext.tsx
-
 import React, {
   createContext,
   useContext,
@@ -16,17 +14,16 @@ interface LiveCallContextType {
   isVideoActive: boolean;
   errorMessage: string | null;
   transcript: string;
+  duration: number;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
-  startCall: (systemInstruction?: string) => Promise<void>;
+  startCall: (systemInstruction?: string, maxDuration?: number) => Promise<void>;
   endCall: () => void;
   toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
   toggleVideo: () => void;
 }
 
-const LiveCallContext = createContext<LiveCallContextType | undefined>(
-  undefined
-);
+const LiveCallContext = createContext<LiveCallContextType | undefined>(undefined);
 
 export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -37,42 +34,42 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isVideoActive, setIsVideoActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
+  const [duration, setDuration] = useState(0);
 
   const DEFAULT_SYSTEM_INSTRUCTION =
     'You are roleplaying a real person testing a new interface while talking to a designer.' +
-    "Speak casually, like you're figuring things out out loud. This isn’t a polished review — it's a live reaction." +
-    'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It’s okay to feel stuck or ramble a bit—don’t tidy your sentences.Use natural phrases: “Hmm…”, “Let me read this…”, “Not sure what that means…” Focus on what your eyes land on first . don’t describe everything at once. Don’t try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don’t explain unless it feels obvious. Keep answers short. You don’t need to keep the conversation going unless you have a reaction.' +
-    'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. “Okay… first thing I see is…” Pause to read or scan — You should react like someone figuring it out in real time. “Let me read this real quick…” ” “Wait — what’s this down here…” Guess or think aloud — Share your thoughts as they form. Don’t rush to a final answer. ' +
-    'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you’d take. 2. Say why you chose it (brief). Only list other ideas if the designer asks “anything else?"' +
-    'Important: You are not supposed to summarize or label the tool right away. You’re reacting moment by moment, like someone thinking out loud in a real usability session.';
+    "Speak casually, like you're figuring things out out loud. This isn't a polished review — it's a live reaction." +
+    'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It\'s okay to feel stuck or ramble a bit—don't tidy your sentences.Use natural phrases: "Hmm…", "Let me read this…", "Not sure what that means…" Focus on what your eyes land on first . don\'t describe everything at once. Don't try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don\'t explain unless it feels obvious. Keep answers short. You don't need to keep the conversation going unless you have a reaction.' +
+    'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. "Okay… first thing I see is…" Pause to read or scan — You should react like someone figuring it out in real time. "Let me read this real quick…" " "Wait — what\'s this down here…" Guess or think aloud — Share your thoughts as they form. Don't rush to a final answer. ' +
+    'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you\'d take. 2. Say why you chose it (brief). Only list other ideas if the designer asks "anything else?"' +
+    'Important: You are not supposed to summarize or label the tool right away. You\'re reacting moment by moment, like someone thinking out loud in a real usability session.';
 
-  // ─── Refs ───────────────────────────────────────────────────────────────────
   const websocketRef = useRef<WebSocket | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
   const microphoneStream = useRef<MediaStream | null>(null);
   const videoStream = useRef<MediaStream | null>(null);
-
-  // We create/hold onto a single AudioContext for the entire session:
   const audioContextRef = useRef<AudioContext | null>(null);
-  // This tracks “when to schedule the next chunk” (in seconds of AudioContext.currentTime)
   const audioQueueTimeRef = useRef<number>(0);
-  // Ensures we only send the greeting once:
   const greetingSentRef = useRef(false);
+  const durationTimerRef = useRef<number | null>(null);
+  const maxDurationTimerRef = useRef<number | null>(null);
 
-  // For screen streaming
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
 
-  // ─── Clean‐up on Unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      // Close WebSocket
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+      }
+      if (maxDurationTimerRef.current) {
+        clearTimeout(maxDurationTimerRef.current);
+      }
       if (websocketRef.current) {
         websocketRef.current.close();
         websocketRef.current = null;
       }
-      // Stop all media tracks
       [screenStream.current, microphoneStream.current, videoStream.current].forEach(
         (stream) => {
           if (stream) {
@@ -81,7 +78,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       );
       stopScreenStreaming();
-      // Close AudioContext
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
         audioContextRef.current = null;
@@ -89,56 +85,57 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  // ─── Helper: schedule and play a raw PCM16 (24 kHz) Blob ────────────────────
   const playAudioBuffer = async (pcmBlob: Blob) => {
     try {
-      // 1) Read the entire Blob as ArrayBuffer
       const arrayBuffer = await pcmBlob.arrayBuffer();
-      // 2) Interpret it as Int16Array
       const pcm16 = new Int16Array(arrayBuffer);
-      // 3) Convert Int16 → Float32 in [-1, +1]:
       const float32 = new Float32Array(pcm16.length);
       for (let i = 0; i < pcm16.length; i++) {
         float32[i] = pcm16[i] / 32768;
       }
 
-      // 4) Create or reuse AudioContext
       if (!audioContextRef.current) {
         audioContextRef.current =
           new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       const audioCtx = audioContextRef.current!;
 
-      // 5) Make an AudioBuffer: mono, float32.length frames, 24000 Hz
       const buffer = audioCtx.createBuffer(1, float32.length, 24000);
       buffer.copyToChannel(float32, 0, 0);
 
-      // 6) Create a source node and schedule it
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      // Decide when to start: either “now” (if the queue is empty) or at queue‐time
       let startAt = audioCtx.currentTime;
       if (audioQueueTimeRef.current > audioCtx.currentTime) {
         startAt = audioQueueTimeRef.current;
       }
       source.start(startAt);
-      // Update next‐in‐queue = startAt + buffer.duration (in seconds)
       audioQueueTimeRef.current = startAt + buffer.duration;
     } catch (err) {
       console.error('[Live] playAudioBuffer() error decoding PCM16:', err);
     }
   };
 
-  // ─── startCall(): open WebSocket, send setup, wait for setupComplete ─────────
-  const startCall = async (systemInstruction?: string): Promise<void> => {
+  const startCall = async (systemInstruction?: string, maxDuration?: number): Promise<void> => {
     try {
       setErrorMessage(null);
+      setDuration(0);
 
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
         return;
+      }
+
+      durationTimerRef.current = window.setInterval(() => {
+        setDuration(prev => prev + 1);
+      }, 1000);
+
+      if (maxDuration) {
+        maxDurationTimerRef.current = window.setTimeout(() => {
+          endCall();
+        }, maxDuration * 1000);
       }
 
       const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
@@ -147,7 +144,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       console.log('[Live] VITE_GOOGLE_API_KEY present:', !!apiKey);
 
-      // The Live‐WebSocket endpoint (v1beta)
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/` +
         `google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       console.log('[Live] WebSocket URL:', wsUrl);
@@ -159,7 +155,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
-        // 1) Send the “setup” message
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
@@ -182,12 +177,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       ws.onmessage = async (ev) => {
-        // We only care about Blob frames. If it’s text, ignore.
         if (!(ev.data instanceof Blob)) {
           return;
         }
 
-        // Attempt to read Blob as UTF‐8 text
         let maybeText: string | null = null;
         try {
           maybeText = await ev.data.text();
@@ -196,14 +189,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         if (maybeText) {
-          // Try to JSON.parse it
           try {
             const parsed = JSON.parse(maybeText);
             console.log('[Live][Debug] incoming JSON frame:', parsed);
 
-            // ────────────────────────────────────────────────
-            // A) setupComplete → send initial greeting + start mic
-            // ────────────────────────────────────────────────
             if (parsed.setupComplete) {
               console.log('[Live][WebSocket] Received setupComplete ✅');
               setStatus('active');
@@ -225,14 +214,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 console.log('[Live] Sent initial text greeting: "Hello!"');
               }
 
-              // Now that setup is done, begin streaming microphone (16 kHz downsampled)
               startMicStreaming();
               return;
             }
 
-            // ────────────────────────────────────────────────
-            // B) serverContent.modelTurn.parts → may contain text or inlineData
-            // ────────────────────────────────────────────────
             if (parsed.serverContent) {
               if (parsed.serverContent.outputTranscription?.text) {
                 setTranscript(
@@ -247,12 +232,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn && Array.isArray(modelTurn.parts)) {
                 for (const part of modelTurn.parts) {
-                  // 1) If part.text exists, log or store it
                   if (typeof part.text === 'string') {
                     console.log('[Live] AI says (text):', part.text);
                     setTranscript((prev) => prev + part.text);
                   }
-                  // 2) If part.inlineData.data exists, Base64→PCM→play
                   if (
                     part.inlineData &&
                     typeof part.inlineData.data === 'string'
@@ -265,7 +248,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                       for (let i = 0; i < len; i++) {
                         rawBuffer[i] = binaryStr.charCodeAt(i);
                       }
-                      // Create a Blob of PCM16 @ 24000 Hz
                       const pcmBlob = new Blob([rawBuffer.buffer], {
                         type: 'audio/pcm;rate=24000',
                       });
@@ -281,20 +263,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     }
                   }
                 }
-                return; // done handling this JSON
+                return;
               }
             }
 
-            // If we reach here, it was JSON but not setupComplete or serverContent
             return;
           } catch {
-            // JSON.parse failed → go to fallback
           }
         }
 
-        // ─────────────────────────────────────────────────────────────────
-        // C) Fallback: treat the entire Blob as raw PCM16 @24 kHz, play it
-        // ─────────────────────────────────────────────────────────────────
         console.log(
           '[Live][Debug] incoming Blob is not JSON or not recognized → playing raw PCM'
         );
@@ -321,7 +298,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── startMicStreaming(): capture mic, downsample to 16 kHz PCM16, send JSON ──
   const startMicStreaming = async () => {
     try {
       const micStream = await navigator.mediaDevices.getUserMedia({
@@ -329,7 +305,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       microphoneStream.current = micStream;
 
-      // Create a fresh AudioContext if needed (we already have one for playback)
       if (!audioContextRef.current) {
         audioContextRef.current =
           new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -345,12 +320,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
       processor.onaudioprocess = (event: AudioProcessingEvent) => {
         const float32Data = event.inputBuffer.getChannelData(0);
-        const inRate = audioCtx.sampleRate; // e.g. 48000
-        const outRate = 16000; // we want 16 kHz
+        const inRate = audioCtx.sampleRate;
+        const outRate = 16000;
         const ratio = inRate / outRate;
         const outLength = Math.floor(float32Data.length / ratio);
 
-        // Downsample + convert Float32 → Int16
         const pcm16 = new Int16Array(outLength);
         for (let i = 0; i < outLength; i++) {
           const idx = Math.floor(i * ratio);
@@ -359,7 +333,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
         }
 
-        // Base64‐encode that Int16 array
         const u8 = new Uint8Array(pcm16.buffer);
         let binary = '';
         for (let i = 0; i < u8.byteLength; i++) {
@@ -367,7 +340,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         const base64Audio = btoa(binary);
 
-        // Wrap in JSON as “realtime_input.audio”
         const payload = {
           realtime_input: {
             audio: {
@@ -377,7 +349,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           },
         };
 
-        // Only send if WS is open
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
           console.log(
@@ -393,9 +364,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── startScreenStreaming(): capture screen frames and send via WebSocket ──
-  // This follows the Gemini Live API spec for realtimeInputScreen
-  // https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
   const startScreenStreaming = () => {
     try {
       if (!screenStream.current || screenIntervalRef.current) {
@@ -443,7 +411,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               const dataUrl = reader.result as string;
               const base64 = dataUrl.split(',')[1];
               const payload = {
-                // See https://ai.google.dev/gemini-api/docs/live#realtimeinputscreen
                 realtime_input: {
                   video: { data: base64, mime_type: blob.type },
                 },
@@ -461,7 +428,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       };
 
-      // Send around 2 frames per second (tweak as needed)
       screenIntervalRef.current = window.setInterval(capture, 500);
     } catch (err) {
       console.error('[Live] startScreenStreaming error:', err);
@@ -480,18 +446,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── toggleMicrophone(): stop mic streaming (and processor) ─────────────────
   const toggleMicrophone = (): void => {
     try {
       setErrorMessage(null);
       if (isMicrophoneActive && microphoneStream.current) {
-        // Close the entire AudioContext graph (processor + source + destination)
         if (audioContextRef.current) {
           audioContextRef.current.close().catch(() => {});
           audioContextRef.current = null;
           audioQueueTimeRef.current = 0;
         }
-        // Stop mic tracks
         microphoneStream.current.getTracks().forEach((t) => t.stop());
         microphoneStream.current = null;
         setIsMicrophoneActive(false);
@@ -507,7 +470,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── toggleScreenShare: exactly as before ─────────────────────────────────
   const toggleScreenShare = async (): Promise<void> => {
     try {
       setErrorMessage(null);
@@ -535,7 +497,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── toggleVideo: exactly as before ───────────────────────────────────────
   const toggleVideo = (): void => {
     try {
       setErrorMessage(null);
@@ -561,9 +522,17 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ─── endCall(): tear down WS + media + audioCtx ───────────────────────────
   const endCall = (): void => {
     try {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
+      }
+      if (maxDurationTimerRef.current) {
+        clearTimeout(maxDurationTimerRef.current);
+        maxDurationTimerRef.current = null;
+      }
+
       if (websocketRef.current) {
         websocketRef.current.close();
         websocketRef.current = null;
@@ -604,6 +573,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         isVideoActive,
         errorMessage,
         transcript,
+        duration,
         setTranscript,
         startCall,
         endCall,
