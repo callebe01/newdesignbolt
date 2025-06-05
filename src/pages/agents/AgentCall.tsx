@@ -114,7 +114,7 @@ export const AgentCall: React.FC = () => {
           <Button
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 shadow-lg"
+            className="rounded-full w-16 h-16 flex items-center justify-center"
             onClick={toggleMicrophone}
           >
             {isMicrophoneActive ? (
@@ -128,7 +128,7 @@ export const AgentCall: React.FC = () => {
             <Button
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
-              className="rounded-full w-16 h-16 shadow-lg"
+              className="rounded-full w-16 h-16 flex items-center justify-center"
               onClick={toggleScreenShare}
             >
               <Monitor className="h-6 w-6" />
@@ -138,7 +138,7 @@ export const AgentCall: React.FC = () => {
           <Button
             size="lg"
             variant="destructive"
-            className="rounded-full w-16 h-16 shadow-lg"
+            className="rounded-full w-16 h-16 flex items-center justify-center"
             onClick={handleEnd}
           >
             <X className="h-6 w-6" />
