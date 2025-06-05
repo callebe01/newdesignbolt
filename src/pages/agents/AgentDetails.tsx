@@ -85,13 +85,11 @@ export const AgentDetails: React.FC = () => {
     } catch (err) {
       if (err instanceof Error) {
         if (err.message === 'Unauthorized') {
-          // Handle unauthorized error gracefully
           setError('Your session expired. Please log in again.');
           await logout();
           navigate('/login');
           return;
         }
-        // Log unexpected errors
         console.error('Unexpected error during analysis:', err);
         setError('Failed to analyze transcripts. Please try again later.');
       }
@@ -116,7 +114,7 @@ export const AgentDetails: React.FC = () => {
       }
     }
   };
-
+  
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -124,7 +122,7 @@ export const AgentDetails: React.FC = () => {
       </div>
     );
   }
-
+  
   if (error || !agent) {
     return (
       <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
@@ -206,7 +204,7 @@ export const AgentDetails: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Sessions</p>
                 <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
               </div>
               <div className="p-2 bg-muted rounded-md">
