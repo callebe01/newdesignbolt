@@ -17,16 +17,22 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 `VITE_OPENAI_API_KEY` is used for transcript analysis via OpenAI.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` connect the app to your Supabase backend for persistence.
 
-For Supabase Edge Functions such as `analyze-transcripts`, these values must also be available when deploying. Create a `supabase/.env` file containing `SUPABASE_URL` and `SUPABASE_ANON_KEY` and pass it when you deploy:
+2. Create a `supabase/.env` file with the following format for deploying Edge Functions such as `analyze-transcripts`:
+
+```
+SUPABASE_URL=https://ljfidzppyflrrszkgusa.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+Pass this file when deploying:
 
 ```bash
 supabase functions deploy --env-file ./supabase/.env
 ```
 
-If either variable is missing or incorrect the `analyze-transcripts` function will return an **Unauthorized** error.
+If either variable is missing or incorrect, `analyze-transcripts` will return a **401 Unauthorized** error.
 
-
-2. Initialize the Supabase schema:
+3. Initialize the Supabase schema:
 
 ```bash
 # Install the Supabase CLI if you don't have it
@@ -38,13 +44,13 @@ supabase db push
 
 This will create required tables such as `transcriptions` and `analysis_results`.
 
-3. Install dependencies:
+4. Install dependencies:
 
 ```bash
 npm install
 ```
 
-4. Start the development server:
+5. Start the development server:
 
 ```bash
 npm run dev
