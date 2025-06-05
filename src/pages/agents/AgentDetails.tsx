@@ -20,12 +20,14 @@ import {
   Workflow,
   Repeat,
   UserCircle,
-  Inbox
+  Inbox,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
+import { Dialog } from '../../components/ui/Dialog';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
@@ -49,6 +51,9 @@ export const AgentDetails: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [modal, setModal] = useState<ModalState>({ type: null, data: null });
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
+  const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
+  const [selectedTranscripts, setSelectedTranscripts] = useState<string[]>([]);
+  const [timeframe, setTimeframe] = useState<'today' | '7days'>('today');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,20 +90,48 @@ export const AgentDetails: React.FC = () => {
     fetchData();
   }, [agentId, getAgent]);
 
-  const handleAnalyze = async () => {
-    if (!transcripts.length) {
-      setError('No conversations to analyze');
+  const getTodayTranscripts = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return transcripts.filter(t => new Date(t.created_at) >= today);
+  };
+
+  const getLast7DaysTranscripts = () => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    return transcripts.filter(t => new Date(t.created_at) >= sevenDaysAgo);
+  };
+
+  const handleAnalyzeClick = () => {
+    setTimeframe('today');
+    setSelectedTranscripts([]);
+    setShowAnalyzeDialog(true);
+  };
+
+  const handleAnalyzeConfirm = async () => {
+    const transcriptsToAnalyze = timeframe === 'today' ? getTodayTranscripts() : getLast7DaysTranscripts();
+    
+    if (transcriptsToAnalyze.length === 0) {
+      setError('No conversations available for the selected timeframe');
       return;
     }
+
+    // Filter out transcripts that have already been analyzed
+    const analyzedIds = new Set(analysisResults.flatMap(r => r.transcriptionIds));
+    const unanalyzedTranscripts = transcriptsToAnalyze.filter(t => !analyzedIds.has(t.id));
+
+    if (unanalyzedTranscripts.length === 0) {
+      setError('All conversations in this timeframe have already been analyzed');
+      return;
+    }
+
+    setShowAnalyzeDialog(false);
     
     try {
       setAnalyzing(true);
       setError(null);
-      
-      // Get the 5 most recent transcripts
-      const recentTranscripts = transcripts.slice(0, 5);
-      const result = await analyzeTranscripts(recentTranscripts);
-      
+      const result = await analyzeTranscripts(unanalyzedTranscripts);
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
       console.error('Analysis error:', err);
@@ -542,7 +575,7 @@ export const AgentDetails: React.FC = () => {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Analysis Results</h2>
                 <Button 
-                  onClick={handleAnalyze}
+                  onClick={handleAnalyzeClick}
                   disabled={analyzing || transcripts.length === 0}
                 >
                   <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
@@ -609,6 +642,78 @@ export const AgentDetails: React.FC = () => {
       >
         {modal.type === 'conversation' && renderConversationModal(modal.data)}
       </Modal>
+
+      <Dialog
+        isOpen={showAnalyzeDialog}
+        onClose={() => setShowAnalyzeDialog(false)}
+        title="Analyze Conversations"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setShowAnalyzeDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAnalyzeConfirm}
+              disabled={analyzing}
+            >
+              {analyzing ? 'Analyzing...' : 'Analyze'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Choose which conversations to analyze:
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              className={`p-4 rounded-lg border text-left ${
+                timeframe === 'today' ? 'border-primary bg-primary/5' : 'border-border'
+              }`}
+              onClick={() => setTimeframe('today')}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <CalendarIcon className="h-5 w-5" />
+                <span className="text-sm font-medium">
+                  {getTodayTranscripts().length} conversations
+                </span>
+              </div>
+              <h3 className="font-medium">Today</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Analyze today's conversations
+              </p>
+            </button>
+
+            <button
+              className={`p-4 rounded-lg border text-left ${
+                timeframe === '7days' ? 'border-primary bg-primary/5' : 'border-border'
+              }`}
+              onClick={() => setTimeframe('7days')}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <CalendarIcon className="h-5 w-5" />
+                <span className="text-sm font-medium">
+                  {getLast7DaysTranscripts().length} conversations
+                </span>
+              </div>
+              <h3 className="font-medium">Last 7 Days</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Analyze conversations from the past week
+              </p>
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-md text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+      </Dialog>
     </div>
   );
 };
