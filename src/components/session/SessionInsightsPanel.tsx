@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useSession } from '../../context/SessionContext';
+import { useLiveCall } from '../../context/LiveCallContext';
 import { analyzeTranscript as analyzeTranscriptAPI, AnalysisResult } from '../../services/openai';
 
 interface SessionInsightsPanelProps {
@@ -18,6 +19,7 @@ interface SessionInsightsPanelProps {
 
 export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ liveSession = true }) => {
   const { insights, addUserStatement, addUserPreference, addUserFriction, addUserDecision, setHypothesis } = useSession();
+  const { transcript } = useLiveCall();
   
   const handleCopyInsights = () => {
     // Create a formatted string of all insights
@@ -58,10 +60,12 @@ ${insights.decisions.length > 0
       });
   };
 
-  // Placeholder transcript. Replace with real session transcript when available.
-  const transcript = '';
-
   const analyzeTranscript = async () => {
+    if (!transcript) {
+      console.warn('No transcript available for analysis');
+      return;
+    }
+
     try {
       const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
       setHypothesis(result.hypothesis);
@@ -75,6 +79,11 @@ ${insights.decisions.length > 0
   };
 
   const extractStatements = async () => {
+    if (!transcript) {
+      console.warn('No transcript available for analysis');
+      return;
+    }
+
     try {
       const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
       result.statements.forEach((s) => addUserStatement(s));
@@ -84,6 +93,11 @@ ${insights.decisions.length > 0
   };
 
   const findPreferences = async () => {
+    if (!transcript) {
+      console.warn('No transcript available for analysis');
+      return;
+    }
+
     try {
       const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
       result.preferences.forEach((p) => addUserPreference(p));
@@ -93,6 +107,11 @@ ${insights.decisions.length > 0
   };
 
   const identifyFriction = async () => {
+    if (!transcript) {
+      console.warn('No transcript available for analysis');
+      return;
+    }
+
     try {
       const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
       result.frictions.forEach((f) => addUserFriction(f.content, f.severity));
@@ -102,6 +121,11 @@ ${insights.decisions.length > 0
   };
 
   const recordDecisions = async () => {
+    if (!transcript) {
+      console.warn('No transcript available for analysis');
+      return;
+    }
+
     try {
       const result: AnalysisResult = await analyzeTranscriptAPI(transcript);
       result.decisions.forEach((d) => addUserDecision(d));
@@ -147,7 +171,11 @@ ${insights.decisions.length > 0
             </p>
             
             {liveSession && (
-              <Button className="mt-4" onClick={analyzeTranscript}>
+              <Button 
+                className="mt-4" 
+                onClick={analyzeTranscript}
+                disabled={!transcript}
+              >
                 <Search className="mr-2 h-4 w-4" />
                 Analyze Transcript
               </Button>
@@ -165,6 +193,7 @@ ${insights.decisions.length > 0
           emptySubMessage="Extract user quotes and reactions from transcript"
           actionLabel={liveSession ? "Extract Statements" : undefined}
           onAction={liveSession ? extractStatements : undefined}
+          disabled={!transcript}
         />
         
         <InsightSection
@@ -175,6 +204,7 @@ ${insights.decisions.length > 0
           emptySubMessage="Find explicitly stated user preferences"
           actionLabel={liveSession ? "Find Preferences" : undefined}
           onAction={liveSession ? findPreferences : undefined}
+          disabled={!transcript}
         />
         
         <InsightSection
@@ -185,6 +215,7 @@ ${insights.decisions.length > 0
           emptySubMessage="Identify pain points in the user experience"
           actionLabel={liveSession ? "Identify Friction" : undefined}
           onAction={liveSession ? identifyFriction : undefined}
+          disabled={!transcript}
         />
         
         <InsightSection
@@ -195,6 +226,7 @@ ${insights.decisions.length > 0
           emptySubMessage="Track user decision points and choices"
           actionLabel={liveSession ? "Record Decisions" : undefined}
           onAction={liveSession ? recordDecisions : undefined}
+          disabled={!transcript}
         />
       </div>
     </div>
@@ -209,6 +241,7 @@ interface InsightSectionProps {
   emptySubMessage: string;
   actionLabel?: string;
   onAction?: () => void;
+  disabled?: boolean;
 }
 
 const InsightSection: React.FC<InsightSectionProps> = ({
@@ -218,7 +251,8 @@ const InsightSection: React.FC<InsightSectionProps> = ({
   emptyMessage,
   emptySubMessage,
   actionLabel,
-  onAction
+  onAction,
+  disabled
 }) => {
   return (
     <div className="bg-card rounded-lg border border-border p-6">
@@ -252,6 +286,7 @@ const InsightSection: React.FC<InsightSectionProps> = ({
               variant="outline" 
               className="mt-4"
               onClick={onAction}
+              disabled={disabled}
             >
               {actionLabel}
             </Button>
