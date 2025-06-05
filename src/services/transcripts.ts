@@ -71,6 +71,31 @@ export async function analyzeTranscripts(
     throw new Error('Authentication required');
   }
 
+  if (!transcriptionIds.length) {
+    throw new Error('No transcripts selected for analysis');
+  }
+
+  // First, fetch the content of all selected transcripts
+  const { data: transcripts, error: fetchError } = await supabase
+    .from('transcriptions')
+    .select('content')
+    .in('id', transcriptionIds);
+
+  if (fetchError) {
+    throw new Error('Failed to fetch transcript content');
+  }
+
+  if (!transcripts || transcripts.length === 0) {
+    throw new Error('No transcript content found');
+  }
+
+  // Combine all transcript content into a single text
+  const combinedText = transcripts.map(t => t.content).join('\n\n');
+
+  if (!combinedText.trim()) {
+    throw new Error('No valid transcript content to analyze');
+  }
+
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
@@ -79,7 +104,10 @@ export async function analyzeTranscripts(
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ transcriptionIds })
+      body: JSON.stringify({
+        transcriptionIds,
+        text: combinedText
+      })
     }
   );
 
