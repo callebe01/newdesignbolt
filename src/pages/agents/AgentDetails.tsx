@@ -10,7 +10,16 @@ import {
   RefreshCw,
   Table,
   MessageSquare,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  BarChart2,
+  Brain,
+  GitPullRequest,
+  AlertTriangle,
+  Workflow,
+  Repeat,
+  UserCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -116,7 +125,7 @@ export const AgentDetails: React.FC = () => {
   };
 
   const renderAnalysisDetails = (analysis: AnalysisResult) => (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <Button 
           variant="ghost" 
@@ -131,54 +140,197 @@ export const AgentDetails: React.FC = () => {
         </div>
       </div>
 
-      <div>
-        <h3 className="text-lg font-medium mb-2">Summary</h3>
+      {/* Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Brain className="h-5 w-5 mr-2" />
+            Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm">{analysis.summary}</p>
+        </CardContent>
+      </Card>
+
+      {/* Resolution and Engagement */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardContent className="p-4">
-            <p className="text-sm">{analysis.summary}</p>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Resolution Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-around text-center">
+              <div>
+                <div className="text-3xl font-bold text-success">
+                  {analysis.resolutionRate?.resolved || 0}%
+                </div>
+                <div className="text-sm text-muted-foreground">Resolved</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-destructive">
+                  {analysis.resolutionRate?.unresolved || 0}%
+                </div>
+                <div className="text-sm text-muted-foreground">Unresolved</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart2 className="h-5 w-5 mr-2" />
+              Engagement Score
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <div className="text-4xl font-bold">{analysis.engagementScore}</div>
+              <div className="text-sm text-muted-foreground mt-2">
+                {analysis.engagementScore >= 80 ? 'High Engagement' :
+                 analysis.engagementScore >= 50 ? 'Moderate Engagement' :
+                 'Low Engagement'}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div>
-        <h3 className="text-lg font-medium mb-2">Sentiment Analysis</h3>
-        <div className="grid grid-cols-3 gap-4">
-          {Object.entries(analysis.sentimentScores || {}).map(([key, value]) => (
-            <Card key={key}>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{Math.round(value * 100)}%</div>
-                <div className="text-sm text-muted-foreground capitalize">{key}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      {/* User Intent */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <UserCircle className="h-5 w-5 mr-2" />
+            User Intent
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {Object.entries(analysis.userIntent || {}).map(([intent, percentage]) => (
+              <div key={intent} className="bg-muted p-4 rounded-lg text-center">
+                <div className="text-xl font-bold">{percentage}%</div>
+                <div className="text-sm text-muted-foreground capitalize">
+                  {intent.replace(/_/g, ' ')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      <div>
-        <h3 className="text-lg font-medium mb-2">Key Points</h3>
-        <Card>
-          <CardContent className="p-4">
-            <ul className="list-disc list-inside space-y-2">
-              {analysis.keyPoints?.map((point, index) => (
-                <li key={index} className="text-sm">{point}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Workflow Patterns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Workflow className="h-5 w-5 mr-2" />
+            Workflow Patterns
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {analysis.workflowPatterns?.map((pattern, index) => (
+              <li key={index} className="flex items-start">
+                <div className="h-6 w-6 flex-shrink-0 text-primary">
+                  <Workflow className="h-5 w-5" />
+                </div>
+                <span className="ml-2">{pattern}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
-      <div>
-        <h3 className="text-lg font-medium mb-2">Recommendations</h3>
-        <Card>
-          <CardContent className="p-4">
-            <ul className="list-disc list-inside space-y-2">
-              {analysis.recommendations?.map((rec, index) => (
-                <li key={index} className="text-sm">{rec}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Repetitive Questions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Repeat className="h-5 w-5 mr-2" />
+            Repetitive Questions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {analysis.repetitiveQuestions?.map((question, index) => (
+              <li key={index} className="flex items-start">
+                <div className="h-6 w-6 flex-shrink-0 text-accent">
+                  <Repeat className="h-5 w-5" />
+                </div>
+                <span className="ml-2">{question}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Feature Requests */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <GitPullRequest className="h-5 w-5 mr-2" />
+            Feature Requests
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {analysis.featureRequests?.map((request, index) => (
+              <li key={index} className="flex items-start">
+                <div className="h-6 w-6 flex-shrink-0 text-secondary">
+                  <GitPullRequest className="h-5 w-5" />
+                </div>
+                <span className="ml-2">{request}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Key Points */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            Key Points & UX Issues
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {analysis.keyPoints?.map((point, index) => (
+              <li key={index} className="flex items-start">
+                <div className="h-6 w-6 flex-shrink-0 text-warning">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <span className="ml-2">{point}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Recommendations */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Recommendations
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3">
+            {analysis.recommendations?.map((rec, index) => (
+              <li key={index} className="flex items-start">
+                <div className="h-6 w-6 flex-shrink-0 text-success">
+                  <CheckCircle className="h-5 w-5" />
+                </div>
+                <span className="ml-2">{rec}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 
