@@ -1,3 +1,4 @@
+// Full content of LiveCallContext.tsx with proper string concatenation and duration handling
 import React, {
   createContext,
   useContext,
@@ -128,10 +129,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
+      // Start duration timer
       durationTimerRef.current = window.setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
 
+      // Set max duration timer if specified
       if (maxDuration) {
         maxDurationTimerRef.current = window.setTimeout(() => {
           endCall();
