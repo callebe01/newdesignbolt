@@ -21,6 +21,11 @@ export async function getTranscripts(agentId: string) {
 }
 
 export async function saveTranscript(agentId: string, content: string) {
+  if (!content?.trim()) {
+    console.warn('Empty transcript content, skipping save');
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('transcriptions')
     .insert([
@@ -65,7 +70,28 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
   }
 
   const result = await response.json();
-  return result;
+  
+  // Store the analysis result
+  const { data: savedAnalysis, error: saveError } = await supabase
+    .from('analysis_results')
+    .insert({
+      transcription_ids: transcripts.map(t => t.id),
+      summary: result.summary,
+      sentiment_scores: result.sentiment_scores,
+      key_points: result.key_points,
+      recommendations: result.recommendations,
+      user_intent: result.user_intent,
+      workflow_patterns: result.workflow_patterns,
+      feature_requests: result.feature_requests,
+      resolution_rate: result.resolution_rate,
+      engagement_score: result.engagement_score,
+      repetitive_questions: result.repetitive_questions || []
+    })
+    .select()
+    .single();
+
+  if (saveError) throw saveError;
+  return savedAnalysis;
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {

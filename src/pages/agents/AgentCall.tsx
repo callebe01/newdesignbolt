@@ -72,7 +72,6 @@ export const AgentCall: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center">
           <Button
@@ -97,7 +96,6 @@ export const AgentCall: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         <div className={`w-32 h-32 rounded-full bg-gradient-to-b from-sky-200 to-sky-500 flex items-center justify-center mb-8 ${
           status === 'active' ? 'animate-pulse-subtle' : ''
