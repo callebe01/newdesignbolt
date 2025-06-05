@@ -1,124 +1,53 @@
 import { supabase } from './supabase';
 
-export interface Transcript {
-  id: string;
-  agentId: string;
-  content: string;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-}
-
 export interface AnalysisResult {
   id: string;
-  transcriptionIds: string[];
+  transcription_ids: string[];
   summary: string;
-  sentimentScores: Record<string, number>;
-  keyPoints: string[];
+  sentiment_scores: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
+  key_points: string[];
   recommendations: string[];
-  createdAt: string;
+  created_at: string;
 }
 
-export async function saveTranscript(agentId: string, content: string, metadata: Record<string, unknown> = {}) {
-  if (!content.trim()) return;
+export async function getTranscripts(agentId: string) {
+  const { data, error } = await supabase
+    .from('transcriptions')
+    .select('*')
+    .eq('agent_id', agentId)
+    .order('created_at', { ascending: false });
 
-  try {
-    const { data, error } = await supabase
-      .from('transcriptions')
-      .insert({
-        agent_id: agentId,
-        content,
-        metadata,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (err) {
-    console.error('Failed to save transcription:', err);
-    throw err;
-  }
+  if (error) throw error;
+  return data;
 }
 
-export async function getAgentTranscripts(agentId: string): Promise<Transcript[]> {
-  try {
-    const { data, error } = await supabase
-      .from('transcriptions')
-      .select('*')
-      .eq('agent_id', agentId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data.map(row => ({
-      id: row.id,
-      agentId: row.agent_id,
-      content: row.content,
-      metadata: row.metadata,
-      createdAt: row.created_at
-    }));
-  } catch (err) {
-    console.error('Failed to fetch transcriptions:', err);
-    throw err;
-  }
-}
-
-export async function analyzeTranscripts(transcriptionIds: string[], accessToken: string, count: number = 5): Promise<AnalysisResult> {
-  if (!accessToken) {
-    console.error('No access token provided');
-    throw new Error('Authentication required');
-  }
-
-  console.log('Making Edge Function call with token:', accessToken.substring(0, 10) + '...');
+export async function analyzeTranscripts(transcriptionIds: string[]): Promise<AnalysisResult> {
+  // Get the current session
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!session) throw new Error('No active session');
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        // Use the access token from the current session
+        'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ transcriptionIds, count })
+      body: JSON.stringify({ transcriptionIds }),
     }
   );
 
-  if (response.status === 401) {
-    console.error('Authentication failed with status 401');
-    throw new Error('Unauthorized: Invalid or expired authentication token');
-  }
-
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('Edge Function error:', errorData);
-    throw new Error(errorData.error || 'Failed to analyze transcripts');
+    const error = await response.json();
+    throw new Error(`Analysis failed:\n\n${error.error}`);
   }
 
-  const result = await response.json();
-  console.log('Analysis completed successfully:', result);
-  return result;
-}
-
-export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
-  try {
-    const { data, error } = await supabase
-      .from('analysis_results')
-      .select('*')
-      .contains('transcription_ids', transcriptionIds)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data.map(row => ({
-      id: row.id,
-      transcriptionIds: row.transcription_ids,
-      summary: row.summary,
-      sentimentScores: row.sentiment_scores,
-      keyPoints: row.key_points,
-      recommendations: row.recommendations,
-      createdAt: row.created_at
-    }));
-  } catch (err) {
-    console.error('Failed to fetch analysis results:', err);
-    throw err;
-  }
+  return response.json();
 }
