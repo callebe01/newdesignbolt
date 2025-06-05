@@ -34,15 +34,16 @@ serve(async (req) => {
           role: "system",
           content: `You are a conversation analyst. Analyze the provided transcripts and return a JSON object with:
             - summary (brief overview)
-            - sentiment_scores (object with positive/negative/neutral percentages)
-            - key_points (array of main takeaways)
+            - sentimentScores (object with positive/negative/neutral percentages)
+            - keyPoints (array of main takeaways)
             - recommendations (array of actionable insights)
-            - user_intent (object categorizing user intents like onboarding, troubleshooting, feature discovery)
-            - workflow_patterns (array of identified workflow patterns and bottlenecks)
-            - feature_requests (array of feature requests or suggestions)
-            - resolution_rate (object with resolved and unresolved percentages)
-            - engagement_score (number from 0-100 indicating user engagement level)
-            - repetitive_questions (array of questions that came up multiple times)
+            - userIntent (object categorizing user intents like onboarding, troubleshooting, feature discovery)
+            - workflowPatterns (array of identified workflow patterns and bottlenecks)
+            - uxIssues (array of UX issues mentioned)
+            - featureRequests (array of feature requests or suggestions)
+            - resolutionRate (object with resolved and unresolved percentages)
+            - engagementScore (number from 0-100 indicating user engagement level)
+            - repetitiveQuestions (array of questions that came up multiple times)
             
             Focus on extracting actionable insights and patterns.`
         }, {
@@ -63,9 +64,14 @@ serve(async (req) => {
 
     // Validate analysis structure
     if (
-      typeof analysis.sentiment_scores !== 'object' || 
-      !Array.isArray(analysis.key_points) || 
-      !Array.isArray(analysis.recommendations)
+      typeof analysis.sentimentScores !== 'object' || 
+      !Array.isArray(analysis.keyPoints) || 
+      !Array.isArray(analysis.recommendations) ||
+      typeof analysis.userIntent !== 'object' ||
+      !Array.isArray(analysis.workflowPatterns) ||
+      !Array.isArray(analysis.featureRequests) ||
+      typeof analysis.resolutionRate !== 'object' ||
+      typeof analysis.engagementScore !== 'number'
     ) {
       throw new Error("Invalid analysis format");
     }
@@ -82,23 +88,20 @@ serve(async (req) => {
       .insert({
         transcription_ids: transcriptionIds,
         summary: analysis.summary,
-        sentiment_scores: analysis.sentiment_scores,
-        key_points: analysis.key_points,
+        sentiment_scores: analysis.sentimentScores,
+        key_points: analysis.keyPoints,
         recommendations: analysis.recommendations,
-        user_intent: analysis.user_intent || {},
-        workflow_patterns: analysis.workflow_patterns || [],
-        feature_requests: analysis.feature_requests || [],
-        resolution_rate: analysis.resolution_rate || { resolved: 0, unresolved: 0 },
-        engagement_score: analysis.engagement_score || 0,
-        repetitive_questions: analysis.repetitive_questions || []
+        user_intent: analysis.userIntent,
+        workflow_patterns: analysis.workflowPatterns,
+        feature_requests: analysis.featureRequests,
+        resolution_rate: analysis.resolutionRate,
+        engagement_score: analysis.engagementScore,
+        repetitive_questions: analysis.repetitiveQuestions || []
       })
       .select()
       .single();
 
-    if (saveError) {
-      console.error("Failed to save analysis:", saveError);
-      throw saveError;
-    }
+    if (saveError) throw saveError;
 
     return new Response(
       JSON.stringify(savedAnalysis),
