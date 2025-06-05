@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { generateAgentReport } from './openai';
 
 export interface Transcript {
   id: string;
@@ -69,12 +68,17 @@ export async function analyzeTranscripts(transcriptionIds: string[], accessToken
     throw new Error('Authentication required');
   }
 
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Unauthorized');
+  }
+
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ transcriptionIds, count })

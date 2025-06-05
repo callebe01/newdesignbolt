@@ -1,27 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
-  Phone,
-  Clock,
-  Calendar,
-  Edit2,
-  Trash2,
+  Phone, 
+  Clock, 
+  Calendar, 
+  Edit2, 
+  Trash2, 
+  MoreVertical,
   ChevronLeft,
+  Plus,
   RefreshCw
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Card, CardContent } from '../../components/ui/Card';
-import { formatDateTime } from '../../utils/format';
-import { useAgents } from '../../context/AgentContext';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { formatDateTime, formatDuration } from '../../utils/format';
+import { useProjects } from '../../context/ProjectContext';
+import { Project, Session } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { Agent } from '../../types';
 import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
-  const { getAgent } = useAgents();
-  const { accessToken, logout } = useAuth();
+  const { getAgent } = useProjects();
+  const { user, accessToken } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,10 @@ export const AgentDetails: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!agentId) return;
+      if (!agentId || !user) {
+        navigate('/login');
+        return;
+      }
       
       try {
         setLoading(true);
@@ -54,12 +59,10 @@ export const AgentDetails: React.FC = () => {
           setError('Agent not found');
         }
       } catch (err) {
+        console.error('Error fetching data:', err);
         if (err instanceof Error && err.message === 'Unauthorized') {
-          setError('Your session expired. Please log in again.');
-          await logout();
           navigate('/login');
         } else {
-          console.error('Error fetching data:', err);
           setError('Failed to load agent details');
         }
       } finally {
@@ -68,10 +71,13 @@ export const AgentDetails: React.FC = () => {
     };
     
     fetchData();
-  }, [agentId, getAgent, logout, navigate]);
+  }, [agentId, getAgent, navigate, user]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length || !accessToken) return;
+    if (!transcripts.length || !user || !accessToken) {
+      navigate('/login');
+      return;
+    }
     
     try {
       setAnalyzing(true);
@@ -79,19 +85,19 @@ export const AgentDetails: React.FC = () => {
       const result = await analyzeTranscripts(
         transcripts.map(t => t.id),
         accessToken,
-        5 // Analyze last 5 transcripts
+        5
       );
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
+      console.error('Analysis failed:', err);
       if (err instanceof Error) {
         if (err.message === 'Unauthorized') {
-          setError('Your session expired. Please log in again.');
-          await logout();
           navigate('/login');
           return;
         }
-        console.error('Unexpected error during analysis:', err);
-        setError('Failed to analyze transcripts. Please try again later.');
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
       }
     } finally {
       setAnalyzing(false);
@@ -127,40 +133,34 @@ export const AgentDetails: React.FC = () => {
     return (
       <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
-        {error === 'Your session expired. Please log in again.' ? (
-          <p>
-            Your session expired. Please{' '}
-            <Link to="/login" className="underline">
-              log in
-            </Link>{' '}
-            again.
-          </p>
-        ) : (
-          <p>{error || 'Agent not found'}</p>
-        )}
-        <Link to="/agents" className="underline">
+        <p>{error || 'Agent not found'}</p>
+        <Button
+          variant="outline"
+          className="mt-4"
+          onClick={() => navigate('/agents')}
+        >
+          <ChevronLeft className="mr-2 h-4 w-4" />
           Back to Agents
-        </Link>
+        </Button>
       </div>
     );
   }
-
-  const latestAnalysis = analysisResults[0];
-
+  
+  const activeSessions = project.sessions.filter(s => s.status === 'active');
+  const completedSessions = project.sessions.filter(s => s.status === 'completed');
+  
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="mr-1 h-4 w-4" />
-          Back to Agents
-        </Link>
-      </div>
-
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{agent.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {agent.status === 'active' ? 'Active • Last active 2h ago' : 'Inactive'}
+          <div className="flex items-center gap-2">
+            <Link to="/agents" className="text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+            <h1 className="text-3xl font-bold">{agent.name}</h1>
+          </div>
+          <p className="text-muted-foreground mt-1">
+            {agent.description}
           </p>
         </div>
         
@@ -176,29 +176,7 @@ export const AgentDetails: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium mb-1">Shareable Link</h3>
-              <p className="text-sm text-muted-foreground break-all">
-                {`${window.location.origin}/agent/${agent.id}`}
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/agent/${agent.id}`);
-                alert('Link copied to clipboard!');
-              }}
-            >
-              Copy Link
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -254,7 +232,7 @@ export const AgentDetails: React.FC = () => {
           <h2 className="text-xl font-semibold">Conversation History</h2>
           <Button 
             onClick={handleAnalyze}
-            disabled={analyzing || transcripts.length === 0 || !accessToken}
+            disabled={analyzing || transcripts.length === 0 || !user || !accessToken}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
             {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
