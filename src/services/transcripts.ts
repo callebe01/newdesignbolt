@@ -98,7 +98,7 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
   const { data, error } = await supabase
     .from('analysis_results')
     .select('*')
-    .contains('transcription_ids', transcriptionIds)
+    .overlaps('transcription_ids', transcriptionIds)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
