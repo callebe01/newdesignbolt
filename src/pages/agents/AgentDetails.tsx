@@ -6,15 +6,15 @@ import {
   Calendar, 
   Edit2, 
   Trash2, 
-  MoreVertical,
   ChevronLeft,
-  RefreshCw
+  RefreshCw,
+  Table
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
-import { useAuth } from '../../context/AuthContext';
 import { Agent } from '../../types';
 import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
 
@@ -22,13 +22,13 @@ export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const { getAgent, deleteAgent } = useAgents();
-  const { user } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<any[]>([]);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -125,8 +125,6 @@ export const AgentDetails: React.FC = () => {
     );
   }
 
-  const latestAnalysis = analysisResults[0];
-
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
@@ -157,142 +155,159 @@ export const AgentDetails: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
-                <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
-              </div>
-              <div className="p-2 bg-muted rounded-md">
-                <Phone className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="conversations">Conversations</TabsTrigger>
+          <TabsTrigger value="analysis">Analysis</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
-                <h3 className="text-3xl font-bold mt-1">
-                  {latestAnalysis?.sentimentScores?.average || 'N/A'}
-                </h3>
-              </div>
-              <div className="p-2 bg-muted rounded-md">
-                <Clock className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
-                <h3 className="text-3xl font-bold mt-1">
-                  {transcripts[0] 
-                    ? formatDateTime(transcripts[0].created_at)
-                    : 'Never'}
-                </h3>
-              </div>
-              <div className="p-2 bg-muted rounded-md">
-                <Calendar className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Conversation History</h2>
-          <Button 
-            onClick={handleAnalyze}
-            disabled={analyzing || transcripts.length === 0}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
-          </Button>
-        </div>
-
-        {error && (
-          <div className="bg-destructive/10 text-destructive p-4 rounded-md">
-            {error}
-          </div>
-        )}
-
-        {transcripts.length > 0 ? (
-          <div className="space-y-4">
-            {transcripts.map((transcript, idx) => (
-              <Card key={transcript.id}>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-medium">Conversation #{transcripts.length - idx}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDateTime(transcript.created_at)}
-                      </p>
-                    </div>
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
+                    <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{transcript.content}</p>
-                </CardContent>
-              </Card>
-            ))}
+                  <div className="p-2 bg-muted rounded-md">
+                    <Phone className="h-5 w-5" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
+                    <h3 className="text-3xl font-bold mt-1">
+                      {analysisResults[0]?.sentimentScores?.average || 'N/A'}
+                    </h3>
+                  </div>
+                  <div className="p-2 bg-muted rounded-md">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
+                    <h3 className="text-3xl font-bold mt-1">
+                      {transcripts[0] 
+                        ? formatDateTime(transcripts[0].created_at)
+                        : 'Never'}
+                    </h3>
+                  </div>
+                  <div className="p-2 bg-muted rounded-md">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        ) : (
+
           <Card>
-            <CardContent className="p-6 text-center">
-              <p className="text-muted-foreground">No conversations yet</p>
+            <CardHeader>
+              <CardTitle>Agent Instructions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="whitespace-pre-wrap">{agent.instructions}</p>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </TabsContent>
 
-      {latestAnalysis && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Latest Analysis</h2>
-          <Card>
-            <CardContent className="p-6 space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Summary</h3>
-                <p className="text-sm whitespace-pre-wrap">{latestAnalysis.summary}</p>
-              </div>
+        <TabsContent value="conversations" className="space-y-4">
+          {transcripts.length > 0 ? (
+            <div className="space-y-4">
+              {transcripts.map((transcript, idx) => (
+                <Card key={transcript.id}>
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-medium">Conversation #{transcripts.length - idx}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDateTime(transcript.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{transcript.content}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">No conversations yet</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
-              {latestAnalysis.keyPoints?.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Key Points</h3>
-                  <ul className="space-y-2">
-                    {latestAnalysis.keyPoints.map((point, idx) => (
-                      <li key={idx} className="text-sm flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+        <TabsContent value="analysis" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Analysis Results</h2>
+            <Button 
+              onClick={handleAnalyze}
+              disabled={analyzing || transcripts.length === 0}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+              {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
+            </Button>
+          </div>
 
-              {latestAnalysis.recommendations?.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Recommendations</h3>
-                  <ul className="space-y-2">
-                    {latestAnalysis.recommendations.map((rec, idx) => (
-                      <li key={idx} className="text-sm flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-accent mr-2" />
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Summary</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Sentiment</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {analysisResults.map((analysis) => (
+                  <tr key={analysis.id} className="hover:bg-muted/50">
+                    <td className="px-4 py-3 text-sm">
+                      {formatDateTime(analysis.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 text-sm max-w-md">
+                      <p className="truncate">{analysis.summary}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {analysis.sentimentScores?.positive && (
+                        <span className="text-success">
+                          {Math.round(analysis.sentimentScores.positive * 100)}% Positive
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <Button variant="outline" size="sm">
+                        <Table className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
