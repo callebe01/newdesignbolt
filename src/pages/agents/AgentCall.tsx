@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, X, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, X, ArrowLeft, Monitor } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -16,7 +16,7 @@ export const AgentCall: React.FC = () => {
     endCall, 
     status, 
     transcript, 
-    toggleMicrophone,
+    toggleMicrophone, 
     toggleScreenShare,
     isScreenSharing,
     isMicrophoneActive,
@@ -47,10 +47,14 @@ export const AgentCall: React.FC = () => {
   }, [agent, startCall]);
 
   const handleEnd = async () => {
-    endCall();
-    if (agentId) {
-      await saveTranscript(agentId, transcript);
+    if (agentId && transcript) {
+      try {
+        await saveTranscript(agentId, transcript);
+      } catch (err) {
+        console.error('Failed to save transcript:', err);
+      }
     }
+    endCall();
     navigate('/agents');
   };
 
@@ -136,21 +140,7 @@ export const AgentCall: React.FC = () => {
             onClick={toggleScreenShare}
             disabled={!agent?.canSeeScreenshare}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="20" height="14" x="2" y="3" rx="2" />
-              <line x1="8" x2="16" y1="21" y2="21" />
-              <line x1="12" x2="12" y1="17" y2="21" />
-            </svg>
+            <Monitor className="h-6 w-6" />
           </Button>
 
           <Button
