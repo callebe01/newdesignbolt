@@ -78,7 +78,7 @@ export const AgentDetails: React.FC = () => {
     avgDuration: 0
   });
   const [linkCopied, setLinkCopied] = useState(false);
-  const shareUrl = `https://voicepilot.live/agent/${agentId}`;
+  const shareUrl = `https://${agent?.share_domain}/agent/${agentId}`;
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => {
       setLinkCopied(true);
