@@ -79,7 +79,12 @@ export const AgentDetails: React.FC = () => {
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
       console.error('Analysis failed:', err);
-      setError('Failed to analyze transcripts');
+      if (err instanceof Error && err.message === 'Unauthorized') {
+        setError('Your session expired. Please log in again.');
+        navigate('/login');
+      } else {
+        setError('Failed to analyze transcripts');
+      }
     } finally {
       setAnalyzing(false);
     }

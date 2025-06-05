@@ -81,6 +81,10 @@ export async function analyzeTranscripts(transcriptionIds: string[], accessToken
     }
   );
 
+  if (response.status === 401) {
+    throw new Error('Unauthorized');
+  }
+
   if (!response.ok) {
     throw new Error('Failed to analyze transcripts');
   }
