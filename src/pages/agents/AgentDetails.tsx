@@ -21,7 +21,9 @@ import {
   Repeat,
   UserCircle,
   Inbox,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Copy,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -76,6 +78,12 @@ export const AgentDetails: React.FC = () => {
     engagementScore: 0,
     avgDuration: 0
   });
+
+  const copyShareableLink = () => {
+    if (!agent) return;
+    const shareableUrl = `https://voicepilot.live/agent/${agent.id}`;
+    navigator.clipboard.writeText(shareableUrl);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -536,6 +544,33 @@ export const AgentDetails: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="font-medium">Shareable Link</h3>
+              <p className="text-sm text-muted-foreground">
+                Share this link with your users to let them talk to your AI agent
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={copyShareableLink}
+              className="flex items-center"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy Link
+            </Button>
+          </div>
+          <div className="mt-4 p-3 bg-muted rounded-lg flex items-center gap-2">
+            <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <code className="text-sm flex-1 break-all">
+              https://voicepilot.live/agent/{agent?.id}
+            </code>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
