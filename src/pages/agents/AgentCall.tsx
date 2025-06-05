@@ -44,7 +44,9 @@ export const AgentCall: React.FC = () => {
   useEffect(() => {
     if (!startedRef.current && agent) {
       startedRef.current = true;
-      startCall(agent.instructions, 300).catch((err) => console.error(err));
+      startCall(agent.instructions, agent.callDuration).catch((err) =>
+        console.error(err)
+      );
     }
   }, [agent, startCall]);
 

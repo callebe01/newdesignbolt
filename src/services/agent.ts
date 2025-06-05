@@ -1,13 +1,18 @@
 import { supabase } from './supabase';
 import { Agent, AgentConversation, ConversationMessage, AgentAnalytics, AgentMetrics } from '../types/agent';
 
-export async function createAgent(name: string, instructions: string): Promise<Agent> {
+export async function createAgent(
+  name: string,
+  instructions: string,
+  duration: number
+): Promise<Agent> {
   const { data, error } = await supabase
     .from('agents')
     .insert({
       name,
       instructions,
       status: 'active',
+      call_duration: duration,
     })
     .select()
     .single();
@@ -30,7 +35,12 @@ export async function getAgent(id: string): Promise<Agent | null> {
 export async function updateAgent(id: string, updates: Partial<Agent>): Promise<Agent> {
   const { data, error } = await supabase
     .from('agents')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+      call_duration: (updates as any).callDuration,
+      can_see_screenshare: (updates as any).canSeeScreenshare,
+    })
     .eq('id', id)
     .select()
     .single();
@@ -163,6 +173,8 @@ function mapAgent(row: Record<string, any>): Agent {
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     userId: row.user_id,
+    canSeeScreenshare: row.can_see_screenshare,
+    callDuration: row.call_duration,
   };
 }
 

@@ -10,7 +10,12 @@ interface AgentContextType {
   error: string | null;
   fetchAgents: () => Promise<void>;
   getAgent: (id: string) => Promise<Agent | null>;
-  createAgent: (name: string, instructions: string, canSeeScreenshare: boolean) => Promise<Agent>;
+  createAgent: (
+    name: string,
+    instructions: string,
+    canSeeScreenshare: boolean,
+    duration: number
+  ) => Promise<Agent>;
   setCurrentAgent: (agent: Agent | null) => void;
 }
 
@@ -32,6 +37,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updated_at: string;
     user_id: string;
     can_see_screenshare: boolean;
+    call_duration: number;
   }
 
   const mapAgent = (data: AgentRow): Agent => ({
@@ -43,6 +49,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updatedAt: new Date(data.updated_at),
     userId: data.user_id,
     canSeeScreenshare: data.can_see_screenshare,
+    callDuration: data.call_duration,
   });
 
   const fetchAgents = useCallback(async () => {
@@ -89,7 +96,12 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const createAgent = async (name: string, instructions: string, canSeeScreenshare: boolean): Promise<Agent> => {
+  const createAgent = async (
+    name: string,
+    instructions: string,
+    canSeeScreenshare: boolean,
+    duration: number
+  ): Promise<Agent> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create an agent');
@@ -103,6 +115,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           status: 'active',
           user_id: user.id,
           can_see_screenshare: canSeeScreenshare,
+          call_duration: duration,
         })
         .select()
         .single();
