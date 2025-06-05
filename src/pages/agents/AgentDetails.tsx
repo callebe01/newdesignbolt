@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   RefreshCw,
   Table,
-  MessageSquare
+  MessageSquare,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -21,7 +22,7 @@ import { Agent } from '../../types';
 import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
 
 interface ModalState {
-  type: 'analysis' | 'conversation' | null;
+  type: 'conversation' | null;
   data: any;
 }
 
@@ -37,6 +38,7 @@ export const AgentDetails: React.FC = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [modal, setModal] = useState<ModalState>({ type: null, data: null });
+  const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -113,41 +115,69 @@ export const AgentDetails: React.FC = () => {
     }
   };
 
-  const renderAnalysisModal = (analysis: AnalysisResult) => (
+  const renderAnalysisDetails = (analysis: AnalysisResult) => (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <Button 
+          variant="ghost" 
+          onClick={() => setSelectedAnalysis(null)}
+          className="hover:bg-transparent p-0"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Analysis List
+        </Button>
+        <div className="text-sm text-muted-foreground">
+          {formatDateTime(analysis.createdAt)}
+        </div>
+      </div>
+
       <div>
         <h3 className="text-lg font-medium mb-2">Summary</h3>
-        <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm">{analysis.summary}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div>
         <h3 className="text-lg font-medium mb-2">Sentiment Analysis</h3>
         <div className="grid grid-cols-3 gap-4">
           {Object.entries(analysis.sentimentScores || {}).map(([key, value]) => (
-            <div key={key} className="bg-muted p-4 rounded-lg">
-              <div className="text-2xl font-bold">{Math.round(value * 100)}%</div>
-              <div className="text-sm text-muted-foreground capitalize">{key}</div>
-            </div>
+            <Card key={key}>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold">{Math.round(value * 100)}%</div>
+                <div className="text-sm text-muted-foreground capitalize">{key}</div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
 
       <div>
         <h3 className="text-lg font-medium mb-2">Key Points</h3>
-        <ul className="list-disc list-inside space-y-2">
-          {analysis.keyPoints?.map((point, index) => (
-            <li key={index} className="text-sm">{point}</li>
-          ))}
-        </ul>
+        <Card>
+          <CardContent className="p-4">
+            <ul className="list-disc list-inside space-y-2">
+              {analysis.keyPoints?.map((point, index) => (
+                <li key={index} className="text-sm">{point}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       <div>
         <h3 className="text-lg font-medium mb-2">Recommendations</h3>
-        <ul className="list-disc list-inside space-y-2">
-          {analysis.recommendations?.map((rec, index) => (
-            <li key={index} className="text-sm">{rec}</li>
-          ))}
-        </ul>
+        <Card>
+          <CardContent className="p-4">
+            <ul className="list-disc list-inside space-y-2">
+              {analysis.recommendations?.map((rec, index) => (
+                <li key={index} className="text-sm">{rec}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -318,73 +348,78 @@ export const AgentDetails: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="analysis" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Analysis Results</h2>
-            <Button 
-              onClick={handleAnalyze}
-              disabled={analyzing || transcripts.length === 0}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
-            </Button>
-          </div>
+          {selectedAnalysis ? (
+            renderAnalysisDetails(selectedAnalysis)
+          ) : (
+            <>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Analysis Results</h2>
+                <Button 
+                  onClick={handleAnalyze}
+                  disabled={analyzing || transcripts.length === 0}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+                  {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
+                </Button>
+              </div>
 
-          {error && (
-            <div className="bg-destructive/10 text-destructive p-4 rounded-md">
-              {error}
-            </div>
+              {error && (
+                <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-lg border">
+                <table className="w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Summary</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Sentiment</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {analysisResults.map((analysis) => (
+                      <tr key={analysis.id} className="hover:bg-muted/50">
+                        <td className="px-4 py-3 text-sm">
+                          {formatDateTime(analysis.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 text-sm max-w-md">
+                          <p className="truncate">{analysis.summary}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {analysis.sentimentScores?.positive && (
+                            <span className="text-success">
+                              {Math.round(analysis.sentimentScores.positive * 100)}% Positive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedAnalysis(analysis)}
+                          >
+                            <Table className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
-
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Summary</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Sentiment</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {analysisResults.map((analysis) => (
-                  <tr key={analysis.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-3 text-sm">
-                      {formatDateTime(analysis.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-sm max-w-md">
-                      <p className="truncate">{analysis.summary}</p>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {analysis.sentimentScores?.positive && (
-                        <span className="text-success">
-                          {Math.round(analysis.sentimentScores.positive * 100)}% Positive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setModal({ type: 'analysis', data: analysis })}
-                      >
-                        <Table className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </TabsContent>
       </Tabs>
 
       <Modal
         isOpen={modal.type !== null}
         onClose={() => setModal({ type: null, data: null })}
-        title={modal.type === 'analysis' ? 'Analysis Details' : 'Conversation Details'}
+        title="Conversation Details"
       >
-        {modal.type === 'analysis' && renderAnalysisModal(modal.data)}
         {modal.type === 'conversation' && renderConversationModal(modal.data)}
       </Modal>
     </div>
