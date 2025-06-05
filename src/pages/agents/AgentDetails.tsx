@@ -8,15 +8,22 @@ import {
   Trash2, 
   ChevronLeft,
   RefreshCw,
-  Table
+  Table,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
+import { Modal } from '../../components/ui/Modal';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
 import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
+
+interface ModalState {
+  type: 'analysis' | 'conversation' | null;
+  data: any;
+}
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -29,6 +36,7 @@ export const AgentDetails: React.FC = () => {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [modal, setModal] = useState<ModalState>({ type: null, data: null });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,6 +112,56 @@ export const AgentDetails: React.FC = () => {
       }
     }
   };
+
+  const renderAnalysisModal = (analysis: AnalysisResult) => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-2">Summary</h3>
+        <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-medium mb-2">Sentiment Analysis</h3>
+        <div className="grid grid-cols-3 gap-4">
+          {Object.entries(analysis.sentimentScores).map(([key, value]) => (
+            <div key={key} className="bg-muted p-4 rounded-lg">
+              <div className="text-2xl font-bold">{Math.round(value * 100)}%</div>
+              <div className="text-sm text-muted-foreground capitalize">{key}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-medium mb-2">Key Points</h3>
+        <ul className="list-disc list-inside space-y-2">
+          {analysis.keyPoints?.map((point, index) => (
+            <li key={index} className="text-sm">{point}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+        <ul className="list-disc list-inside space-y-2">
+          {analysis.recommendations?.map((rec, index) => (
+            <li key={index} className="text-sm">{rec}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderConversationModal = (transcript: any) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div>Created: {formatDateTime(transcript.created_at)}</div>
+      </div>
+      <div className="bg-muted p-4 rounded-lg">
+        <pre className="whitespace-pre-wrap font-sans text-sm">{transcript.content}</pre>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -217,38 +275,46 @@ export const AgentDetails: React.FC = () => {
             <CardHeader>
               <CardTitle>Agent Instructions</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-h-48 overflow-y-auto">
               <p className="whitespace-pre-wrap">{agent.instructions}</p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="conversations" className="space-y-4">
-          {transcripts.length > 0 ? (
-            <div className="space-y-4">
-              {transcripts.map((transcript, idx) => (
-                <Card key={transcript.id}>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="font-medium">Conversation #{transcripts.length - idx}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateTime(transcript.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap">{transcript.content}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground">No conversations yet</p>
-              </CardContent>
-            </Card>
-          )}
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Preview</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {transcripts.map((transcript) => (
+                  <tr key={transcript.id} className="hover:bg-muted/50">
+                    <td className="px-4 py-3 text-sm">
+                      {formatDateTime(transcript.created_at)}
+                    </td>
+                    <td className="px-4 py-3 text-sm max-w-md">
+                      <p className="truncate">{transcript.content}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setModal({ type: 'conversation', data: transcript })}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </TabsContent>
 
         <TabsContent value="analysis" className="space-y-6">
@@ -296,7 +362,11 @@ export const AgentDetails: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setModal({ type: 'analysis', data: analysis })}
+                      >
                         <Table className="h-4 w-4 mr-1" />
                         View Details
                       </Button>
@@ -308,6 +378,15 @@ export const AgentDetails: React.FC = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Modal
+        isOpen={modal.type !== null}
+        onClose={() => setModal({ type: null, data: null })}
+        title={modal.type === 'analysis' ? 'Analysis Details' : 'Conversation Details'}
+      >
+        {modal.type === 'analysis' && renderAnalysisModal(modal.data)}
+        {modal.type === 'conversation' && renderConversationModal(modal.data)}
+      </Modal>
     </div>
   );
 };
