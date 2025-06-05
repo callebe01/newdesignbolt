@@ -65,20 +65,18 @@ export async function getAgentTranscripts(agentId: string): Promise<Transcript[]
 
 export async function analyzeTranscripts(transcriptionIds: string[], accessToken: string, count: number = 5): Promise<AnalysisResult> {
   if (!accessToken) {
+    console.error('No access token provided');
     throw new Error('Authentication required');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error('Unauthorized');
-  }
+  console.log('Making Edge Function call with token:', accessToken.substring(0, 10) + '...');
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ transcriptionIds, count })
@@ -86,14 +84,19 @@ export async function analyzeTranscripts(transcriptionIds: string[], accessToken
   );
 
   if (response.status === 401) {
-    throw new Error('Unauthorized');
+    console.error('Authentication failed with status 401');
+    throw new Error('Unauthorized: Invalid or expired authentication token');
   }
 
   if (!response.ok) {
-    throw new Error('Failed to analyze transcripts');
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Edge Function error:', errorData);
+    throw new Error(errorData.error || 'Failed to analyze transcripts');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('Analysis completed successfully:', result);
+  return result;
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {

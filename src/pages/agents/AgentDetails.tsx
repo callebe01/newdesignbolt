@@ -17,6 +17,7 @@ import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Project, Session } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../services/supabase';
 import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
 
 export const AgentDetails: React.FC = () => {
@@ -74,24 +75,49 @@ export const AgentDetails: React.FC = () => {
   }, [agentId, getAgent, navigate, user]);
 
   const handleAnalyze = async () => {
-    if (!transcripts.length || !user || !accessToken) {
+    if (!transcripts.length) {
+      setError('No transcripts available for analysis');
+      return;
+    }
+
+    if (!user) {
+      console.error('No user found');
       navigate('/login');
       return;
     }
-    
+
     try {
       setAnalyzing(true);
       setError(null);
+
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get session');
+      }
+
+      if (!session?.access_token) {
+        console.error('No access token in session');
+        throw new Error('No valid session found');
+      }
+
+      console.log('Got valid session, proceeding with analysis...');
+
       const result = await analyzeTranscripts(
         transcripts.map(t => t.id),
-        accessToken,
+        session.access_token,
         5
       );
+
+      console.log('Analysis completed successfully');
       setAnalysisResults([result, ...analysisResults]);
     } catch (err) {
       console.error('Analysis failed:', err);
       if (err instanceof Error) {
-        if (err.message === 'Unauthorized') {
+        if (err.message.includes('Unauthorized')) {
+          console.log('Session expired, redirecting to login...');
           navigate('/login');
           return;
         }
@@ -231,7 +257,7 @@ export const AgentDetails: React.FC = () => {
           <h2 className="text-xl font-semibold">Conversation History</h2>
           <Button 
             onClick={handleAnalyze}
-            disabled={analyzing || transcripts.length === 0 || !user || !accessToken}
+            disabled={analyzing || transcripts.length === 0}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
             {analyzing ? 'Analyzing...' : 'Analyze Conversations'}
