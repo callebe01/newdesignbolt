@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, X, ArrowLeft, Monitor } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Mic, MicOff, X, Monitor } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -67,9 +67,6 @@ export const AgentCall: React.FC = () => {
       <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
         <p>Agent not found</p>
-        <Link to="/agents" className="underline">
-          Back to Agents
-        </Link>
       </div>
     );
   }
@@ -78,14 +75,6 @@ export const AgentCall: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleEnd}
-            className="mr-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
           <div className="flex items-center">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
               <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
