@@ -69,17 +69,12 @@ export async function analyzeTranscripts(transcriptionIds: string[], accessToken
     throw new Error('Authentication required');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error('Unauthorized');
-  }
-
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ transcriptionIds, count })
