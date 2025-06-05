@@ -112,6 +112,7 @@ export const AgentCall: React.FC = () => {
 
         <div className="flex items-center space-x-4">
           <Button
+            aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
             className="rounded-full w-16 h-16 flex items-center justify-center"
@@ -126,6 +127,7 @@ export const AgentCall: React.FC = () => {
 
           {agent?.canSeeScreenshare && (
             <Button
+              aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
               className="rounded-full w-16 h-16 flex items-center justify-center"
@@ -136,6 +138,7 @@ export const AgentCall: React.FC = () => {
           )}
 
           <Button
+            aria-label="End call"
             size="lg"
             variant="destructive"
             className="rounded-full w-16 h-16 flex items-center justify-center"
