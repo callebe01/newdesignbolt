@@ -120,3 +120,5 @@ export default function AgentDetails() {
     </div>
   );
 }
+
+export { AgentDetails }
