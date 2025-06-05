@@ -46,9 +46,11 @@ export const AgentCall: React.FC = () => {
       startedRef.current = true;
       // Clear transcript before starting new call
       setTranscript('');
-      startCall(agent.instructions, agent.callDuration).catch((err) =>
-        console.error(err)
-      );
+      startCall(
+        agent.instructions,
+        agent.callDuration,
+        agent.documentationUrls
+      ).catch((err) => console.error(err));
     }
   }, [agent, startCall, setTranscript]);
 

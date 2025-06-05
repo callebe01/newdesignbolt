@@ -1,4 +1,3 @@
-// Full content of LiveCallContext.tsx with proper string concatenation and duration handling
 import React, {
   createContext,
   useContext,
@@ -17,7 +16,7 @@ interface LiveCallContextType {
   transcript: string;
   duration: number;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
-  startCall: (systemInstruction?: string, maxDuration?: number) => Promise<void>;
+  startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[]) => Promise<void>;
   endCall: () => void;
   toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
@@ -119,7 +118,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const startCall = async (systemInstruction?: string, maxDuration?: number): Promise<void> => {
+  const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[]): Promise<void> => {
     try {
       setErrorMessage(null);
       setDuration(0);
@@ -145,10 +144,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!apiKey) {
         throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
       }
-      console.log('[Live] VITE_GOOGLE_API_KEY present:', !!apiKey);
 
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/` +
-        `google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       console.log('[Live] WebSocket URL:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -158,12 +155,21 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
+        // Create URL context tools if documentation URLs are provided
+        const tools = documentationUrls?.length ? [{
+          url_context: {
+            urls: documentationUrls
+          }
+        }] : undefined;
+
+        // Setup message with tools
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
             generationConfig: {
               responseModalities: ['AUDIO'],
             },
+            tools,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
             systemInstruction: {
@@ -175,6 +181,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             },
           },
         };
+
         console.log('[Live][WebSocket] Sending setup:', setupMsg);
         ws.send(JSON.stringify(setupMsg));
       };
