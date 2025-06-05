@@ -1,3 +1,5 @@
+import { User } from './index';
+
 export interface Agent {
   id: string;
   name: string;
@@ -6,6 +8,7 @@ export interface Agent {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
+  canSeeScreenshare: boolean;
 }
 
 export interface AgentConversation {

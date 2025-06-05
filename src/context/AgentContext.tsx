@@ -10,7 +10,7 @@ interface AgentContextType {
   error: string | null;
   fetchAgents: () => Promise<void>;
   getAgent: (id: string) => Promise<Agent | null>;
-  createAgent: (name: string, instructions: string) => Promise<Agent>;
+  createAgent: (name: string, instructions: string, canSeeScreenshare: boolean) => Promise<Agent>;
   setCurrentAgent: (agent: Agent | null) => void;
 }
 
@@ -31,6 +31,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     created_at: string;
     updated_at: string;
     user_id: string;
+    can_see_screenshare: boolean;
   }
 
   const mapAgent = (data: AgentRow): Agent => ({
@@ -41,6 +42,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
     userId: data.user_id,
+    canSeeScreenshare: data.can_see_screenshare,
   });
 
   const fetchAgents = useCallback(async () => {
@@ -87,7 +89,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const createAgent = async (name: string, instructions: string): Promise<Agent> => {
+  const createAgent = async (name: string, instructions: string, canSeeScreenshare: boolean): Promise<Agent> => {
     try {
       if (!user) {
         throw new Error('User must be authenticated to create an agent');
@@ -100,6 +102,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           instructions,
           status: 'active',
           user_id: user.id,
+          can_see_screenshare: canSeeScreenshare,
         })
         .select()
         .single();

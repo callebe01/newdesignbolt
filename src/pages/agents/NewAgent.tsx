@@ -9,6 +9,7 @@ import { useAgents } from '../../context/AgentContext';
 export const NewAgent: React.FC = () => {
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +33,7 @@ export const NewAgent: React.FC = () => {
     setError(null);
 
     try {
-      const agent = await createAgent(name, instructions);
+      const agent = await createAgent(name, instructions, canSeeScreenshare);
       navigate(`/agents/${agent.id}`);
     } catch (err) {
       console.error('Failed to create agent:', err);
@@ -90,6 +91,19 @@ export const NewAgent: React.FC = () => {
               <p className="mt-2 text-sm text-muted-foreground">
                 Be specific about the agent's role, tone, and how it should handle different scenarios.
               </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="canSeeScreenshare"
+                checked={canSeeScreenshare}
+                onChange={(e) => setCanSeeScreenshare(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="canSeeScreenshare" className="text-sm font-medium">
+                Allow this agent to see screen shares
+              </label>
             </div>
           </CardContent>
 
