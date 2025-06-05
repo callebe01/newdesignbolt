@@ -14,7 +14,7 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { formatDateTime, formatDuration } from '../../utils/format';
-import { useProjects } from '../../context/ProjectContext';
+import { useAgents } from '../../context/AgentContext';
 import { Project, Session } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
@@ -22,7 +22,7 @@ import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
-  const { getAgent } = useProjects();
+  const { getAgent, deleteAgent } = useAgents();
   const { user, accessToken } = useAuth();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,8 +146,7 @@ export const AgentDetails: React.FC = () => {
     );
   }
   
-  const activeSessions = project.sessions.filter(s => s.status === 'active');
-  const completedSessions = project.sessions.filter(s => s.status === 'completed');
+  const latestAnalysis = analysisResults[0];
   
   return (
     <div className="space-y-8">
