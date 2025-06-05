@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Bot, Clock } from 'lucide-react';
+import { ChevronLeft, Bot, Clock, Plus, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
@@ -23,11 +23,28 @@ export const NewAgent: React.FC = () => {
   const [instructions, setInstructions] = useState('');
   const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
   const [duration, setDuration] = useState<number>(300); // Default to 5 minutes
+  const [documentationUrls, setDocumentationUrls] = useState<string[]>([]);
+  const [newUrl, setNewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { createAgent } = useAgents();
   const navigate = useNavigate();
+
+  const addUrl = () => {
+    if (!newUrl.trim()) return;
+    try {
+      new URL(newUrl); // Validate URL format
+      setDocumentationUrls([...documentationUrls, newUrl.trim()]);
+      setNewUrl('');
+    } catch (err) {
+      setError('Please enter a valid URL');
+    }
+  };
+
+  const removeUrl = (index: number) => {
+    setDocumentationUrls(documentationUrls.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +67,8 @@ export const NewAgent: React.FC = () => {
         name,
         instructions,
         canSeeScreenshare,
-        duration
+        duration,
+        documentationUrls
       );
       navigate(`/agents/${agent.id}`);
     } catch (err) {
@@ -108,6 +126,41 @@ export const NewAgent: React.FC = () => {
               />
               <p className="mt-2 text-sm text-muted-foreground">
                 Be specific about the agent's role, tone, and how it should handle different scenarios.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-sm font-medium">Documentation URLs</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://docs.example.com"
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  fullWidth
+                />
+                <Button type="button" onClick={addUrl}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {documentationUrls.length > 0 && (
+                <div className="space-y-2">
+                  {documentationUrls.map((url, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-muted p-2 rounded-md">
+                      <span className="text-sm flex-1 truncate">{url}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeUrl(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                Add URLs to documentation that the agent should reference during conversations.
               </p>
             </div>
 

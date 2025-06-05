@@ -10,6 +10,7 @@ export interface Agent {
   userId: string;
   canSeeScreenshare: boolean;
   callDuration: number;
+  documentationUrls?: string[];
 }
 
 export interface AgentConversation {
