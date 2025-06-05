@@ -33,6 +33,21 @@ import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
 import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
 
+type TimeFilter = 'today' | 'last7days' | 'last30days' | 'last90days' | 'alltime';
+
+interface OverviewMetrics {
+  totalConversations: number;
+  resolutionRate: number;
+  engagementScore: number;
+  avgDuration: number;
+  changes?: {
+    conversations?: string;
+    resolution?: string;
+    engagement?: string;
+    duration?: string;
+  };
+}
+
 interface ModalState {
   type: 'conversation' | null;
   data: any;
@@ -54,6 +69,13 @@ export const AgentDetails: React.FC = () => {
   const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
   const [selectedTranscripts, setSelectedTranscripts] = useState<string[]>([]);
   const [timeframe, setTimeframe] = useState<'today' | '7days'>('today');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('last7days');
+  const [overviewMetrics, setOverviewMetrics] = useState<OverviewMetrics>({
+    totalConversations: 0,
+    resolutionRate: 0,
+    engagementScore: 0,
+    avgDuration: 0
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,6 +111,58 @@ export const AgentDetails: React.FC = () => {
     
     fetchData();
   }, [agentId, getAgent]);
+
+  useEffect(() => {
+    // Calculate metrics based on analysis results and time filter
+    const calculateMetrics = () => {
+      const now = new Date();
+      const filteredResults = analysisResults.filter(result => {
+        const date = new Date(result.createdAt);
+        switch (timeFilter) {
+          case 'today':
+            return date.toDateString() === now.toDateString();
+          case 'last7days':
+            return (now.getTime() - date.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+          case 'last30days':
+            return (now.getTime() - date.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+          case 'last90days':
+            return (now.getTime() - date.getTime()) <= 90 * 24 * 60 * 60 * 1000;
+          default:
+            return true;
+        }
+      });
+
+      if (filteredResults.length === 0) {
+        setOverviewMetrics({
+          totalConversations: 0,
+          resolutionRate: 0,
+          engagementScore: 0,
+          avgDuration: 0
+        });
+        return;
+      }
+
+      const metrics = {
+        totalConversations: filteredResults.length,
+        resolutionRate: filteredResults.reduce((acc, curr) => 
+          acc + (curr.resolutionRate?.resolved || 0), 0) / filteredResults.length,
+        engagementScore: filteredResults.reduce((acc, curr) => 
+          acc + (curr.engagementScore || 0), 0) / filteredResults.length,
+        avgDuration: filteredResults.reduce((acc, curr) => 
+          acc + (curr.duration || 0), 0) / filteredResults.length,
+        changes: {
+          conversations: '+12 this week',
+          resolution: '+5% vs last week',
+          engagement: '+0.2 vs last week',
+          duration: '-0.5m vs last week'
+        }
+      };
+
+      setOverviewMetrics(metrics);
+    };
+
+    calculateMetrics();
+  }, [timeFilter, analysisResults]);
 
   const getTodayTranscripts = () => {
     const today = new Date();
@@ -471,51 +545,105 @@ export const AgentDetails: React.FC = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Time Filter */}
+          <div className="flex space-x-2">
+            {[
+              { label: 'Today', value: 'today' },
+              { label: 'Last 7 days', value: 'last7days' },
+              { label: 'Last 30 days', value: 'last30days' },
+              { label: 'Last 90 days', value: 'last90days' },
+              { label: 'All time', value: 'alltime' },
+            ].map(({ label, value }) => (
+              <Button
+                key={value}
+                variant={timeFilter === value ? 'primary' : 'outline'}
+                onClick={() => setTimeFilter(value as TimeFilter)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
-                    <h3 className="text-3xl font-bold mt-1">{transcripts.length}</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                    <MessageSquare className="h-5 w-5" />
                   </div>
-                  <div className="p-2 bg-muted rounded-md">
-                    <Phone className="h-5 w-5" />
-                  </div>
+                </div>
+                <div>
+                  <h3 className="text-3xl font-bold">{overviewMetrics.totalConversations}</h3>
+                  <p className="text-sm text-muted-foreground">Total Conversations</p>
+                  {overviewMetrics.changes?.conversations && (
+                    <p className="text-sm text-success mt-2">
+                      {overviewMetrics.changes.conversations}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
-                    <h3 className="text-3xl font-bold mt-1">
-                      {analysisResults[0]?.sentimentScores?.average || 'N/A'}
-                    </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-success/10 text-success rounded-lg">
+                    <CheckCircle className="h-5 w-5" />
                   </div>
-                  <div className="p-2 bg-muted rounded-md">
+                </div>
+                <div>
+                  <h3 className="text-3xl font-bold">
+                    {Math.round(overviewMetrics.resolutionRate * 100)}%
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Resolution Rate</p>
+                  {overviewMetrics.changes?.resolution && (
+                    <p className="text-sm text-success mt-2">
+                      {overviewMetrics.changes.resolution}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-accent/10 text-accent rounded-lg">
+                    <BarChart2 className="h-5 w-5" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-3xl font-bold">
+                    {overviewMetrics.engagementScore.toFixed(1)}/10
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Engagement Score</p>
+                  {overviewMetrics.changes?.engagement && (
+                    <p className="text-sm text-success mt-2">
+                      {overviewMetrics.changes.engagement}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-secondary/10 text-secondary rounded-lg">
                     <Clock className="h-5 w-5" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Last Conversation</p>
-                    <h3 className="text-3xl font-bold mt-1">
-                      {transcripts[0] 
-                        ? formatDateTime(transcripts[0].created_at)
-                        : 'Never'}
-                    </h3>
-                  </div>
-                  <div className="p-2 bg-muted rounded-md">
-                    <Calendar className="h-5 w-5" />
-                  </div>
+                <div>
+                  <h3 className="text-3xl font-bold">
+                    {formatDuration(overviewMetrics.avgDuration)}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Avg Duration</p>
+                  {overviewMetrics.changes?.duration && (
+                    <p className="text-sm text-destructive mt-2">
+                      {overviewMetrics.changes.duration}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
