@@ -18,6 +18,7 @@ import { useAgents } from '../../context/AgentContext';
 import { useAuth } from '../../context/AuthContext';
 import { Agent } from '../../types';
 import { getAgentTranscripts, analyzeTranscripts, getAnalysisResults, Transcript, AnalysisResult } from '../../services/transcripts';
+import { supabase } from '../../services/supabase';
 
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -68,23 +69,31 @@ export const AgentDetails: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!transcripts.length || !accessToken) return;
-    
+
+    setAnalyzing(true);
+
+    const ids = transcripts.map(t => t.id);
+    let token = accessToken;
+
     try {
-      setAnalyzing(true);
-      const result = await analyzeTranscripts(
-        transcripts.map(t => t.id),
-        accessToken,
-        5 // Analyze last 5 transcripts
-      );
-      setAnalysisResults([result, ...analysisResults]);
+      try {
+        const result = await analyzeTranscripts(ids, token, 5);
+        setAnalysisResults([result, ...analysisResults]);
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Unauthorized') {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error) throw err;
+          token = data.session?.access_token || token;
+          const retry = await analyzeTranscripts(ids, token, 5);
+          setAnalysisResults([retry, ...analysisResults]);
+          return;
+        }
+        throw err;
+      }
     } catch (err) {
       console.error('Analysis failed:', err);
-      if (err instanceof Error && err.message === 'Unauthorized') {
-        setError('Your session expired. Please log in again.');
-        navigate('/login');
-      } else {
-        setError('Failed to analyze transcripts');
-      }
+      setError('Failed to analyze transcripts');
     } finally {
       setAnalyzing(false);
     }

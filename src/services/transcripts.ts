@@ -69,20 +69,31 @@ export async function analyzeTranscripts(transcriptionIds: string[], accessToken
     throw new Error('Authentication required');
   }
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ transcriptionIds, count })
-    }
-  );
+  const makeRequest = async (token: string) => {
+    return fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transcriptionIds, count })
+      }
+    );
+  };
 
+  let response = await makeRequest(accessToken);
   if (response.status === 401) {
-    throw new Error('Unauthorized');
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      throw new Error('Unauthorized');
+    }
+    const newToken = data.session?.access_token;
+    response = await makeRequest(newToken || accessToken);
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
   }
 
   if (!response.ok) {
