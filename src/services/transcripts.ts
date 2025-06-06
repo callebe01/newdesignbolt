@@ -55,6 +55,32 @@ export async function saveTranscript(agentId: string, content: string) {
   }
 }
 
+export async function saveTranscriptBeacon(agentId: string, content: string) {
+  if (!content?.trim()) {
+    return;
+  }
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/transcriptions`;
+  const body = JSON.stringify({
+    agent_id: agentId,
+    content: content.trim(),
+    metadata: { saved_at: new Date().toISOString(), length: content.trim().length }
+  });
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body,
+      keepalive: true,
+    });
+  } catch (err) {
+    console.error('Failed to beacon save transcript:', err);
+  }
+}
+
 export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
   // Get the current session
   const { data: { session } } = await supabase.auth.getSession();

@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
-import { saveTranscript } from '../services/transcripts';
+import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
 
 interface LiveCallContextType {
   status: LiveCallStatus;
@@ -19,7 +19,7 @@ interface LiveCallContextType {
   duration: number;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
   startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string) => Promise<void>;
-  endCall: () => void;
+  endCall: (fromUnload?: boolean) => void;
   toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
   toggleVideo: () => void;
@@ -57,12 +57,17 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const durationTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
   const usageRecordedRef = useRef(false);
+  const callEndedRef = useRef(false);
   const agentOwnerIdRef = useRef<string | null>(null);
   const currentAgentIdRef = useRef<string | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
+
+  const handleBeforeUnload = () => {
+    endCall(true);
+  };
 
   useEffect(() => {
     return () => {
@@ -88,6 +93,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         audioContextRef.current.close().catch(() => {});
         audioContextRef.current = null;
       }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
@@ -182,6 +188,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setDuration(0);
       usageRecordedRef.current = false;
       currentAgentIdRef.current = agentId || null;
+      callEndedRef.current = false;
+      window.addEventListener('beforeunload', handleBeforeUnload);
 
       // Check agent owner's usage limits if agentId is provided
       if (agentId) {
@@ -609,12 +617,18 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const endCall = (): void => {
+  const endCall = (fromUnload = false): void => {
+    if (callEndedRef.current) {
+      return;
+    }
+    callEndedRef.current = true;
+    window.removeEventListener('beforeunload', handleBeforeUnload);
     try {
       // Save transcript if we have one and an agent ID
       if (currentAgentIdRef.current && transcript.trim()) {
         console.log('[Live] Saving transcript for agent:', currentAgentIdRef.current);
-        saveTranscript(currentAgentIdRef.current, transcript).catch(err => {
+        const save = fromUnload ? saveTranscriptBeacon : saveTranscript;
+        save(currentAgentIdRef.current, transcript).catch(err => {
           console.error('Failed to save transcript:', err);
         });
       }
