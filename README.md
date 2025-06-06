@@ -78,6 +78,13 @@ curl -i -X POST \
   -H "Authorization: Bearer invalid" \
   -H "Content-Type: application/json" \
   -d '{"transcriptionIds":[1]}' \
-  "$VITE_SUPABASE_URL/functions/v1/analyze-transcripts"
+"$VITE_SUPABASE_URL/functions/v1/analyze-transcripts"
 ```
+
+## Troubleshooting
+
+If you end a call and see an alert that the transcript wasn't saved, check that
+your Supabase credentials are correct and that your network connection is
+stable. The application surfaces the detailed error from Supabase to help you
+identify the issue.
 

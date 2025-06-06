@@ -43,15 +43,19 @@ export async function saveTranscript(agentId: string, content: string) {
       .single();
 
     if (error) {
-      console.error('Error saving transcript:', error);
-      throw error;
+      const message =
+        `Save transcript failed: ${error.message}` +
+        (error.details ? ` - ${error.details}` : '');
+      console.error(message, error);
+      throw new Error(message);
     }
 
     console.log('Transcript saved successfully:', data.id);
     return data;
-  } catch (err) {
-    console.error('Failed to save transcript:', err);
-    throw err;
+  } catch (err: any) {
+    const message = err?.message || JSON.stringify(err);
+    console.error('Failed to save transcript:', message);
+    throw new Error(`Save transcript failed: ${message}`);
   }
 }
 

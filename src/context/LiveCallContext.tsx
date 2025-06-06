@@ -630,6 +630,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         const save = fromUnload ? saveTranscriptBeacon : saveTranscript;
         save(currentAgentIdRef.current, transcript).catch(err => {
           console.error('Failed to save transcript:', err);
+          alert(`Transcript wasn't saved: ${err.message ?? err}`);
         });
       }
 
