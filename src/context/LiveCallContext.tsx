@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { LiveCallStatus } from '../types';
 import { canUserPerformAction, recordUsage } from '../services/usage';
+import { useAuth } from './AuthContext';
 
 interface LiveCallContextType {
   status: LiveCallStatus;
@@ -36,6 +37,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
   const [duration, setDuration] = useState(0);
+  const { user } = useAuth();
 
   const DEFAULT_SYSTEM_INSTRUCTION =
     'You are roleplaying a real person testing a new interface while talking to a designer.' +
@@ -57,7 +59,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const usageRecordedRef = useRef(false);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -126,12 +128,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setDuration(0);
       usageRecordedRef.current = false;
 
-      // Check if user can start a call (for free plan users)
-      const estimatedDuration = Math.ceil((maxDuration || 300) / 60); // Convert to minutes
-      const canStart = await canUserPerformAction('start_call', estimatedDuration);
-      
-      if (!canStart) {
-        throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
+      // Only check usage limits for authenticated users
+      if (user) {
+        const estimatedDuration = Math.ceil((maxDuration || 300) / 60); // Convert to minutes
+        const canStart = await canUserPerformAction('start_call', estimatedDuration);
+        
+        if (!canStart) {
+          throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
+        }
       }
 
       if (websocketRef.current) {
@@ -182,7 +186,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: 'Zephyr'
+                    voiceName: 'Kore'
                   }
                 }
               }
@@ -503,8 +507,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setErrorMessage(null);
       
-      // Check if user can use screen sharing
-      if (!isScreenSharing) {
+      // Only check screen sharing permissions for authenticated users
+      if (user && !isScreenSharing) {
         const canUseScreenShare = await canUserPerformAction('use_screen_share');
         if (!canUseScreenShare) {
           setErrorMessage('Screen sharing is not available on your current plan. Please upgrade to use this feature.');
@@ -563,8 +567,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endCall = (): void => {
     try {
-      // Record usage when call ends (only once)
-      if (duration > 0 && !usageRecordedRef.current) {
+      // Only record usage for authenticated users
+      if (user && duration > 0 && !usageRecordedRef.current) {
         const minutes = Math.ceil(duration / 60);
         recordUsage('minutes', minutes).catch(err => {
           console.error('Failed to record usage:', err);
