@@ -3,6 +3,7 @@ import { Save, Bell, Shield, User, Key, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { BillingSection } from './BillingSection';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -25,6 +26,10 @@ export const Settings: React.FC = () => {
             <a href="#profile" className="flex items-center p-2 rounded-md hover:bg-muted">
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
+            </a>
+            <a href="#billing" className="flex items-center p-2 rounded-md hover:bg-muted">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              <span>Billing</span>
             </a>
             <a href="#appearance" className="flex items-center p-2 rounded-md hover:bg-muted">
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -108,6 +113,10 @@ export const Settings: React.FC = () => {
               </Button>
             </CardFooter>
           </Card>
+
+          <div id="billing">
+            <BillingSection />
+          </div>
           
           <Card id="appearance">
             <CardHeader>
