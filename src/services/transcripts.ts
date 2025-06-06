@@ -26,19 +26,33 @@ export async function saveTranscript(agentId: string, content: string) {
     return null;
   }
 
-  const { data, error } = await supabase
-    .from('transcriptions')
-    .insert([
-      {
-        agent_id: agentId,
-        content: content,
-      }
-    ])
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('transcriptions')
+      .insert([
+        {
+          agent_id: agentId,
+          content: content.trim(),
+          metadata: {
+            saved_at: new Date().toISOString(),
+            length: content.trim().length
+          }
+        }
+      ])
+      .select()
+      .single();
 
-  if (error) throw error;
-  return data;
+    if (error) {
+      console.error('Error saving transcript:', error);
+      throw error;
+    }
+
+    console.log('Transcript saved successfully:', data.id);
+    return data;
+  } catch (err) {
+    console.error('Failed to save transcript:', err);
+    throw err;
+  }
 }
 
 export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
@@ -46,6 +60,10 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
     throw new Error('Authentication required');
+  }
+
+  if (!transcripts || transcripts.length === 0) {
+    throw new Error('No transcripts provided for analysis');
   }
 
   // Call OpenAI API through our Edge Function
@@ -59,7 +77,7 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
       },
       body: JSON.stringify({ 
         transcriptionIds: transcripts.map(t => t.id),
-        text: transcripts.map(t => t.content).join('\n\n')
+        text: transcripts.map(t => t.content).join('\n\n---\n\n')
       })
     }
   );
@@ -71,50 +89,58 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
 
   const result = await response.json();
   
-  // Store the analysis result
-  const { data: savedAnalysis, error: saveError } = await supabase
-    .from('analysis_results')
-    .insert({
-      transcription_ids: transcripts.map(t => t.id),
-      summary: result.summary,
-      sentiment_scores: result.sentiment_scores,
-      key_points: result.key_points,
-      recommendations: result.recommendations,
-      user_intent: result.user_intent,
-      workflow_patterns: result.workflow_patterns,
-      feature_requests: result.feature_requests,
-      resolution_rate: result.resolution_rate,
-      engagement_score: result.engagement_score,
-      repetitive_questions: result.repetitive_questions || []
-    })
-    .select()
-    .single();
-
-  if (saveError) throw saveError;
-  return savedAnalysis;
+  // Return the saved analysis result directly from the edge function
+  return {
+    id: result.id,
+    transcriptionIds: result.transcription_ids,
+    summary: result.summary,
+    sentimentScores: result.sentiment_scores || {},
+    keyPoints: result.key_points || [],
+    recommendations: result.recommendations || [],
+    userIntent: result.user_intent || {},
+    workflowPatterns: result.workflow_patterns || [],
+    featureRequests: result.feature_requests || [],
+    resolutionRate: result.resolution_rate || { resolved: 0, unresolved: 0 },
+    engagementScore: result.engagement_score || 0,
+    repetitiveQuestions: result.repetitive_questions || [],
+    createdAt: result.created_at
+  };
 }
 
 export async function getAnalysisResults(transcriptionIds: string[]): Promise<AnalysisResult[]> {
-  const { data, error } = await supabase
-    .from('analysis_results')
-    .select('*')
-    .overlaps('transcription_ids', transcriptionIds)
-    .order('created_at', { ascending: false });
+  if (!transcriptionIds || transcriptionIds.length === 0) {
+    return [];
+  }
 
-  if (error) throw error;
-  return data.map(row => ({
-    id: row.id,
-    transcriptionIds: row.transcription_ids,
-    summary: row.summary,
-    sentimentScores: row.sentiment_scores,
-    keyPoints: row.key_points,
-    recommendations: row.recommendations,
-    userIntent: row.user_intent,
-    workflowPatterns: row.workflow_patterns,
-    featureRequests: row.feature_requests,
-    resolutionRate: row.resolution_rate,
-    engagementScore: row.engagement_score,
-    repetitiveQuestions: row.repetitive_questions,
-    createdAt: row.created_at
-  }));
+  try {
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('*')
+      .overlaps('transcription_ids', transcriptionIds)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching analysis results:', error);
+      throw error;
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      transcriptionIds: row.transcription_ids || [],
+      summary: row.summary || '',
+      sentimentScores: row.sentiment_scores || {},
+      keyPoints: row.key_points || [],
+      recommendations: row.recommendations || [],
+      userIntent: row.user_intent || {},
+      workflowPatterns: row.workflow_patterns || [],
+      featureRequests: row.feature_requests || [],
+      resolutionRate: row.resolution_rate || { resolved: 0, unresolved: 0 },
+      engagementScore: row.engagement_score || 0,
+      repetitiveQuestions: row.repetitive_questions || [],
+      createdAt: row.created_at
+    }));
+  } catch (err) {
+    console.error('Failed to fetch analysis results:', err);
+    return [];
+  }
 }

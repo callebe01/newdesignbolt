@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
+import { saveTranscript } from '../services/transcripts';
 
 interface LiveCallContextType {
   status: LiveCallStatus;
@@ -57,6 +58,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const maxDurationTimerRef = useRef<number | null>(null);
   const usageRecordedRef = useRef(false);
   const agentOwnerIdRef = useRef<string | null>(null);
+  const currentAgentIdRef = useRef<string | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
@@ -179,6 +181,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setErrorMessage(null);
       setDuration(0);
       usageRecordedRef.current = false;
+      currentAgentIdRef.current = agentId || null;
 
       // Check agent owner's usage limits if agentId is provided
       if (agentId) {
@@ -608,6 +611,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endCall = (): void => {
     try {
+      // Save transcript if we have one and an agent ID
+      if (currentAgentIdRef.current && transcript.trim()) {
+        console.log('[Live] Saving transcript for agent:', currentAgentIdRef.current);
+        saveTranscript(currentAgentIdRef.current, transcript).catch(err => {
+          console.error('Failed to save transcript:', err);
+        });
+      }
+
       // Record usage for the agent owner if we have the owner ID and duration
       if (agentOwnerIdRef.current && duration > 0 && !usageRecordedRef.current) {
         const minutes = Math.ceil(duration / 60);
@@ -651,6 +662,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsVideoActive(false);
       setStatus('ended');
       agentOwnerIdRef.current = null;
+      currentAgentIdRef.current = null;
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
