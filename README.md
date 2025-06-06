@@ -22,13 +22,16 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 SUPABASE_URL=https://ljfidzppyflrrszkgusa.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 Pass this file when deploying:
 
 ```bash
-supabase functions deploy --env-file ./supabase/.env
+supabase functions deploy analyze-transcripts --env-file ./supabase/.env
 ```
+
+`SUPABASE_SERVICE_ROLE_KEY` is required so the function can write results back to Supabase. If this variable is omitted, analysis output will not be saved.
 
 If either variable is missing or incorrect, `analyze-transcripts` will return a **401 Unauthorized** error.
 
