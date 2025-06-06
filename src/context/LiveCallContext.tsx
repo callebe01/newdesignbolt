@@ -634,10 +634,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       }
 
-      // Record usage for the agent owner if we have the owner ID and duration
-      if (agentOwnerIdRef.current && duration > 0 && !usageRecordedRef.current) {
+      // Record usage for the agent owner if we have the agent ID and duration
+      if (currentAgentIdRef.current && duration > 0 && !usageRecordedRef.current) {
         const minutes = Math.ceil(duration / 60);
-        recordAgentUsage(agentOwnerIdRef.current, minutes).catch(err => {
+        recordAgentUsage(currentAgentIdRef.current, minutes).catch(err => {
           console.error('Failed to record agent usage:', err);
         });
         usageRecordedRef.current = true;
