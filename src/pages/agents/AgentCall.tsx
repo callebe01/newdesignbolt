@@ -42,17 +42,18 @@ export const AgentCall: React.FC = () => {
   }, [agentId, getAgent]);
 
   useEffect(() => {
-    if (!startedRef.current && agent) {
+    if (!startedRef.current && agent && agentId) {
       startedRef.current = true;
       // Clear transcript before starting new call
       setTranscript('');
       startCall(
         agent.instructions,
         agent.callDuration,
-        agent.documentationUrls
+        agent.documentationUrls,
+        agentId // Pass the agentId for usage checking
       ).catch((err) => console.error(err));
     }
-  }, [agent, startCall, setTranscript]);
+  }, [agent, agentId, startCall, setTranscript]);
 
   const handleEnd = async () => {
     endCall();

@@ -6,7 +6,6 @@ import React, {
   useEffect,
 } from 'react';
 import { LiveCallStatus } from '../types';
-import { canUserPerformAction, recordUsage } from '../services/usage';
 import { useAuth } from './AuthContext';
 
 interface LiveCallContextType {
@@ -18,7 +17,7 @@ interface LiveCallContextType {
   transcript: string;
   duration: number;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
-  startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[]) => Promise<void>;
+  startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string) => Promise<void>;
   endCall: () => void;
   toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
@@ -57,6 +56,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const durationTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
   const usageRecordedRef = useRef(false);
+  const agentOwnerIdRef = useRef<string | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
@@ -122,18 +122,68 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[]): Promise<void> => {
+  const checkAgentOwnerUsage = async (agentId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-agent-usage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ 
+            agentId,
+            estimatedDuration: 5 // Estimate 5 minutes for the check
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to check usage');
+      }
+
+      const result = await response.json();
+      agentOwnerIdRef.current = result.ownerId;
+      return result.canUse;
+    } catch (err) {
+      console.error('Error checking agent owner usage:', err);
+      return false;
+    }
+  };
+
+  const recordAgentUsage = async (agentId: string, minutes: number): Promise<void> => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-agent-usage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ 
+            agentId,
+            minutes
+          })
+        }
+      );
+    } catch (err) {
+      console.error('Error recording agent usage:', err);
+    }
+  };
+
+  const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
       setErrorMessage(null);
       setDuration(0);
       usageRecordedRef.current = false;
 
-      // Only check usage limits for authenticated users
-      if (user) {
-        const estimatedDuration = Math.ceil((maxDuration || 300) / 60); // Convert to minutes
-        const canStart = await canUserPerformAction('start_call', estimatedDuration);
-        
-        if (!canStart) {
+      // Check agent owner's usage limits if agentId is provided
+      if (agentId) {
+        const canUse = await checkAgentOwnerUsage(agentId);
+        if (!canUse) {
           throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
         }
       }
@@ -506,15 +556,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const toggleScreenShare = async (): Promise<void> => {
     try {
       setErrorMessage(null);
-      
-      // Only check screen sharing permissions for authenticated users
-      if (user && !isScreenSharing) {
-        const canUseScreenShare = await canUserPerformAction('use_screen_share');
-        if (!canUseScreenShare) {
-          setErrorMessage('Screen sharing is not available on your current plan. Please upgrade to use this feature.');
-          return;
-        }
-      }
 
       if (isScreenSharing && screenStream.current) {
         screenStream.current.getTracks().forEach((t) => t.stop());
@@ -567,11 +608,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endCall = (): void => {
     try {
-      // Only record usage for authenticated users
-      if (user && duration > 0 && !usageRecordedRef.current) {
+      // Record usage for the agent owner if we have the owner ID and duration
+      if (agentOwnerIdRef.current && duration > 0 && !usageRecordedRef.current) {
         const minutes = Math.ceil(duration / 60);
-        recordUsage('minutes', minutes).catch(err => {
-          console.error('Failed to record usage:', err);
+        recordAgentUsage(agentOwnerIdRef.current, minutes).catch(err => {
+          console.error('Failed to record agent usage:', err);
         });
         usageRecordedRef.current = true;
       }
@@ -609,6 +650,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsMicrophoneActive(false);
       setIsVideoActive(false);
       setStatus('ended');
+      agentOwnerIdRef.current = null;
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
