@@ -616,6 +616,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live] Saving transcript for agent:', currentAgentIdRef.current);
         saveTranscript(currentAgentIdRef.current, transcript).catch(err => {
           console.error('Failed to save transcript:', err);
+          alert(`Transcript wasn't saved: ${err.message ?? err}`);
         });
       }
 
