@@ -182,7 +182,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: 'Kore'
+                    voiceName: 'Zephyr'
                   }
                 }
               }
