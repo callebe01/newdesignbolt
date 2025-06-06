@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from 'react';
 import { LiveCallStatus } from '../types';
+import { canUserPerformAction, recordUsage } from '../services/usage';
 
 interface LiveCallContextType {
   status: LiveCallStatus;
@@ -53,6 +54,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const greetingSentRef = useRef(false);
   const durationTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
+  const usageRecordedRef = useRef(false);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -122,6 +124,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setErrorMessage(null);
       setDuration(0);
+      usageRecordedRef.current = false;
+
+      // Check if user can start a call (for free plan users)
+      const estimatedDuration = Math.ceil((maxDuration || 300) / 60); // Convert to minutes
+      const canStart = await canUserPerformAction('start_call', estimatedDuration);
+      
+      if (!canStart) {
+        throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
+      }
 
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
@@ -279,6 +290,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
             return;
           } catch {
+            // JSON.parse failed → go to fallback
           }
         }
 
@@ -483,6 +495,16 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const toggleScreenShare = async (): Promise<void> => {
     try {
       setErrorMessage(null);
+      
+      // Check if user can use screen sharing
+      if (!isScreenSharing) {
+        const canUseScreenShare = await canUserPerformAction('use_screen_share');
+        if (!canUseScreenShare) {
+          setErrorMessage('Screen sharing is not available on your current plan. Please upgrade to use this feature.');
+          return;
+        }
+      }
+
       if (isScreenSharing && screenStream.current) {
         screenStream.current.getTracks().forEach((t) => t.stop());
         screenStream.current = null;
@@ -534,6 +556,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endCall = (): void => {
     try {
+      // Record usage when call ends (only once)
+      if (duration > 0 && !usageRecordedRef.current) {
+        const minutes = Math.ceil(duration / 60);
+        recordUsage('minutes', minutes).catch(err => {
+          console.error('Failed to record usage:', err);
+        });
+        usageRecordedRef.current = true;
+      }
+
       if (durationTimerRef.current) {
         clearInterval(durationTimerRef.current);
         durationTimerRef.current = null;

@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../comp
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { BillingSection } from './BillingSection';
+import { UsageDisplay } from '../../components/usage/UsageDisplay';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -26,6 +27,10 @@ export const Settings: React.FC = () => {
             <a href="#profile" className="flex items-center p-2 rounded-md hover:bg-muted">
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
+            </a>
+            <a href="#usage" className="flex items-center p-2 rounded-md hover:bg-muted">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              <span>Usage</span>
             </a>
             <a href="#billing" className="flex items-center p-2 rounded-md hover:bg-muted">
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -114,6 +119,10 @@ export const Settings: React.FC = () => {
             </CardFooter>
           </Card>
 
+          <div id="usage">
+            <UsageDisplay />
+          </div>
+
           <div id="billing">
             <BillingSection />
           </div>
@@ -179,9 +188,9 @@ export const Settings: React.FC = () => {
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium">Project Updates</h3>
+                    <h3 className="font-medium">Usage Alerts</h3>
                     <p className="text-sm text-muted-foreground">
-                      Get notified when team members make changes
+                      Get notified when approaching plan limits
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">

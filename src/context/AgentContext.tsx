@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Agent } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
+import { canUserPerformAction, recordUsage } from '../services/usage';
 
 interface AgentContextType {
   agents: Agent[];
@@ -107,6 +108,12 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('User must be authenticated to create an agent');
       }
 
+      // Check if user can create another agent
+      const canCreate = await canUserPerformAction('create_agent');
+      if (!canCreate) {
+        throw new Error('You have reached your agent limit for your current plan. Please upgrade or delete an existing agent.');
+      }
+
       const { data, error: createError } = await supabase
         .from('agents')
         .insert({
@@ -122,12 +129,15 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (createError) throw createError;
 
+      // Record the agent creation in usage tracking
+      await recordUsage('agent_created', 1);
+
       const newAgent = mapAgent(data);
       setAgents(prev => [newAgent, ...prev]);
       return newAgent;
     } catch (err) {
       console.error('Failed to create agent:', err);
-      throw new Error('Failed to create agent');
+      throw err;
     }
   };
 

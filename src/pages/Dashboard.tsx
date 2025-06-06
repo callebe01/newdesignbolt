@@ -1,15 +1,20 @@
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Bot, Activity, Clock, Calendar } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { UsageWarning } from '../components/usage/UsageWarning';
+import { UsageDisplay } from '../components/usage/UsageDisplay';
 import { useAgents } from '../context/AgentContext';
 import { useAuth } from '../context/AuthContext';
+import { useUsage } from '../context/UsageContext';
 import { formatDateTime } from '../utils/format';
 
 export const Dashboard: React.FC = () => {
   const { agents, loading, error, fetchAgents } = useAgents();
   const { user } = useAuth();
+  const { plan, usage } = useUsage();
+  const navigate = useNavigate();
   
   useEffect(() => {
     fetchAgents();
@@ -18,6 +23,10 @@ export const Dashboard: React.FC = () => {
   const activeAgents = agents.filter(a => a.status === 'active');
   const totalConversations = agents.reduce((sum, agent) => sum + (agent.analytics?.totalConversations || 0), 0);
   const avgDuration = agents.reduce((sum, agent) => sum + (agent.analytics?.avgDuration || 0), 0) / (agents.length || 1);
+  
+  const handleUpgrade = () => {
+    navigate('/settings#billing');
+  };
   
   return (
     <div className="space-y-8">
@@ -36,36 +45,47 @@ export const Dashboard: React.FC = () => {
           </Button>
         </Link>
       </div>
+
+      {/* Usage Warning */}
+      <UsageWarning onUpgrade={handleUpgrade} />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Agents" 
-          value={agents.length.toString()} 
-          icon={<Bot className="h-5 w-5" />} 
-          trend={`${activeAgents.length} active`}
-          trendPositive={activeAgents.length > 0}
-        />
-        
-        <StatCard 
-          title="Total Conversations" 
-          value={totalConversations.toString()} 
-          icon={<Activity className="h-5 w-5" />} 
-          trend="Last 30 days"
-        />
-        
-        <StatCard 
-          title="Avg Duration" 
-          value={`${Math.round(avgDuration / 60)}m`}
-          icon={<Clock className="h-5 w-5" />} 
-          trend="Per conversation"
-        />
-        
-        <StatCard 
-          title="Last Active" 
-          value={agents.length > 0 ? "2h ago" : "Never"} 
-          icon={<Calendar className="h-5 w-5" />} 
-          trend={agents.length > 0 ? "Active today" : "No agents"}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Stats */}
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <StatCard 
+            title="Total Agents" 
+            value={agents.length.toString()} 
+            icon={<Bot className="h-5 w-5" />} 
+            trend={`${activeAgents.length} active`}
+            trendPositive={activeAgents.length > 0}
+          />
+          
+          <StatCard 
+            title="Total Conversations" 
+            value={totalConversations.toString()} 
+            icon={<Activity className="h-5 w-5" />} 
+            trend="Last 30 days"
+          />
+          
+          <StatCard 
+            title="Minutes Used" 
+            value={usage?.minutes_used?.toString() || '0'}
+            icon={<Clock className="h-5 w-5" />} 
+            trend={`${plan?.monthly_minutes || 0} limit`}
+          />
+          
+          <StatCard 
+            title="Current Plan" 
+            value={plan?.plan_name || 'Loading...'} 
+            icon={<Calendar className="h-5 w-5" />} 
+            trend={agents.length > 0 ? "Active today" : "No agents"}
+          />
+        </div>
+
+        {/* Usage Display */}
+        <div>
+          <UsageDisplay />
+        </div>
       </div>
       
       <div>

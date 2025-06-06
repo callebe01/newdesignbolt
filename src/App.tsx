@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AgentProvider } from './context/AgentContext';
 import { LiveCallProvider } from './context/LiveCallContext';
+import { UsageProvider } from './context/UsageContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { AgentsList } from './pages/agents/AgentsList';
@@ -19,36 +20,38 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AgentProvider>
-          <LiveCallProvider>
-            <Router>
-              <Routes>
-                <Route path="/agent/:agentId" element={<AgentCall />} />
-                <Route element={<MainLayout />}>
-                  {/* Public routes */}
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Signup />} />
-                  
-                  {/* Protected routes */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="/" element={<Dashboard />} />
+        <UsageProvider>
+          <AgentProvider>
+            <LiveCallProvider>
+              <Router>
+                <Routes>
+                  <Route path="/agent/:agentId" element={<AgentCall />} />
+                  <Route element={<MainLayout />}>
+                    {/* Public routes */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<Signup />} />
                     
-                    {/* Agent routes */}
-                    <Route path="/agents" element={<AgentsList />} />
-                    <Route path="/agents/new" element={<NewAgent />} />
-                    <Route path="/agents/:agentId" element={<AgentDetails />} />
+                    {/* Protected routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route path="/" element={<Dashboard />} />
+                      
+                      {/* Agent routes */}
+                      <Route path="/agents" element={<AgentsList />} />
+                      <Route path="/agents/new" element={<NewAgent />} />
+                      <Route path="/agents/:agentId" element={<AgentDetails />} />
+                      
+                      {/* Settings route */}
+                      <Route path="/settings" element={<Settings />} />
+                    </Route>
                     
-                    {/* Settings route */}
-                    <Route path="/settings" element={<Settings />} />
+                    {/* Fallback route */}
+                    <Route path="*" element={<Navigate to="/" />} />
                   </Route>
-                  
-                  {/* Fallback route */}
-                  <Route path="*" element={<Navigate to="/" />} />
-                </Route>
-              </Routes>
-            </Router>
-          </LiveCallProvider>
-        </AgentProvider>
+                </Routes>
+              </Router>
+            </LiveCallProvider>
+          </AgentProvider>
+        </UsageProvider>
       </AuthProvider>
     </ThemeProvider>
   );
