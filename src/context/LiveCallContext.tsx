@@ -173,12 +173,19 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }] : undefined;
 
-        // Setup message with tools
+        // Setup message with tools and Kore voice
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
             generationConfig: {
               responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Kore'
+                  }
+                }
+              }
             },
             tools,
             outputAudioTranscription: {},
