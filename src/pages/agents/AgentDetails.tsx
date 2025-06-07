@@ -66,6 +66,17 @@ interface AgentConversation {
   duration?: number;
   created_at: string;
   updated_at: string;
+  messages?: ConversationMessage[];
+  transcript?: string;
+}
+
+interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  created_at: string;
 }
 
 export const AgentDetails: React.FC = () => {
@@ -131,18 +142,57 @@ export const AgentDetails: React.FC = () => {
 
   const getAgentConversations = async (agentId: string): Promise<AgentConversation[]> => {
     try {
-      const { data, error } = await supabase
+      // Get conversations with their messages
+      const { data: conversationsData, error: conversationsError } = await supabase
         .from('agent_conversations')
+        .select(`
+          *,
+          conversation_messages (
+            id,
+            conversation_id,
+            role,
+            content,
+            timestamp,
+            created_at
+          )
+        `)
+        .eq('agent_id', agentId)
+        .order('created_at', { ascending: false });
+
+      if (conversationsError) {
+        console.error('Error fetching conversations:', conversationsError);
+        return [];
+      }
+
+      // Also get transcripts for conversations that might not have messages yet
+      const { data: transcriptsData, error: transcriptsError } = await supabase
+        .from('transcriptions')
         .select('*')
         .eq('agent_id', agentId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching conversations:', error);
-        return [];
+      if (transcriptsError) {
+        console.error('Error fetching transcripts:', transcriptsError);
       }
 
-      return data || [];
+      // Merge conversation data with transcript data
+      const conversationsWithContent = (conversationsData || []).map(conversation => {
+        // Find matching transcript by timestamp (within 5 minutes)
+        const conversationTime = new Date(conversation.start_time).getTime();
+        const matchingTranscript = transcriptsData?.find(transcript => {
+          const transcriptTime = new Date(transcript.created_at).getTime();
+          const timeDiff = Math.abs(conversationTime - transcriptTime);
+          return timeDiff < 5 * 60 * 1000; // 5 minutes tolerance
+        });
+
+        return {
+          ...conversation,
+          messages: conversation.conversation_messages || [],
+          transcript: matchingTranscript?.content || null
+        };
+      });
+
+      return conversationsWithContent;
     } catch (err) {
       console.error('Error fetching conversations:', err);
       return [];
@@ -538,7 +588,7 @@ export const AgentDetails: React.FC = () => {
     </div>
   );
 
-  const renderConversationModal = (conversation: any) => (
+  const renderConversationModal = (conversation: AgentConversation) => (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>Started: {formatDateTime(conversation.start_time)}</div>
@@ -554,7 +604,9 @@ export const AgentDetails: React.FC = () => {
       {conversation.transcript && (
         <div className="bg-muted p-4 rounded-lg">
           <h4 className="font-medium mb-2">Transcript:</h4>
-          <pre className="whitespace-pre-wrap font-sans text-sm">{conversation.transcript}</pre>
+          <div className="max-h-96 overflow-y-auto">
+            <pre className="whitespace-pre-wrap font-sans text-sm">{conversation.transcript}</pre>
+          </div>
         </div>
       )}
       
@@ -562,14 +614,27 @@ export const AgentDetails: React.FC = () => {
       {conversation.messages && conversation.messages.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-medium">Messages:</h4>
-          {conversation.messages.map((message: any, index: number) => (
-            <div key={index} className="bg-muted p-3 rounded-lg">
-              <div className="text-xs text-muted-foreground mb-1">
-                {message.role === 'user' ? 'User' : 'Assistant'} - {formatDateTime(message.timestamp)}
+          <div className="max-h-96 overflow-y-auto space-y-2">
+            {conversation.messages.map((message: ConversationMessage, index: number) => (
+              <div key={index} className="bg-muted p-3 rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">
+                  {message.role === 'user' ? 'User' : 'Assistant'} - {formatDateTime(message.timestamp)}
+                </div>
+                <div className="text-sm">{message.content}</div>
               </div>
-              <div className="text-sm">{message.content}</div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Show empty state if no content */}
+      {!conversation.transcript && (!conversation.messages || conversation.messages.length === 0) && (
+        <div className="text-center py-8">
+          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">No conversation content available</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            This conversation may have been very brief or the content wasn't captured.
+          </p>
         </div>
       )}
     </div>
