@@ -35,6 +35,7 @@ import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
 import { getTranscripts, analyzeTranscripts, getAnalysisResults, AnalysisResult } from '../../services/transcripts';
+import { supabase } from '../../services/supabase';
 
 type TimeFilter = 'today' | 'last7days' | 'last30days' | 'last90days' | 'alltime';
 
@@ -56,6 +57,17 @@ interface ModalState {
   data: any;
 }
 
+interface AgentConversation {
+  id: string;
+  agent_id: string;
+  status: string;
+  start_time: string;
+  end_time?: string;
+  duration?: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export const AgentDetails: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
@@ -64,6 +76,7 @@ export const AgentDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -95,14 +108,16 @@ export const AgentDetails: React.FC = () => {
     if (!agentId) return;
     
     try {
-      const [fetchedAgent, fetchedTranscripts] = await Promise.all([
+      const [fetchedAgent, fetchedTranscripts, fetchedConversations] = await Promise.all([
         getAgent(agentId),
-        getTranscripts(agentId)
+        getTranscripts(agentId),
+        getAgentConversations(agentId)
       ]);
       
       if (fetchedAgent) {
         setAgent(fetchedAgent);
         setTranscripts(fetchedTranscripts);
+        setConversations(fetchedConversations);
         
         if (fetchedTranscripts.length > 0) {
           const results = await getAnalysisResults(fetchedTranscripts.map(t => t.id));
@@ -111,6 +126,26 @@ export const AgentDetails: React.FC = () => {
       }
     } catch (err) {
       console.error('Error refreshing data:', err);
+    }
+  };
+
+  const getAgentConversations = async (agentId: string): Promise<AgentConversation[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('agent_conversations')
+        .select('*')
+        .eq('agent_id', agentId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching conversations:', err);
+      return [];
     }
   };
 
@@ -155,7 +190,7 @@ export const AgentDetails: React.FC = () => {
 
       if (filteredResults.length === 0) {
         setOverviewMetrics({
-          totalConversations: transcripts.length,
+          totalConversations: conversations.length,
           resolutionRate: 0,
           engagementScore: 0,
           avgDuration: 0
@@ -163,13 +198,17 @@ export const AgentDetails: React.FC = () => {
         return;
       }
 
+      const avgDurationFromConversations = conversations.length > 0 
+        ? conversations.reduce((acc, conv) => acc + (conv.duration || 0), 0) / conversations.length
+        : 0;
+
       const metrics = {
-        totalConversations: transcripts.length,
+        totalConversations: conversations.length,
         resolutionRate: filteredResults.reduce((acc, curr) => 
           acc + (curr.resolutionRate?.resolved || 0), 0) / filteredResults.length,
         engagementScore: filteredResults.reduce((acc, curr) => 
           acc + (curr.engagementScore || 0), 0) / filteredResults.length,
-        avgDuration: 300, // Default 5 minutes, could be calculated from actual data
+        avgDuration: avgDurationFromConversations,
         changes: {
           conversations: '+12 this week',
           resolution: '+5% vs last week',
@@ -182,7 +221,7 @@ export const AgentDetails: React.FC = () => {
     };
 
     calculateMetrics();
-  }, [timeFilter, analysisResults, transcripts]);
+  }, [timeFilter, analysisResults, conversations]);
 
   const getTodayTranscripts = () => {
     const today = new Date();
@@ -499,14 +538,40 @@ export const AgentDetails: React.FC = () => {
     </div>
   );
 
-  const renderConversationModal = (transcript: any) => (
+  const renderConversationModal = (conversation: any) => (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <div>Created: {formatDateTime(transcript.created_at)}</div>
+        <div>Started: {formatDateTime(conversation.start_time)}</div>
+        <div>
+          {conversation.status === 'completed' && conversation.duration 
+            ? `Duration: ${formatDuration(conversation.duration)}`
+            : `Status: ${conversation.status}`
+          }
+        </div>
       </div>
-      <div className="bg-muted p-4 rounded-lg">
-        <pre className="whitespace-pre-wrap font-sans text-sm">{transcript.content}</pre>
-      </div>
+      
+      {/* Show transcript if available */}
+      {conversation.transcript && (
+        <div className="bg-muted p-4 rounded-lg">
+          <h4 className="font-medium mb-2">Transcript:</h4>
+          <pre className="whitespace-pre-wrap font-sans text-sm">{conversation.transcript}</pre>
+        </div>
+      )}
+      
+      {/* Show conversation messages if available */}
+      {conversation.messages && conversation.messages.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="font-medium">Messages:</h4>
+          {conversation.messages.map((message: any, index: number) => (
+            <div key={index} className="bg-muted p-3 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">
+                {message.role === 'user' ? 'User' : 'Assistant'} - {formatDateTime(message.timestamp)}
+              </div>
+              <div className="text-sm">{message.content}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -590,7 +655,7 @@ export const AgentDetails: React.FC = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="conversations">Conversations ({transcripts.length})</TabsTrigger>
+          <TabsTrigger value="conversations">Conversations ({conversations.length})</TabsTrigger>
           <TabsTrigger value="analysis">Analysis ({analysisResults.length})</TabsTrigger>
         </TabsList>
 
@@ -710,30 +775,42 @@ export const AgentDetails: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="conversations" className="space-y-4">
-          {transcripts.length > 0 ? (
+          {conversations.length > 0 ? (
             <div className="overflow-hidden rounded-lg border">
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Preview</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Duration</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {transcripts.map((transcript) => (
-                    <tr key={transcript.id} className="hover:bg-muted/50">
+                  {conversations.map((conversation) => (
+                    <tr key={conversation.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3 text-sm">
-                        {formatDateTime(transcript.created_at)}
+                        {formatDateTime(conversation.start_time)}
                       </td>
-                      <td className="px-4 py-3 text-sm max-w-md">
-                        <p className="truncate">{transcript.content}</p>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          conversation.status === 'completed' 
+                            ? 'bg-success/10 text-success' 
+                            : conversation.status === 'active'
+                            ? 'bg-accent/10 text-accent'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {conversation.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {conversation.duration ? formatDuration(conversation.duration) : 'N/A'}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setModal({ type: 'conversation', data: transcript })}
+                          onClick={() => setModal({ type: 'conversation', data: conversation })}
                         >
                           <MessageSquare className="h-4 w-4 mr-1" />
                           View Details

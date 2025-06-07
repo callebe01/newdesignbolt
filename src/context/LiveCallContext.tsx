@@ -8,6 +8,7 @@ import React, {
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
 import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
+import { supabase } from '../services/supabase';
 
 interface LiveCallContextType {
   status: LiveCallStatus;
@@ -60,6 +61,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const callEndedRef = useRef(false);
   const agentOwnerIdRef = useRef<string | null>(null);
   const currentAgentIdRef = useRef<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
@@ -182,12 +184,81 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const createConversationRecord = async (agentId: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('agent_conversations')
+        .insert({
+          agent_id: agentId,
+          status: 'active',
+          start_time: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to create conversation record:', error);
+        return null;
+      }
+
+      console.log('Created conversation record:', data.id);
+      return data.id;
+    } catch (err) {
+      console.error('Error creating conversation record:', err);
+      return null;
+    }
+  };
+
+  const endConversationRecord = async (conversationId: string, duration: number): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('agent_conversations')
+        .update({
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          duration: duration,
+        })
+        .eq('id', conversationId);
+
+      if (error) {
+        console.error('Failed to end conversation record:', error);
+      } else {
+        console.log('Ended conversation record:', conversationId);
+      }
+    } catch (err) {
+      console.error('Error ending conversation record:', err);
+    }
+  };
+
+  const saveConversationMessages = async (conversationId: string, transcript: string): Promise<void> => {
+    try {
+      // For now, save the entire transcript as a single message
+      // In the future, we could parse it into individual messages
+      const { error } = await supabase
+        .from('conversation_messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'user',
+          content: transcript,
+        });
+
+      if (error) {
+        console.error('Failed to save conversation messages:', error);
+      } else {
+        console.log('Saved conversation messages for:', conversationId);
+      }
+    } catch (err) {
+      console.error('Error saving conversation messages:', err);
+    }
+  };
+
   const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
       setErrorMessage(null);
       setDuration(0);
       usageRecordedRef.current = false;
       currentAgentIdRef.current = agentId || null;
+      conversationIdRef.current = null;
       callEndedRef.current = false;
       window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -197,6 +268,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!canUse) {
           throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
         }
+
+        // Create conversation record
+        const conversationId = await createConversationRecord(agentId);
+        conversationIdRef.current = conversationId;
       }
 
       if (websocketRef.current) {
@@ -623,21 +698,43 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     callEndedRef.current = true;
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    
     try {
-      // Save transcript if we have one and an agent ID
-      if (currentAgentIdRef.current && transcript.trim()) {
-        console.log('[Live] Saving transcript for agent:', currentAgentIdRef.current);
+      const finalDuration = duration;
+      const finalTranscript = transcript.trim();
+      const agentId = currentAgentIdRef.current;
+      const conversationId = conversationIdRef.current;
+
+      // Save transcript and conversation data
+      if (agentId && finalTranscript) {
+        console.log('[Live] Saving transcript for agent:', agentId);
         const save = fromUnload ? saveTranscriptBeacon : saveTranscript;
-        save(currentAgentIdRef.current, transcript).catch(err => {
+        save(agentId, finalTranscript).catch(err => {
           console.error('Failed to save transcript:', err);
-          alert(`Transcript wasn't saved: ${err.message ?? err}`);
+          if (!fromUnload) {
+            alert(`Transcript wasn't saved: ${err.message ?? err}`);
+          }
+        });
+
+        // Save conversation messages if we have a conversation record
+        if (conversationId) {
+          saveConversationMessages(conversationId, finalTranscript).catch(err => {
+            console.error('Failed to save conversation messages:', err);
+          });
+        }
+      }
+
+      // End conversation record
+      if (conversationId && finalDuration > 0) {
+        endConversationRecord(conversationId, finalDuration).catch(err => {
+          console.error('Failed to end conversation record:', err);
         });
       }
 
       // Record usage for the agent owner if we have the agent ID and duration
-      if (currentAgentIdRef.current && duration > 0 && !usageRecordedRef.current) {
-        const minutes = Math.ceil(duration / 60);
-        recordAgentUsage(currentAgentIdRef.current, minutes).catch(err => {
+      if (agentId && finalDuration > 0 && !usageRecordedRef.current) {
+        const minutes = Math.ceil(finalDuration / 60);
+        recordAgentUsage(agentId, minutes).catch(err => {
           console.error('Failed to record agent usage:', err);
         });
         usageRecordedRef.current = true;
@@ -678,6 +775,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       setStatus('ended');
       agentOwnerIdRef.current = null;
       currentAgentIdRef.current = null;
+      conversationIdRef.current = null;
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
