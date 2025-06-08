@@ -64,7 +64,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const conversationIdRef = useRef<string | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const screenCanvasRef = useRef<HTMLCanvasCanvas | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
 
   const handleBeforeUnload = () => {
