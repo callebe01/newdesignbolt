@@ -29,7 +29,7 @@ serve(async (req) => {
     // Validate persona exists and user has access
     const { data: personaData, error: personaError } = await supabase
       .from('personas')
-      .select('instructions')
+      .select('instructions, documentation_urls')
       .eq('id', persona)
       .single();
 
@@ -38,6 +38,14 @@ serve(async (req) => {
     }
 
     // Call Gemini API
+    const tools = personaData.documentation_urls?.length
+      ? [{
+          url_context: {
+            urls: personaData.documentation_urls,
+          },
+        }]
+      : undefined;
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GOOGLE_API_KEY}`,
       {
@@ -50,10 +58,11 @@ serve(async (req) => {
               parts: [{ text: personaData.instructions }]
             },
             {
-              role: 'user', 
+              role: 'user',
               parts: [{ text: message }]
             }
-          ]
+          ],
+          tools,
         })
       }
     );
