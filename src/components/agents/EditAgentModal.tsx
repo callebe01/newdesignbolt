@@ -95,7 +95,7 @@ export const EditAgentModal: React.FC<EditAgentModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div className="relative bg-card rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold">Edit Agent</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
