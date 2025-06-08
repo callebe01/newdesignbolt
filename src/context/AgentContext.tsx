@@ -15,7 +15,8 @@ interface AgentContextType {
     name: string,
     instructions: string,
     canSeeScreenshare: boolean,
-    duration: number
+    duration: number,
+    documentationUrls?: string[]
   ) => Promise<Agent>;
   setCurrentAgent: (agent: Agent | null) => void;
 }
@@ -39,6 +40,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     user_id: string;
     can_see_screenshare: boolean;
     call_duration: number;
+    documentation_urls: string[] | null;
   }
 
   const mapAgent = (data: AgentRow): Agent => ({
@@ -51,6 +53,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     userId: data.user_id,
     canSeeScreenshare: data.can_see_screenshare,
     callDuration: data.call_duration,
+    documentationUrls: data.documentation_urls || undefined,
   });
 
   const fetchAgents = useCallback(async () => {
@@ -101,7 +104,8 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     name: string,
     instructions: string,
     canSeeScreenshare: boolean,
-    duration: number
+    duration: number,
+    documentationUrls?: string[]
   ): Promise<Agent> => {
     try {
       if (!user) {
@@ -123,6 +127,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           user_id: user.id,
           can_see_screenshare: canSeeScreenshare,
           call_duration: duration,
+          documentation_urls: documentationUrls,
         })
         .select()
         .single();
