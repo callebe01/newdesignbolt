@@ -33,14 +33,33 @@ export async function getAgent(id: string): Promise<Agent | null> {
 }
 
 export async function updateAgent(id: string, updates: Partial<Agent>): Promise<Agent> {
+  const {
+    callDuration,
+    canSeeScreenshare,
+    documentationUrls,
+    ...rest
+  } = updates as any;
+
+  const updateData: Record<string, any> = {
+    ...rest,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (callDuration !== undefined) {
+    updateData.call_duration = callDuration;
+  }
+
+  if (canSeeScreenshare !== undefined) {
+    updateData.can_see_screenshare = canSeeScreenshare;
+  }
+
+  if (documentationUrls !== undefined) {
+    updateData.documentation_urls = documentationUrls;
+  }
+
   const { data, error } = await supabase
     .from('agents')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-      call_duration: (updates as any).callDuration,
-      can_see_screenshare: (updates as any).canSeeScreenshare,
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
