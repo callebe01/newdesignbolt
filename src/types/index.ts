@@ -92,4 +92,5 @@ export interface Agent {
   updatedAt: Date;
   canSeeScreenshare: boolean;
   callDuration: number;
+  documentationUrls?: string[];
 }
