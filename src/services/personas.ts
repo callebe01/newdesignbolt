@@ -5,6 +5,7 @@ export interface Persona {
   projectId: string;
   name: string;
   instructions: string;
+  documentationUrls?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +32,7 @@ export async function createPersona(
     projectId: data.project_id,
     name: data.name,
     instructions: data.instructions,
+    documentationUrls: data.documentation_urls ?? [],
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
   };
@@ -50,6 +52,7 @@ export async function getProjectPersonas(projectId: string): Promise<Persona[]> 
     projectId: row.project_id,
     name: row.name,
     instructions: row.instructions,
+    documentationUrls: row.documentation_urls ?? [],
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   }));
@@ -69,6 +72,7 @@ export async function getPersona(id: string): Promise<Persona | null> {
     projectId: data.project_id,
     name: data.name,
     instructions: data.instructions,
+    documentationUrls: data.documentation_urls ?? [],
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
   };
@@ -76,11 +80,14 @@ export async function getPersona(id: string): Promise<Persona | null> {
 
 export async function updatePersona(
   id: string,
-  updates: Partial<Pick<Persona, 'name' | 'instructions'>>
+  updates: Partial<Pick<Persona, 'name' | 'instructions' | 'documentationUrls'>>
 ): Promise<Persona> {
   const { data, error } = await supabase
     .from('personas')
-    .update(updates)
+    .update({
+      ...updates,
+      documentation_urls: (updates as any).documentationUrls,
+    })
     .eq('id', id)
     .select()
     .single();
@@ -92,6 +99,7 @@ export async function updatePersona(
     projectId: data.project_id,
     name: data.name,
     instructions: data.instructions,
+    documentationUrls: data.documentation_urls ?? [],
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
   };
