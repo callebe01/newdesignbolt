@@ -4,7 +4,9 @@ import { Agent, AgentConversation, ConversationMessage, AgentAnalytics, AgentMet
 export async function createAgent(
   name: string,
   instructions: string,
-  duration: number
+  canSeeScreenshare: boolean,
+  duration: number,
+  documentationUrls?: string[]
 ): Promise<Agent> {
   const { data, error } = await supabase
     .from('agents')
@@ -12,7 +14,9 @@ export async function createAgent(
       name,
       instructions,
       status: 'active',
+      can_see_screenshare: canSeeScreenshare,
       call_duration: duration,
+      documentation_urls: documentationUrls,
     })
     .select()
     .single();
@@ -194,6 +198,7 @@ function mapAgent(row: Record<string, any>): Agent {
     userId: row.user_id,
     canSeeScreenshare: row.can_see_screenshare,
     callDuration: row.call_duration,
+    documentationUrls: row.documentation_urls || [],
   };
 }
 
