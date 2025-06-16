@@ -280,6 +280,18 @@
       opacity: 1;
     }
 
+    .transcript-area {
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 8px;
+      background: var(--vc-border);
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--vc-text);
+      white-space: pre-wrap;
+    }
+
     @media (max-width: 480px) {
       .panel {
         width: 100vw;
@@ -324,11 +336,18 @@
   const WidgetPanelModule = {
     create(container, agentId, api) {
       let state = {
-        callState: 'idle', // idle, live, ended
+        callState: 'idle', // idle, connecting, live, ended
         isScreenSharing: false,
+        isMicrophoneActive: false,
         startTime: null,
         timer: null,
-        websocket: null
+        websocket: null,
+        transcript: '',
+        audioContext: null,
+        audioQueue: 0,
+        microphoneStream: null,
+        screenStream: null,
+        greetingSent: false
       };
 
       const panel = document.createElement('div');
@@ -344,6 +363,7 @@
             <div class="status-dot"></div>
             <span class="status-text">Ready to help</span>
           </div>
+          <div class="transcript-area" style="display: none;"></div>
           <div class="call-controls">
             <button class="primary-btn start-call-btn" aria-label="Start call">
               Start Call
@@ -376,6 +396,7 @@
       const liveControls = panel.querySelector('.live-controls');
       const checkbox = panel.querySelector('.checkbox');
       const checkIcon = panel.querySelector('.check-icon');
+      const transcriptArea = panel.querySelector('.transcript-area');
 
       closeBtn.addEventListener('click', () => api.close());
 
@@ -384,7 +405,7 @@
           await startCall();
         } catch (error) {
           console.error('Failed to start call:', error);
-          showToast('Failed to start call');
+          showToast('Failed to start call: ' + error.message);
         }
       });
 
@@ -403,51 +424,267 @@
       async function startCall() {
         if (state.callState !== 'idle') return;
 
+        state.callState = 'connecting';
         startCallBtn.disabled = true;
         startCallBtn.textContent = 'Connecting...';
+        updateUI();
 
         try {
-          // Fetch stream endpoint
-          const response = await fetch(`/agent/${agentId}/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
+          const apiKey = 'AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ'; // This should be passed from the parent app
           
-          if (!response.ok) throw new Error('Failed to get stream URL');
+          if (!apiKey) {
+            throw new Error('Google API key not available');
+          }
+
+          const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
           
-          const { wsUrl } = await response.json();
-          
-          // Connect WebSocket
           state.websocket = new WebSocket(wsUrl);
+          state.greetingSent = false;
           
           state.websocket.onopen = () => {
-            state.callState = 'live';
-            state.startTime = Date.now();
-            updateUI();
-            startTimer();
+            console.log('[Widget] WebSocket connected');
+            
+            // Send setup message
+            const setupMsg = {
+              setup: {
+                model: 'models/gemini-2.0-flash-live-001',
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: {
+                        voiceName: 'Kore'
+                      }
+                    }
+                  }
+                },
+                outputAudioTranscription: {},
+                inputAudioTranscription: {},
+                systemInstruction: {
+                  parts: [{
+                    text: 'You are a helpful AI assistant for a design testing platform. Help users understand how to use the platform, create agents, run tests, and analyze results. Be concise and practical in your responses.'
+                  }]
+                }
+              }
+            };
+            
+            state.websocket.send(JSON.stringify(setupMsg));
+          };
+          
+          state.websocket.onmessage = async (ev) => {
+            await handleWebSocketMessage(ev);
           };
           
           state.websocket.onclose = () => {
+            console.log('[Widget] WebSocket closed');
             if (state.callState === 'live') {
               endCall();
             }
           };
           
           state.websocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            console.error('[Widget] WebSocket error:', error);
             endCall();
             showToast('Connection error');
           };
 
         } catch (error) {
+          state.callState = 'idle';
           startCallBtn.disabled = false;
           startCallBtn.textContent = 'Start Call';
+          updateUI();
           throw error;
         }
       }
 
+      async function handleWebSocketMessage(ev) {
+        if (!(ev.data instanceof Blob)) {
+          return;
+        }
+
+        let maybeText = null;
+        try {
+          maybeText = await ev.data.text();
+        } catch {
+          maybeText = null;
+        }
+
+        if (maybeText) {
+          try {
+            const parsed = JSON.parse(maybeText);
+            console.log('[Widget] Received JSON:', parsed);
+
+            if (parsed.setupComplete) {
+              console.log('[Widget] Setup complete');
+              state.callState = 'live';
+              state.startTime = Date.now();
+              updateUI();
+              startTimer();
+              startMicStreaming();
+
+              // Send initial greeting
+              if (!state.greetingSent) {
+                const greeting = {
+                  clientContent: {
+                    turns: [{
+                      role: 'user',
+                      parts: [{ text: 'Hello! I need help using this design testing platform.' }]
+                    }],
+                    turnComplete: true
+                  }
+                };
+                state.websocket.send(JSON.stringify(greeting));
+                state.greetingSent = true;
+              }
+              return;
+            }
+
+            if (parsed.serverContent) {
+              // Handle transcription
+              if (parsed.serverContent.outputTranscription?.text) {
+                state.transcript += parsed.serverContent.outputTranscription.text;
+                updateTranscript();
+              }
+              if (parsed.serverContent.inputTranscription?.text) {
+                state.transcript += parsed.serverContent.inputTranscription.text;
+                updateTranscript();
+              }
+
+              // Handle audio response
+              const modelTurn = parsed.serverContent.modelTurn;
+              if (modelTurn && Array.isArray(modelTurn.parts)) {
+                for (const part of modelTurn.parts) {
+                  if (typeof part.text === 'string') {
+                    console.log('[Widget] AI says:', part.text);
+                    state.transcript += part.text;
+                    updateTranscript();
+                  }
+                  if (part.inlineData && typeof part.inlineData.data === 'string') {
+                    try {
+                      const base64str = part.inlineData.data;
+                      const binaryStr = atob(base64str);
+                      const len = binaryStr.length;
+                      const rawBuffer = new Uint8Array(len);
+                      for (let i = 0; i < len; i++) {
+                        rawBuffer[i] = binaryStr.charCodeAt(i);
+                      }
+                      const pcmBlob = new Blob([rawBuffer.buffer], {
+                        type: 'audio/pcm;rate=24000'
+                      });
+                      playAudioBuffer(pcmBlob);
+                    } catch (err) {
+                      console.error('[Widget] Error decoding audio:', err);
+                    }
+                  }
+                }
+              }
+            }
+            return;
+          } catch {
+            // JSON parse failed, continue to audio handling
+          }
+        }
+
+        // Handle raw audio
+        console.log('[Widget] Playing raw audio buffer');
+        playAudioBuffer(ev.data);
+      }
+
+      async function playAudioBuffer(pcmBlob) {
+        try {
+          const arrayBuffer = await pcmBlob.arrayBuffer();
+          const pcm16 = new Int16Array(arrayBuffer);
+          const float32 = new Float32Array(pcm16.length);
+          for (let i = 0; i < pcm16.length; i++) {
+            float32[i] = pcm16[i] / 32768;
+          }
+
+          if (!state.audioContext) {
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          const audioCtx = state.audioContext;
+
+          const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+          buffer.copyToChannel(float32, 0, 0);
+
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+
+          let startAt = audioCtx.currentTime;
+          if (state.audioQueue > audioCtx.currentTime) {
+            startAt = state.audioQueue;
+          }
+          source.start(startAt);
+          state.audioQueue = startAt + buffer.duration;
+        } catch (err) {
+          console.error('[Widget] Audio playback error:', err);
+        }
+      }
+
+      async function startMicStreaming() {
+        try {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          state.microphoneStream = micStream;
+          state.isMicrophoneActive = true;
+
+          if (!state.audioContext) {
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          const audioCtx = state.audioContext;
+
+          const sourceNode = audioCtx.createMediaStreamSource(micStream);
+          const bufferSize = 4096;
+          const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+          sourceNode.connect(processor);
+          processor.connect(audioCtx.destination);
+
+          processor.onaudioprocess = (event) => {
+            const float32Data = event.inputBuffer.getChannelData(0);
+            const inRate = audioCtx.sampleRate;
+            const outRate = 16000;
+            const ratio = inRate / outRate;
+            const outLength = Math.floor(float32Data.length / ratio);
+
+            const pcm16 = new Int16Array(outLength);
+            for (let i = 0; i < outLength; i++) {
+              const idx = Math.floor(i * ratio);
+              let sample = float32Data[idx];
+              sample = Math.max(-1, Math.min(1, sample));
+              pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+            }
+
+            const u8 = new Uint8Array(pcm16.buffer);
+            let binary = '';
+            for (let i = 0; i < u8.byteLength; i++) {
+              binary += String.fromCharCode(u8[i]);
+            }
+            const base64Audio = btoa(binary);
+
+            const payload = {
+              realtime_input: {
+                audio: {
+                  data: base64Audio,
+                  mime_type: 'audio/pcm;rate=16000'
+                }
+              }
+            };
+
+            if (state.websocket?.readyState === WebSocket.OPEN) {
+              state.websocket.send(JSON.stringify(payload));
+            }
+          };
+
+          updateUI();
+        } catch (err) {
+          console.error('[Widget] Microphone error:', err);
+          showToast('Microphone access denied');
+        }
+      }
+
       function endCall() {
-        if (state.callState !== 'live') return;
+        if (state.callState === 'idle') return;
 
         state.callState = 'ended';
         
@@ -461,9 +698,22 @@
           state.timer = null;
         }
 
-        if (state.isScreenSharing) {
-          // Stop screen sharing
+        if (state.microphoneStream) {
+          state.microphoneStream.getTracks().forEach(track => track.stop());
+          state.microphoneStream = null;
+          state.isMicrophoneActive = false;
+        }
+
+        if (state.screenStream) {
+          state.screenStream.getTracks().forEach(track => track.stop());
+          state.screenStream = null;
           state.isScreenSharing = false;
+        }
+
+        if (state.audioContext) {
+          state.audioContext.close().catch(() => {});
+          state.audioContext = null;
+          state.audioQueue = 0;
         }
 
         updateUI();
@@ -475,6 +725,8 @@
           // Reset state for next call
           state.callState = 'idle';
           state.startTime = null;
+          state.transcript = '';
+          state.greetingSent = false;
           updateUI();
         }, 2000);
       }
@@ -492,17 +744,26 @@
 
       function updateUI() {
         const isIdle = state.callState === 'idle';
+        const isConnecting = state.callState === 'connecting';
         const isLive = state.callState === 'live';
 
-        startCallBtn.style.display = isIdle ? 'block' : 'none';
+        startCallBtn.style.display = (isIdle || isConnecting) ? 'block' : 'none';
         liveControls.style.display = isLive ? 'block' : 'none';
+        transcriptArea.style.display = (isLive && state.transcript) ? 'block' : 'none';
         
         startCallBtn.disabled = !isIdle;
-        startCallBtn.textContent = 'Start Call';
+        if (isConnecting) {
+          startCallBtn.textContent = 'Connecting...';
+        } else {
+          startCallBtn.textContent = 'Start Call';
+        }
 
         if (isLive) {
           statusDot.classList.add('live');
           statusText.textContent = 'Live call in progress';
+        } else if (isConnecting) {
+          statusDot.classList.add('live');
+          statusText.textContent = 'Connecting...';
         } else {
           statusDot.classList.remove('live');
           statusText.textContent = 'Ready to help';
@@ -515,6 +776,14 @@
         } else {
           checkbox.classList.remove('checked');
           checkIcon.style.display = 'none';
+        }
+      }
+
+      function updateTranscript() {
+        if (state.transcript) {
+          transcriptArea.textContent = state.transcript;
+          transcriptArea.scrollTop = transcriptArea.scrollHeight;
+          transcriptArea.style.display = 'block';
         }
       }
 
@@ -569,21 +838,27 @@
               video: { mediaSource: 'screen' }
             });
             
+            state.screenStream = stream;
             state.isScreenSharing = true;
             
             // Handle stream end
             stream.getVideoTracks()[0].addEventListener('ended', () => {
               state.isScreenSharing = false;
+              state.screenStream = null;
               updateUI();
             });
             
           } else {
+            if (state.screenStream) {
+              state.screenStream.getTracks().forEach(track => track.stop());
+              state.screenStream = null;
+            }
             state.isScreenSharing = false;
           }
           
           updateUI();
         } catch (error) {
-          console.error('Screen share error:', error);
+          console.error('[Widget] Screen share error:', error);
           showToast('Screen sharing not available');
         }
       }
@@ -597,7 +872,11 @@
         setTimeout(() => toast.classList.add('show'), 100);
         setTimeout(() => {
           toast.classList.remove('show');
-          setTimeout(() => container.removeChild(toast), 300);
+          setTimeout(() => {
+            if (container.contains(toast)) {
+              container.removeChild(toast);
+            }
+          }, 300);
         }, 2000);
       }
 
