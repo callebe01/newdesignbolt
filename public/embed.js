@@ -14,8 +14,12 @@
       
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       position: fixed;
-      z-index: 999999;
+      z-index: 2147483647; /* Maximum z-index value */
       pointer-events: none;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
     }
 
     * {
@@ -25,26 +29,26 @@
     }
 
     .fab {
-      width: 64px;
-      height: 64px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
-      background: var(--vc-primary);
+      background: linear-gradient(135deg, var(--vc-primary) 0%, #1D4ED8 100%);
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
       transition: all 0.3s ease;
       pointer-events: auto;
       color: white;
-      position: relative;
-      z-index: 999999;
+      position: fixed;
+      z-index: 2147483647;
     }
 
     .fab:hover {
       transform: scale(1.1);
-      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 16px 40px rgba(37, 99, 235, 0.5);
     }
 
     .fab.pulse {
@@ -65,16 +69,16 @@
     .panel {
       position: fixed;
       background: var(--vc-background);
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      width: 380px;
-      max-height: 600px;
+      border-radius: 20px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+      width: 400px;
+      max-height: 650px;
       transform: translateY(100%);
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: auto;
-      border: 1px solid var(--vc-border);
+      border: 2px solid var(--vc-border);
       overflow: hidden;
-      z-index: 999998;
+      z-index: 2147483646;
     }
 
     .panel.open {
@@ -82,7 +86,7 @@
     }
 
     .panel-header {
-      padding: 20px;
+      padding: 24px;
       border-bottom: 1px solid var(--vc-border);
       display: flex;
       align-items: center;
@@ -92,146 +96,161 @@
     }
 
     .panel-title {
-      font-size: 18px;
-      font-weight: 600;
+      font-size: 20px;
+      font-weight: 700;
       color: white;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .close-btn {
       background: rgba(255, 255, 255, 0.2);
       border: none;
       cursor: pointer;
-      padding: 8px;
-      border-radius: 8px;
+      padding: 12px;
+      border-radius: 12px;
       color: white;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
     }
 
     .close-btn:hover {
       background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.1);
     }
 
     .panel-content {
-      padding: 24px;
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      max-height: 500px;
+      gap: 24px;
+      max-height: 550px;
       overflow-y: auto;
     }
 
     .status-indicator {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 14px;
+      gap: 16px;
+      font-size: 15px;
       color: var(--vc-muted);
-      padding: 12px;
-      background: var(--vc-border);
-      border-radius: 8px;
+      padding: 16px;
+      background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+      border-radius: 16px;
+      border: 1px solid var(--vc-border);
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       background: var(--vc-muted);
+      flex-shrink: 0;
     }
 
     .status-dot.live {
       background: var(--vc-success);
       animation: pulse 2s infinite;
+      box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.2);
     }
 
     .call-controls {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
     }
 
     .primary-btn {
-      background: var(--vc-primary);
+      background: linear-gradient(135deg, var(--vc-primary) 0%, #1D4ED8 100%);
       color: white;
       border: none;
-      padding: 16px 20px;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
+      padding: 20px 24px;
+      border-radius: 16px;
+      font-size: 17px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+      position: relative;
+      overflow: hidden;
     }
 
     .primary-btn:hover:not(:disabled) {
-      background: #1D4ED8;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
     }
 
     .primary-btn:disabled {
-      opacity: 0.6;
+      opacity: 0.7;
       cursor: not-allowed;
       transform: none;
     }
 
     .danger-btn {
-      background: var(--vc-error);
+      background: linear-gradient(135deg, var(--vc-error) 0%, #B91C1C 100%);
       color: white;
       border: none;
-      padding: 16px 20px;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
+      padding: 20px 24px;
+      border-radius: 16px;
+      font-size: 17px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 24px rgba(220, 38, 38, 0.3);
     }
 
     .danger-btn:hover {
-      background: #B91C1C;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(220, 38, 38, 0.4);
     }
 
     .timer {
       font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-      font-size: 24px;
-      font-weight: 700;
+      font-size: 28px;
+      font-weight: 800;
       color: var(--vc-text);
       text-align: center;
-      padding: 16px;
-      background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
-      border-radius: 12px;
+      padding: 20px;
+      background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%);
+      border-radius: 16px;
       border: 2px solid var(--vc-border);
+      letter-spacing: 2px;
     }
 
     .screen-share-control {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px;
+      gap: 16px;
+      padding: 20px;
       border: 2px solid var(--vc-border);
-      border-radius: 12px;
+      border-radius: 16px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s ease;
       background: var(--vc-background);
     }
 
     .screen-share-control:hover {
       border-color: var(--vc-primary);
-      background: rgba(37, 99, 235, 0.02);
+      background: rgba(37, 99, 235, 0.03);
+      transform: translateY(-1px);
     }
 
     .checkbox {
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--vc-primary);
-      border-radius: 4px;
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--vc-primary);
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: white;
       transition: all 0.2s ease;
+      flex-shrink: 0;
     }
 
     .checkbox.checked {
@@ -240,80 +259,83 @@
     }
 
     .modal-overlay {
-      position: absolute;
+      position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.7);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      z-index: 999999;
+      z-index: 2147483647;
+      backdrop-filter: blur(4px);
     }
 
     .modal {
       background: var(--vc-background);
-      border-radius: 16px;
-      padding: 24px;
-      max-width: 320px;
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 360px;
       text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--vc-border);
     }
 
     .modal h3 {
-      font-size: 18px;
-      font-weight: 600;
+      font-size: 20px;
+      font-weight: 700;
       color: var(--vc-text);
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
 
     .modal p {
-      font-size: 14px;
+      font-size: 15px;
       color: var(--vc-muted);
-      margin-bottom: 20px;
-      line-height: 1.5;
+      margin-bottom: 24px;
+      line-height: 1.6;
     }
 
     .modal-buttons {
       display: flex;
-      gap: 12px;
+      gap: 16px;
     }
 
     .secondary-btn {
       background: var(--vc-border);
       color: var(--vc-text);
       border: none;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
       flex: 1;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
     }
 
     .secondary-btn:hover {
       background: #D1D5DB;
+      transform: translateY(-1px);
     }
 
     .toast {
       position: fixed;
-      bottom: 100px;
+      bottom: 120px;
       left: 50%;
       transform: translateX(-50%);
       background: var(--vc-text);
       color: white;
-      padding: 16px 24px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 500;
+      padding: 20px 28px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 600;
       opacity: 0;
       transition: opacity 0.3s ease;
       pointer-events: none;
-      z-index: 999999;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      z-index: 2147483647;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
     }
 
     .toast.show {
@@ -321,87 +343,89 @@
     }
 
     .transcript-area {
-      max-height: 150px;
+      max-height: 180px;
       overflow-y: auto;
-      padding: 16px;
-      background: #F9FAFB;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.5;
+      padding: 20px;
+      background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
       color: var(--vc-text);
       white-space: pre-wrap;
       border: 1px solid var(--vc-border);
     }
 
     .transcript-area:empty::before {
-      content: "Conversation will appear here...";
+      content: "💬 Conversation will appear here...";
       color: var(--vc-muted);
       font-style: italic;
     }
 
     /* Position classes */
     .position-bottom-right {
-      bottom: 24px;
-      right: 24px;
+      bottom: 32px;
+      right: 32px;
     }
 
     .position-bottom-left {
-      bottom: 24px;
-      left: 24px;
+      bottom: 32px;
+      left: 32px;
     }
 
     .position-top-right {
-      top: 24px;
-      right: 24px;
+      top: 32px;
+      right: 32px;
     }
 
     .position-top-left {
-      top: 24px;
-      left: 24px;
+      top: 32px;
+      left: 32px;
     }
 
     .panel.position-bottom-right {
-      bottom: 100px;
-      right: 24px;
+      bottom: 120px;
+      right: 32px;
     }
 
     .panel.position-bottom-left {
-      bottom: 100px;
-      left: 24px;
+      bottom: 120px;
+      left: 32px;
     }
 
     .panel.position-top-right {
-      top: 100px;
-      right: 24px;
+      top: 120px;
+      right: 32px;
     }
 
     .panel.position-top-left {
-      top: 100px;
-      left: 24px;
+      top: 120px;
+      left: 32px;
     }
 
     @media (max-width: 480px) {
       .panel {
-        width: calc(100vw - 32px);
-        height: calc(100vh - 120px);
-        border-radius: 16px;
+        width: calc(100vw - 24px);
+        height: calc(100vh - 140px);
+        border-radius: 20px;
         max-height: none;
-        left: 16px !important;
-        right: 16px !important;
-        bottom: 100px !important;
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 120px !important;
         top: auto !important;
       }
 
       .fab {
-        width: 56px;
-        height: 56px;
+        width: 64px;
+        height: 64px;
+        bottom: 24px !important;
+        right: 24px !important;
       }
     }
   `;
 
   // SVG Icons
   const ICONS = {
-    headset: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    headset: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M3 11v3a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H4a9 9 0 0 1 18 0h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3"/>
       <path d="M19 14v2a2 2 0 0 1-2 2h-1"/>
     </svg>`,
@@ -413,18 +437,18 @@
       <line x1="8" x2="16" y1="22" y2="22"/>
     </svg>`,
     
-    close: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    close: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <line x1="18" y1="6" x2="6" y2="18"/>
       <line x1="6" y1="6" x2="18" y2="18"/>
     </svg>`,
     
-    monitor: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    monitor: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect width="20" height="14" x="2" y="3" rx="2"/>
       <line x1="8" x2="16" y1="21" y2="21"/>
       <line x1="12" x2="12" y1="17" y2="21"/>
     </svg>`,
     
-    check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+    check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
       <polyline points="20,6 9,17 4,12"/>
     </svg>`
   };
@@ -495,9 +519,17 @@
       const checkIcon = panel.querySelector('.check-icon');
       const transcriptArea = panel.querySelector('.transcript-area');
 
-      closeBtn.addEventListener('click', () => api.close());
+      // Fix close button event handler
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Widget] Close button clicked');
+        api.close();
+      });
 
-      startCallBtn.addEventListener('click', async () => {
+      startCallBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         try {
           await startCall();
         } catch (error) {
@@ -506,11 +538,15 @@
         }
       });
 
-      endCallBtn.addEventListener('click', () => {
+      endCallBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         endCall();
       });
 
-      screenShareControl.addEventListener('click', async () => {
+      screenShareControl.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (!state.isScreenSharing) {
           const hasConsent = await checkScreenShareConsent();
           if (!hasConsent) return;
@@ -527,10 +563,11 @@
         updateUI();
 
         try {
-          const apiKey = 'AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ'; // This should be passed from the parent app
+          // Use environment variable or fallback
+          const apiKey = window.GOOGLE_API_KEY || 'AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ';
           
-          if (!apiKey) {
-            throw new Error('Google API key not available');
+          if (!apiKey || apiKey.includes('JJJJJJ')) {
+            throw new Error('Google API key not configured');
           }
 
           const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
@@ -911,18 +948,22 @@
           const cancelBtn = modal.querySelector('.cancel-btn');
           const continueBtn = modal.querySelector('.continue-btn');
 
-          cancelBtn.addEventListener('click', () => {
-            panel.removeChild(modal);
+          cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            container.removeChild(modal);
             resolve(false);
           });
 
-          continueBtn.addEventListener('click', () => {
+          continueBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             localStorage.setItem(consentKey, JSON.stringify({ timestamp: Date.now() }));
-            panel.removeChild(modal);
+            container.removeChild(modal);
             resolve(true);
           });
 
-          panel.appendChild(modal);
+          container.appendChild(modal);
         });
       }
 
@@ -1030,7 +1071,12 @@
       this.fab.setAttribute('aria-label', 'Open AI Assistant');
       this.fab.innerHTML = ICONS.headset;
       
-      this.fab.addEventListener('click', () => this.toggle());
+      this.fab.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Widget] FAB clicked');
+        this.toggle();
+      });
       
       shadow.appendChild(this.fab);
       
@@ -1052,6 +1098,7 @@
     }
 
     async toggle() {
+      console.log('[Widget] Toggle called, isOpen:', this.isOpen);
       if (this.isOpen) {
         this.close();
       } else {
@@ -1062,11 +1109,16 @@
     async open() {
       if (this.isOpen) return;
       
+      console.log('[Widget] Opening panel');
+      
       // Lazy load panel if not created
       if (!this.panel) {
         const shadow = this.container.shadowRoot;
         this.panel = WidgetPanelModule.create(shadow, this.agentId, this.position, {
-          close: () => this.close(),
+          close: () => {
+            console.log('[Widget] API close called');
+            this.close();
+          },
           startCall: () => this.panel?.startCall(),
           endCall: () => this.panel?.endCall()
         });
@@ -1079,6 +1131,7 @@
     close() {
       if (!this.isOpen) return;
       
+      console.log('[Widget] Closing panel');
       this.isOpen = false;
       if (this.panel) {
         this.panel.close();
@@ -1124,17 +1177,27 @@
       return;
     }
 
+    console.log('[Widget] Initializing with agent:', agentId, 'position:', position);
+
     // Create widget instance
     const widget = new VoicePilotWidget(agentId, position);
 
     // Expose global API
     window.voicepilot = {
-      open: () => widget.open(),
-      close: () => widget.close(),
+      open: () => {
+        console.log('[Widget] Global API open called');
+        widget.open();
+      },
+      close: () => {
+        console.log('[Widget] Global API close called');
+        widget.close();
+      },
       startCall: () => widget.startCall(),
       endCall: () => widget.endCall(),
       setPulse: (enabled) => widget.setPulse(enabled)
     };
+
+    console.log('[Widget] Initialization complete');
   }
 
   // Initialize when DOM is ready
