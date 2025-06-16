@@ -1,122 +1,48 @@
 // src/components/AgentCall.tsx
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
-import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
 
-// -- ICONS WITH INLINE STYLE HACKS --
-
-const MicIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    style={{
-      width: '24px',
-      height: '24px',
-      stroke: '#ffffff',
-      fill: 'none',
-      strokeWidth: 2,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-    }}
-    xmlns="http://www.w3.org/2000/svg"
+// A simple styled button
+const ControlButton: React.FC<{
+  onClick: () => void;
+  label: string;
+  bg: string;
+  hoverBg: string;
+}> = ({ onClick, label, bg, hoverBg }) => (
+  <button
+    onClick={onClick}
+    className={`
+      flex items-center justify-center space-x-2
+      px-4 py-2 rounded-full font-medium text-white
+      bg-${bg} hover:bg-${hoverBg}
+      transition-colors
+    `}
   >
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" />
-    <line x1="8"  y1="23" x2="16" y2="23" />
-  </svg>
+    <span>{label}</span>
+  </button>
 );
-
-const MicOffIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    style={{
-      width: '24px',
-      height: '24px',
-      stroke: '#555555',
-      fill: 'none',
-      strokeWidth: 2,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-    }}
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <line x1="1"  y1="1"  x2="23" y2="23" />
-    <path d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
-    <path d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" />
-    <line x1="8"  y1="23" x2="16" y2="23" />
-  </svg>
-);
-
-const MonitorIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    style={{
-      width: '24px',
-      height: '24px',
-      stroke: '#555555',
-      fill: 'none',
-      strokeWidth: 2,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-    }}
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-    <line x1="8"  y1="21" x2="16" y2="21" />
-    <line x1="12" y1="17" x2="12" y2="21" />
-  </svg>
-);
-
-const XIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    style={{
-      width: '24px',
-      height: '24px',
-      stroke: '#ffffff',
-      fill: 'none',
-      strokeWidth: 2,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-    }}
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <line x1="18" y1="6"  x2="6"  y2="18" />
-    <line x1="6"  y1="6"  x2="18" y2="18" />
-  </svg>
-);
-
-// -- MAIN COMPONENT --
 
 export const AgentCall: React.FC = () => {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const { getAgent } = useAgents();
   const {
-    startCall,
-    endCall,
-    status,
-    transcript,
-    toggleMicrophone,
-    toggleScreenShare,
-    isScreenSharing,
-    isMicrophoneActive,
-    duration,
-    errorMessage,
-    setTranscript
+    startCall, endCall, status, transcript,
+    toggleMicrophone, toggleScreenShare,
+    isScreenSharing, isMicrophoneActive,
+    duration, errorMessage, setTranscript
   } = useLiveCall();
 
   const [agent, setAgent] = useState<Agent | null>(null);
   const [notFound, setNotFound] = useState(false);
   const startedRef = useRef(false);
 
-  // Fetch agent once
+  // Load the agent
   useEffect(() => {
     (async () => {
       if (!agentId) return;
@@ -126,7 +52,7 @@ export const AgentCall: React.FC = () => {
     })();
   }, [agentId, getAgent]);
 
-  // Kick off call once
+  // Start the call once
   useEffect(() => {
     if (!startedRef.current && agent && agentId) {
       startedRef.current = true;
@@ -147,7 +73,7 @@ export const AgentCall: React.FC = () => {
 
   if (notFound) {
     return (
-      <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
+      <div className="bg-red-100 text-red-800 p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
         <p>Agent not found</p>
       </div>
@@ -155,85 +81,57 @@ export const AgentCall: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-card">
-        <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
-          </div>
-          <div className="ml-3">
-            <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
-            <p className="text-sm text-muted-foreground">
-              {status === 'active'
-                ? `${formatTime(duration)} elapsed`
-                : status}
-            </p>
-          </div>
-        </div>
-      </div>
+      <header className="flex items-center justify-between p-4 border-b bg-white shadow">
+        <h1 className="text-lg font-semibold">{agent?.name || 'AI Agent'}</h1>
+        <span className="text-sm text-gray-500">
+          {status === 'active' ? `${formatTime(duration)} elapsed` : status}
+        </span>
+      </header>
 
-      {/* Body */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div
-          className={`
-            w-32 h-32 rounded-full bg-gradient-to-b from-sky-200 to-sky-500
-            flex items-center justify-center mb-8
-            ${status === 'active' ? 'animate-pulse-subtle' : ''}
-          `}
-        />
-
+      {/* Transcript area */}
+      <main className="flex-1 flex flex-col items-center justify-center p-6">
         {transcript ? (
-          <div className="max-w-2xl w-full bg-card border rounded-lg p-4 mb-8">
+          <div className="w-full max-w-2xl bg-white border rounded-lg p-4 mb-6 shadow">
             <p className="whitespace-pre-wrap">{transcript}</p>
           </div>
         ) : (
-          <p className="text-muted-foreground mb-8">
-            Start speaking to begin the conversation
-          </p>
+          <p className="text-gray-400 mb-6">Start speaking to begin the conversation</p>
         )}
 
         {errorMessage && (
-          <div className="mb-8 w-full max-w-2xl bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+          <div className="mb-6 w-full max-w-2xl bg-red-100 text-red-800 px-4 py-3 rounded shadow">
             {errorMessage}
           </div>
         )}
 
         {/* Controls */}
         <div className="flex items-center space-x-4">
-          <Button
-            aria-label="Toggle microphone"
-            size="lg"
-            variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+          <ControlButton
             onClick={toggleMicrophone}
-          >
-            {isMicrophoneActive ? <MicIcon /> : <MicOffIcon />}
-          </Button>
+            label={isMicrophoneActive ? '🔇 Mute' : '🎙️ Unmute'}
+            bg={isMicrophoneActive ? 'blue-600' : 'gray-600'}
+            hoverBg={isMicrophoneActive ? 'blue-700' : 'gray-700'}
+          />
 
           {agent?.canSeeScreenshare && (
-            <Button
-              aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
-              size="lg"
-              variant={isScreenSharing ? 'primary' : 'outline'}
-              className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+            <ControlButton
               onClick={toggleScreenShare}
-            >
-              <MonitorIcon />
-            </Button>
+              label={isScreenSharing ? '🛑 Stop Share' : '🖥️ Share Screen'}
+              bg={isScreenSharing ? 'green-600' : 'gray-600'}
+              hoverBg={isScreenSharing ? 'green-700' : 'gray-700'}
+            />
           )}
 
-          <Button
-            aria-label="End call"
-            size="lg"
-            variant="destructive"
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+          <ControlButton
             onClick={handleEnd}
-          >
-            <XIcon />
-          </Button>
+            label="❌ End Call"
+            bg="red-600"
+            hoverBg="red-700"
+          />
         </div>
-      </div>
+      </main>
     </div>
   );
 };
