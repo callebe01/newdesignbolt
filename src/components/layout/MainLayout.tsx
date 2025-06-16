@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { EmbeddedWidget } from '../widget/EmbeddedWidget';
 import { useAuth } from '../../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
@@ -28,6 +29,12 @@ export const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      
+      {/* Embedded Widget - Your AI Assistant */}
+      <EmbeddedWidget 
+        agentId="2d85d376-15e2-4eb6-8495-7023559b886a"
+        position="bottom-right"
+      />
     </div>
   );
 };

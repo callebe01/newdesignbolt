@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Bot, Activity, Clock, Calendar } from 'lucide-react';
+import { Plus, Bot, Activity, Clock, Calendar, MessageCircle, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { UsageWarning } from '../components/usage/UsageWarning';
@@ -27,9 +27,36 @@ export const Dashboard: React.FC = () => {
   const handleUpgrade = () => {
     navigate('/settings#billing');
   };
+
+  const handleTryAssistant = () => {
+    if (window.voicepilot) {
+      window.voicepilot.open();
+    }
+  };
   
   return (
     <div className="space-y-8">
+      {/* Welcome Banner with Assistant CTA */}
+      <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 rounded-lg p-6 border border-primary/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-primary/10 rounded-full">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Welcome to Design Insights!</h2>
+              <p className="text-muted-foreground mt-1">
+                Need help getting started? Try our AI assistant for real-time guidance.
+              </p>
+            </div>
+          </div>
+          <Button onClick={handleTryAssistant} className="bg-primary hover:bg-primary/90">
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Try AI Assistant
+          </Button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -38,12 +65,18 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         
-        <Link to="/agents/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Agent
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleTryAssistant}>
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Get Help
           </Button>
-        </Link>
+          <Link to="/agents/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Agent
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Usage Warning */}
@@ -158,16 +191,29 @@ export const Dashboard: React.FC = () => {
           </div>
         ) : (
           <Card className="text-center p-8">
-            <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start by creating your first AI agent
-            </p>
-            <Link to="/agents/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Agent
-              </Button>
-            </Link>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="p-4 bg-muted rounded-full">
+                <Bot className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start by creating your first AI agent
+                </p>
+                <div className="flex items-center justify-center space-x-3">
+                  <Link to="/agents/new">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Agent
+                    </Button>
+                  </Link>
+                  <Button variant="outline" onClick={handleTryAssistant}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Need Help?
+                  </Button>
+                </div>
+              </div>
+            </div>
           </Card>
         )}
       </div>

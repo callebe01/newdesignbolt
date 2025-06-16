@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Bot, Clock, Plus, X } from 'lucide-react';
+import { ChevronLeft, Bot, Clock, Plus, X, MessageCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
@@ -79,13 +79,23 @@ export const NewAgent: React.FC = () => {
     }
   };
 
+  const handleGetHelp = () => {
+    if (window.voicepilot) {
+      window.voicepilot.open();
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground">
           <ChevronLeft className="mr-1 h-4 w-4" />
           Back to Agents
         </Link>
+        <Button variant="outline" onClick={handleGetHelp}>
+          <MessageCircle className="mr-2 h-4 w-4" />
+          Need Help?
+        </Button>
       </div>
 
       <Card>

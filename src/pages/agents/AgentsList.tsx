@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Bot, Activity, Clock } from 'lucide-react';
+import { Plus, Search, Filter, Bot, Activity, Clock, MessageCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -50,17 +50,29 @@ export const AgentsList: React.FC = () => {
     );
     setFilteredAgents(filtered);
   }, [agents, searchTerm]);
+
+  const handleGetHelp = () => {
+    if (window.voicepilot) {
+      window.voicepilot.open();
+    }
+  };
   
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Agents</h1>
-        <Link to="/agents/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Agent
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleGetHelp}>
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Need Help?
           </Button>
-        </Link>
+          <Link to="/agents/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Agent
+            </Button>
+          </Link>
+        </div>
       </div>
       
       <div className="flex flex-col sm:flex-row gap-4">
@@ -160,14 +172,20 @@ export const AgentsList: React.FC = () => {
           <p className="text-muted-foreground mb-6">
             {searchTerm ? 'No agents match your search' : 'Create your first AI agent'}
           </p>
-          {!searchTerm && (
-            <Button>
-              <Link to="/agents/new" className="flex items-center">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Agent
-              </Link>
+          <div className="flex items-center justify-center space-x-3">
+            {!searchTerm && (
+              <Button>
+                <Link to="/agents/new" className="flex items-center">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Agent
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleGetHelp}>
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Need Help?
             </Button>
-          )}
+          </div>
         </div>
       )}
     </div>
