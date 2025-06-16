@@ -34,6 +34,7 @@ export const MainLayout: React.FC = () => {
       <EmbeddedWidget 
         agentId="2d85d376-15e2-4eb6-8495-7023559b886a"
         position="bottom-right"
+        googleApiKey={import.meta.env.VITE_GOOGLE_API_KEY}
       />
     </div>
   );

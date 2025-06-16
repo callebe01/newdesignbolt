@@ -455,7 +455,7 @@
 
   // Widget Panel Module (inline)
   const WidgetPanelModule = {
-    create(container, agentId, position, api) {
+    create(container, agentId, position, api, googleApiKey) {
       let state = {
         callState: 'idle', // idle, connecting, live, ended
         isScreenSharing: false,
@@ -563,8 +563,8 @@
         updateUI();
 
         try {
-          // Use environment variable or fallback
-          const apiKey = window.GOOGLE_API_KEY || 'AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ';
+          // Use the API key passed from the React app
+          const apiKey = googleApiKey;
           
           if (!apiKey || apiKey.includes('JJJJJJ')) {
             throw new Error('Google API key not configured');
@@ -1044,9 +1044,10 @@
 
   // Main Widget Class
   class VoicePilotWidget {
-    constructor(agentId, position = 'bottom-right') {
+    constructor(agentId, position = 'bottom-right', googleApiKey) {
       this.agentId = agentId;
       this.position = position;
+      this.googleApiKey = googleApiKey;
       this.isOpen = false;
       this.panel = null;
       
@@ -1121,7 +1122,7 @@
           },
           startCall: () => this.panel?.startCall(),
           endCall: () => this.panel?.endCall()
-        });
+        }, this.googleApiKey);
       }
       
       this.isOpen = true;
@@ -1171,6 +1172,7 @@
 
     const agentId = script.getAttribute('data-agent');
     const position = script.getAttribute('data-position') || 'bottom-right';
+    const googleApiKey = script.getAttribute('data-google-api-key');
 
     if (!agentId) {
       console.error('VoicePilot: data-agent attribute is required');
@@ -1180,7 +1182,7 @@
     console.log('[Widget] Initializing with agent:', agentId, 'position:', position);
 
     // Create widget instance
-    const widget = new VoicePilotWidget(agentId, position);
+    const widget = new VoicePilotWidget(agentId, position, googleApiKey);
 
     // Expose global API
     window.voicepilot = {
