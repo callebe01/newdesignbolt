@@ -23,8 +23,8 @@ export const Button: React.FC<ButtonProps> = ({
     accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
     destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
     success: 'bg-success text-success-foreground hover:bg-success/90',
-    outline: 'border border-input bg-background hover:bg-muted hover:text-accent',
-    ghost: 'hover:bg-muted hover:text-accent',
+    outline: 'border border-input bg-background hover:bg-muted hover:text-accent-foreground',
+    ghost: 'hover:bg-muted hover:text-accent-foreground',
   };
   
   const sizeStyles = {

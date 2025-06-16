@@ -113,7 +113,7 @@ export const AgentCall: React.FC = () => {
             aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 flex items-center justify-center"
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
             onClick={toggleMicrophone}
           >
             {isMicrophoneActive ? (
@@ -128,7 +128,7 @@ export const AgentCall: React.FC = () => {
               aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
-              className="rounded-full w-16 h-16 flex items-center justify-center"
+              className="rounded-full w-16 h-16 flex items-center justify-center p-0"
               onClick={toggleScreenShare}
             >
               <Monitor className="h-6 w-6" />
@@ -139,7 +139,7 @@ export const AgentCall: React.FC = () => {
             aria-label="End call"
             size="lg"
             variant="destructive"
-            className="rounded-full w-16 h-16 flex items-center justify-center"
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
             onClick={handleEnd}
           >
             <X className="h-6 w-6" />
