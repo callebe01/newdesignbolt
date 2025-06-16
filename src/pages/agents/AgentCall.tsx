@@ -7,9 +7,9 @@ import { Agent } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
 
-// SVG icons with stroke="currentColor" + stroke-current
-const MicIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+// SVGs, no stroke="currentColor" here
+const MicIcon = ({ className = "h-6 w-6 stroke-white" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -19,8 +19,8 @@ const MicIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string 
   </svg>
 );
 
-const MicOffIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const MicOffIcon = ({ className = "h-6 w-6 stroke-gray-600" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24">
     <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
@@ -33,8 +33,8 @@ const MicOffIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: stri
   </svg>
 );
 
-const MonitorIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const MonitorIcon = ({ className = "h-6 w-6 stroke-gray-600" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24">
     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"
       strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
     <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
@@ -42,8 +42,8 @@ const MonitorIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: str
   </svg>
 );
 
-const XIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const XIcon = ({ className = "h-6 w-6 stroke-white" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24">
     <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
     <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
   </svg>
@@ -64,7 +64,6 @@ export const AgentCall: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const startedRef = useRef(false);
 
-  // load agent
   useEffect(() => {
     (async () => {
       if (!agentId) return;
@@ -74,7 +73,6 @@ export const AgentCall: React.FC = () => {
     })();
   }, [agentId, getAgent]);
 
-  // start call once
   useEffect(() => {
     if (!startedRef.current && agent && agentId) {
       startedRef.current = true;
@@ -147,18 +145,18 @@ export const AgentCall: React.FC = () => {
 
         {/* controls */}
         <div className="flex items-center space-x-4">
-          {/* mic toggle */}
+          {/* mic */}
           <Button
             aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className={`
-              rounded-full w-16 h-16 flex items-center justify-center p-0
-              ${isMicrophoneActive ? 'text-white' : 'text-gray-800'}
-            `}
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
             onClick={toggleMicrophone}
           >
-            {isMicrophoneActive ? <MicIcon /> : <MicOffIcon />}
+            {isMicrophoneActive
+              ? <MicIcon className="h-6 w-6 stroke-white" />
+              : <MicOffIcon className="h-6 w-6 stroke-gray-600" />
+            }
           </Button>
 
           {/* screen share */}
@@ -167,13 +165,13 @@ export const AgentCall: React.FC = () => {
               aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
-              className={`
-                rounded-full w-16 h-16 flex items-center justify-center p-0
-                ${isScreenSharing ? 'text-white' : 'text-gray-800'}
-              `}
+              className="rounded-full w-16 h-16 flex items-center justify-center p-0"
               onClick={toggleScreenShare}
             >
-              <MonitorIcon />
+              <MonitorIcon className={isScreenSharing
+                ? "h-6 w-6 stroke-white"
+                : "h-6 w-6 stroke-gray-600"
+              }/>
             </Button>
           )}
 
@@ -182,10 +180,10 @@ export const AgentCall: React.FC = () => {
             aria-label="End call"
             size="lg"
             variant="destructive"
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0 text-white"
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
             onClick={handleEnd}
           >
-            <XIcon />
+            <XIcon className="h-6 w-6 stroke-white" />
           </Button>
         </div>
       </div>
