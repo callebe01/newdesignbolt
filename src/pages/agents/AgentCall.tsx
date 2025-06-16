@@ -1,11 +1,46 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Monitor, X } from 'lucide-react';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
+
+// Define icons as SVG components to ensure they render
+const MicIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+  </svg>
+);
+
+const MicOffIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+  </svg>
+);
+
+const MonitorIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+  </svg>
+);
+
+const XIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+    <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+  </svg>
+);
 
 export const AgentCall: React.FC = () => {
   const navigate = useNavigate();
@@ -117,9 +152,9 @@ export const AgentCall: React.FC = () => {
             onClick={toggleMicrophone}
           >
             {isMicrophoneActive ? (
-              <Mic className="h-6 w-6" />
+              <MicIcon className="h-6 w-6 text-white" />
             ) : (
-              <MicOff className="h-6 w-6" />
+              <MicOffIcon className="h-6 w-6" />
             )}
           </Button>
 
@@ -131,7 +166,7 @@ export const AgentCall: React.FC = () => {
               className="rounded-full w-16 h-16 flex items-center justify-center p-0"
               onClick={toggleScreenShare}
             >
-              <Monitor className="h-6 w-6" />
+              <MonitorIcon className={`h-6 w-6 ${isScreenSharing ? 'text-white' : ''}`} />
             </Button>
           )}
 
@@ -142,7 +177,7 @@ export const AgentCall: React.FC = () => {
             className="rounded-full w-16 h-16 flex items-center justify-center p-0"
             onClick={handleEnd}
           >
-            <X className="h-6 w-6" />
+            <XIcon className="h-6 w-6 text-white" />
           </Button>
         </div>
       </div>
