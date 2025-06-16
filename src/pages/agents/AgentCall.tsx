@@ -148,13 +148,15 @@ export const AgentCall: React.FC = () => {
             aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+            className={`rounded-full w-16 h-16 flex items-center justify-center p-0 ${
+              isMicrophoneActive ? 'text-white' : 'text-foreground'
+            }`}
             onClick={toggleMicrophone}
           >
             {isMicrophoneActive ? (
-              <MicIcon className="h-6 w-6 text-white" />
+              <MicIcon className="h-6 w-6 stroke-current" />
             ) : (
-              <MicOffIcon className="h-6 w-6" />
+              <MicOffIcon className="h-6 w-6 stroke-current" />
             )}
           </Button>
 
@@ -163,10 +165,12 @@ export const AgentCall: React.FC = () => {
               aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
-              className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+              className={`rounded-full w-16 h-16 flex items-center justify-center p-0 ${
+                isScreenSharing ? 'text-white' : 'text-foreground'
+              }`}
               onClick={toggleScreenShare}
             >
-              <MonitorIcon className={`h-6 w-6 ${isScreenSharing ? 'text-white' : ''}`} />
+              <MonitorIcon className="h-6 w-6 stroke-current" />
             </Button>
           )}
 
@@ -174,10 +178,10 @@ export const AgentCall: React.FC = () => {
             aria-label="End call"
             size="lg"
             variant="destructive"
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0 text-white"
             onClick={handleEnd}
           >
-            <XIcon className="h-6 w-6 text-white" />
+            <XIcon className="h-6 w-6 stroke-current" />
           </Button>
         </div>
       </div>
