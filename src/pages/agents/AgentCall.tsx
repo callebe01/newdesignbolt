@@ -169,9 +169,7 @@ export const AgentCall: React.FC = () => {
             aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className={`
-              rounded-full w-16 h-16 flex items-center justify-center p-0
-              ${isMicrophoneActive ? 'text-white' : 'text-foreground'}
+  className={`… ${isMicrophoneActive ? 'text-red-500' : 'text-red-500'}`}
             `}
             onClick={toggleMicrophone}
           >
