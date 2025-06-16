@@ -124,6 +124,13 @@
       transform: scale(1.1);
     }
 
+    .close-btn svg {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      fill: none;
+    }
+
     .panel-content {
       padding: 28px;
       display: flex;
@@ -178,6 +185,10 @@
       box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
       position: relative;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
     .primary-btn:hover:not(:disabled) {
@@ -191,6 +202,13 @@
       transform: none;
     }
 
+    .primary-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+    }
+
     .danger-btn {
       background: linear-gradient(135deg, var(--vc-error) 0%, #B91C1C 100%);
       color: white;
@@ -202,11 +220,22 @@
       cursor: pointer;
       transition: all 0.3s ease;
       box-shadow: 0 8px 24px rgba(220, 38, 38, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
     .danger-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 12px 32px rgba(220, 38, 38, 0.4);
+    }
+
+    .danger-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
     }
 
     .timer {
@@ -240,6 +269,13 @@
       transform: translateY(-1px);
     }
 
+    .screen-share-control svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+    }
+
     .checkbox {
       width: 24px;
       height: 24px;
@@ -256,6 +292,13 @@
     .checkbox.checked {
       background: var(--vc-primary);
       border-color: var(--vc-primary);
+    }
+
+    .checkbox svg {
+      width: 14px;
+      height: 14px;
+      stroke: white;
+      fill: none;
     }
 
     .modal-overlay {
@@ -423,34 +466,153 @@
     }
   `;
 
-  // SVG Icons
+  // SVG Icons as functions that return DOM elements
   const ICONS = {
-    headset: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M3 11v3a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H4a9 9 0 0 1 18 0h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3"/>
-      <path d="M19 14v2a2 2 0 0 1-2 2h-1"/>
-    </svg>`,
+    headset: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '32');
+      svg.setAttribute('height', '32');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      
+      const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path1.setAttribute('d', 'M3 11v3a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H4a9 9 0 0 1 18 0h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3');
+      
+      const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path2.setAttribute('d', 'M19 14v2a2 2 0 0 1-2 2h-1');
+      
+      svg.appendChild(path1);
+      svg.appendChild(path2);
+      return svg;
+    },
     
-    mic: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-      <line x1="12" x2="12" y1="19" y2="22"/>
-      <line x1="8" x2="16" y1="22" y2="22"/>
-    </svg>`,
+    mic: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '20');
+      svg.setAttribute('height', '20');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      
+      const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path1.setAttribute('d', 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z');
+      
+      const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path2.setAttribute('d', 'M19 10v2a7 7 0 0 1-14 0v-2');
+      
+      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '12');
+      line1.setAttribute('x2', '12');
+      line1.setAttribute('y1', '19');
+      line1.setAttribute('y2', '22');
+      
+      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '8');
+      line2.setAttribute('x2', '16');
+      line2.setAttribute('y1', '22');
+      line2.setAttribute('y2', '22');
+      
+      svg.appendChild(path1);
+      svg.appendChild(path2);
+      svg.appendChild(line1);
+      svg.appendChild(line2);
+      return svg;
+    },
     
-    close: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>`,
+    close: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '24');
+      svg.setAttribute('height', '24');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2.5');
+      
+      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '18');
+      line1.setAttribute('y1', '6');
+      line1.setAttribute('x2', '6');
+      line1.setAttribute('y2', '18');
+      
+      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '6');
+      line2.setAttribute('y1', '6');
+      line2.setAttribute('x2', '18');
+      line2.setAttribute('y2', '18');
+      
+      svg.appendChild(line1);
+      svg.appendChild(line2);
+      return svg;
+    },
     
-    monitor: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect width="20" height="14" x="2" y="3" rx="2"/>
-      <line x1="8" x2="16" y1="21" y2="21"/>
-      <line x1="12" x2="12" y1="17" y2="21"/>
-    </svg>`,
+    monitor: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '18');
+      svg.setAttribute('height', '18');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('width', '20');
+      rect.setAttribute('height', '14');
+      rect.setAttribute('x', '2');
+      rect.setAttribute('y', '3');
+      rect.setAttribute('rx', '2');
+      
+      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '8');
+      line1.setAttribute('x2', '16');
+      line1.setAttribute('y1', '21');
+      line1.setAttribute('y2', '21');
+      
+      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '12');
+      line2.setAttribute('x2', '12');
+      line2.setAttribute('y1', '17');
+      line2.setAttribute('y2', '21');
+      
+      svg.appendChild(rect);
+      svg.appendChild(line1);
+      svg.appendChild(line2);
+      return svg;
+    },
     
-    check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-      <polyline points="20,6 9,17 4,12"/>
-    </svg>`
+    check: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '14');
+      svg.setAttribute('height', '14');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '3');
+      
+      const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      polyline.setAttribute('points', '20,6 9,17 4,12');
+      
+      svg.appendChild(polyline);
+      return svg;
+    },
+
+    phone: () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '20');
+      svg.setAttribute('height', '20');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z');
+      
+      svg.appendChild(path);
+      return svg;
+    }
   };
 
   // Widget Panel Module (inline)
@@ -474,50 +636,106 @@
       const panel = document.createElement('div');
       panel.className = `panel position-${position}`;
       
-      panel.innerHTML = `
-        <div class="panel-header">
-          <div class="panel-title">🤖 AI Assistant</div>
-          <button class="close-btn" aria-label="Close panel">${ICONS.close}</button>
-        </div>
-        <div class="panel-content">
-          <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span class="status-text">Ready to help you with the platform</span>
-          </div>
-          <div class="transcript-area" style="display: none;"></div>
-          <div class="call-controls">
-            <button class="primary-btn start-call-btn" aria-label="Start call">
-              🎙️ Start Voice Chat
-            </button>
-            <div class="live-controls" style="display: none;">
-              <div class="timer">00:00</div>
-              <div class="screen-share-control">
-                <div class="checkbox">
-                  <span class="check-icon" style="display: none;">${ICONS.check}</span>
-                </div>
-                <span>Share Screen</span>
-                ${ICONS.monitor}
-              </div>
-              <button class="danger-btn end-call-btn" aria-label="End call">
-                📞 End Call
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // Event handlers
-      const closeBtn = panel.querySelector('.close-btn');
-      const startCallBtn = panel.querySelector('.start-call-btn');
-      const endCallBtn = panel.querySelector('.end-call-btn');
-      const screenShareControl = panel.querySelector('.screen-share-control');
-      const statusDot = panel.querySelector('.status-dot');
-      const statusText = panel.querySelector('.status-text');
-      const timerEl = panel.querySelector('.timer');
-      const liveControls = panel.querySelector('.live-controls');
-      const checkbox = panel.querySelector('.checkbox');
-      const checkIcon = panel.querySelector('.check-icon');
-      const transcriptArea = panel.querySelector('.transcript-area');
+      // Create panel structure
+      const panelHeader = document.createElement('div');
+      panelHeader.className = 'panel-header';
+      
+      const panelTitle = document.createElement('div');
+      panelTitle.className = 'panel-title';
+      panelTitle.textContent = '🤖 AI Assistant';
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'close-btn';
+      closeBtn.setAttribute('aria-label', 'Close panel');
+      closeBtn.appendChild(ICONS.close());
+      
+      panelHeader.appendChild(panelTitle);
+      panelHeader.appendChild(closeBtn);
+      
+      const panelContent = document.createElement('div');
+      panelContent.className = 'panel-content';
+      
+      // Status indicator
+      const statusIndicator = document.createElement('div');
+      statusIndicator.className = 'status-indicator';
+      
+      const statusDot = document.createElement('div');
+      statusDot.className = 'status-dot';
+      
+      const statusText = document.createElement('span');
+      statusText.className = 'status-text';
+      statusText.textContent = 'Ready to help you with the platform';
+      
+      statusIndicator.appendChild(statusDot);
+      statusIndicator.appendChild(statusText);
+      
+      // Transcript area
+      const transcriptArea = document.createElement('div');
+      transcriptArea.className = 'transcript-area';
+      transcriptArea.style.display = 'none';
+      
+      // Call controls
+      const callControls = document.createElement('div');
+      callControls.className = 'call-controls';
+      
+      const startCallBtn = document.createElement('button');
+      startCallBtn.className = 'primary-btn start-call-btn';
+      startCallBtn.setAttribute('aria-label', 'Start call');
+      startCallBtn.appendChild(ICONS.mic());
+      const startCallText = document.createElement('span');
+      startCallText.textContent = 'Start Voice Chat';
+      startCallBtn.appendChild(startCallText);
+      
+      // Live controls
+      const liveControls = document.createElement('div');
+      liveControls.className = 'live-controls';
+      liveControls.style.display = 'none';
+      
+      const timerEl = document.createElement('div');
+      timerEl.className = 'timer';
+      timerEl.textContent = '00:00';
+      
+      // Screen share control
+      const screenShareControl = document.createElement('div');
+      screenShareControl.className = 'screen-share-control';
+      
+      const checkbox = document.createElement('div');
+      checkbox.className = 'checkbox';
+      
+      const checkIcon = document.createElement('span');
+      checkIcon.className = 'check-icon';
+      checkIcon.style.display = 'none';
+      checkIcon.appendChild(ICONS.check());
+      checkbox.appendChild(checkIcon);
+      
+      const shareText = document.createElement('span');
+      shareText.textContent = 'Share Screen';
+      
+      screenShareControl.appendChild(checkbox);
+      screenShareControl.appendChild(shareText);
+      screenShareControl.appendChild(ICONS.monitor());
+      
+      const endCallBtn = document.createElement('button');
+      endCallBtn.className = 'danger-btn end-call-btn';
+      endCallBtn.setAttribute('aria-label', 'End call');
+      endCallBtn.appendChild(ICONS.phone());
+      const endCallText = document.createElement('span');
+      endCallText.textContent = 'End Call';
+      endCallBtn.appendChild(endCallText);
+      
+      liveControls.appendChild(timerEl);
+      liveControls.appendChild(screenShareControl);
+      liveControls.appendChild(endCallBtn);
+      
+      callControls.appendChild(startCallBtn);
+      callControls.appendChild(liveControls);
+      
+      panelContent.appendChild(statusIndicator);
+      panelContent.appendChild(transcriptArea);
+      panelContent.appendChild(callControls);
+      
+      panel.appendChild(panelHeader);
+      panel.appendChild(panelContent);
 
       // Fix close button event handler
       closeBtn.addEventListener('click', (e) => {
@@ -559,7 +777,7 @@
 
         state.callState = 'connecting';
         startCallBtn.disabled = true;
-        startCallBtn.textContent = '🔄 Connecting...';
+        startCallText.textContent = 'Connecting...';
         updateUI();
 
         try {
@@ -625,7 +843,7 @@
         } catch (error) {
           state.callState = 'idle';
           startCallBtn.disabled = false;
-          startCallBtn.textContent = '🎙️ Start Voice Chat';
+          startCallText.textContent = 'Start Voice Chat';
           updateUI();
           throw error;
         }
@@ -887,9 +1105,9 @@
         
         startCallBtn.disabled = !isIdle;
         if (isConnecting) {
-          startCallBtn.textContent = '🔄 Connecting...';
+          startCallText.textContent = 'Connecting...';
         } else {
-          startCallBtn.textContent = '🎙️ Start Voice Chat';
+          startCallText.textContent = 'Start Voice Chat';
         }
 
         if (isLive) {
@@ -1070,7 +1288,7 @@
       this.fab = document.createElement('button');
       this.fab.className = `fab position-${this.position}`;
       this.fab.setAttribute('aria-label', 'Open AI Assistant');
-      this.fab.innerHTML = ICONS.headset;
+      this.fab.appendChild(ICONS.headset());
       
       this.fab.addEventListener('click', (e) => {
         e.preventDefault();
