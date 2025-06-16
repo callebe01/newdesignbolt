@@ -1,3 +1,4 @@
+// src/components/AgentCall.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
@@ -6,39 +7,45 @@ import { Agent } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
 
-// Define icons as SVG components to ensure they render
-const MicIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+// SVG icons with stroke="currentColor" + stroke-current
+const MicIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
   </svg>
 );
 
-const MicOffIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+const MicOffIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
   </svg>
 );
 
-const MonitorIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+const MonitorIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"
+      strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
   </svg>
 );
 
-const XIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-    <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+const XIcon = ({ className = "h-6 w-6 stroke-current" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
   </svg>
 );
 
@@ -46,51 +53,42 @@ export const AgentCall: React.FC = () => {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const { getAgent } = useAgents();
-  const { 
-    startCall, 
-    endCall, 
-    status, 
-    transcript, 
-    toggleMicrophone,
-    toggleScreenShare,
-    isScreenSharing,
-    isMicrophoneActive,
-    duration,
-    errorMessage,
-    setTranscript
+  const {
+    startCall, endCall, status, transcript,
+    toggleMicrophone, toggleScreenShare,
+    isScreenSharing, isMicrophoneActive,
+    duration, errorMessage, setTranscript
   } = useLiveCall();
-  
+
   const [agent, setAgent] = useState<Agent | null>(null);
   const [notFound, setNotFound] = useState(false);
   const startedRef = useRef(false);
 
+  // load agent
   useEffect(() => {
-    const init = async () => {
+    (async () => {
       if (!agentId) return;
       const a = await getAgent(agentId);
       setAgent(a);
-      if (!a) {
-        setNotFound(true);
-      }
-    };
-    init();
+      if (!a) setNotFound(true);
+    })();
   }, [agentId, getAgent]);
 
+  // start call once
   useEffect(() => {
     if (!startedRef.current && agent && agentId) {
       startedRef.current = true;
-      // Clear transcript before starting new call
       setTranscript('');
       startCall(
         agent.instructions,
         agent.callDuration,
         agent.documentationUrls,
-        agentId // Pass the agentId for usage checking
-      ).catch((err) => console.error(err));
+        agentId
+      ).catch(console.error);
     }
   }, [agent, agentId, startCall, setTranscript]);
 
-  const handleEnd = async () => {
+  const handleEnd = () => {
     endCall();
     navigate('/agents');
   };
@@ -106,26 +104,30 @@ export const AgentCall: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* header */}
       <div className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center">
-          <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
-            </div>
-            <div className="ml-3">
-              <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
-              <p className="text-sm text-muted-foreground">
-                {status === 'active' ? `${formatTime(duration)} elapsed` : status}
-              </p>
-            </div>
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-b from-sky-200 to-sky-500" />
+          </div>
+          <div className="ml-3">
+            <h1 className="font-semibold">{agent?.name || 'AI Agent'}</h1>
+            <p className="text-sm text-muted-foreground">
+              {status === 'active' ? `${formatTime(duration)} elapsed` : status}
+            </p>
           </div>
         </div>
       </div>
 
+      {/* body */}
       <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className={`w-32 h-32 rounded-full bg-gradient-to-b from-sky-200 to-sky-500 flex items-center justify-center mb-8 ${
-          status === 'active' ? 'animate-pulse-subtle' : ''
-        }`} />
+        <div
+          className={`
+            w-32 h-32 rounded-full bg-gradient-to-b from-sky-200 to-sky-500
+            flex items-center justify-center mb-8
+            ${status === 'active' ? 'animate-pulse-subtle' : ''}
+          `}
+        />
 
         {transcript ? (
           <div className="max-w-2xl w-full bg-card border rounded-lg p-4 mb-8">
@@ -143,41 +145,47 @@ export const AgentCall: React.FC = () => {
           </div>
         )}
 
+        {/* controls */}
         <div className="flex items-center space-x-4">
+          {/* mic toggle */}
           <Button
             aria-label="Toggle microphone"
             size="lg"
             variant={isMicrophoneActive ? 'primary' : 'outline'}
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+            className={`
+              rounded-full w-16 h-16 flex items-center justify-center p-0
+              ${isMicrophoneActive ? 'text-white' : 'text-gray-800'}
+            `}
             onClick={toggleMicrophone}
           >
-            {isMicrophoneActive ? (
-              <MicIcon className="h-6 w-6 text-white" />
-            ) : (
-              <MicOffIcon className="h-6 w-6" />
-            )}
+            {isMicrophoneActive ? <MicIcon /> : <MicOffIcon />}
           </Button>
 
+          {/* screen share */}
           {agent?.canSeeScreenshare && (
             <Button
               aria-label={isScreenSharing ? 'Stop screen share' : 'Share screen'}
               size="lg"
               variant={isScreenSharing ? 'primary' : 'outline'}
-              className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+              className={`
+                rounded-full w-16 h-16 flex items-center justify-center p-0
+                ${isScreenSharing ? 'text-white' : 'text-gray-800'}
+              `}
               onClick={toggleScreenShare}
             >
-              <MonitorIcon className={`h-6 w-6 ${isScreenSharing ? 'text-white' : ''}`} />
+              <MonitorIcon />
             </Button>
           )}
 
+          {/* end call */}
           <Button
             aria-label="End call"
             size="lg"
             variant="destructive"
-            className="rounded-full w-16 h-16 flex items-center justify-center p-0"
+            className="rounded-full w-16 h-16 flex items-center justify-center p-0 text-white"
             onClick={handleEnd}
           >
-            <XIcon className="h-6 w-6 text-white" />
+            <XIcon />
           </Button>
         </div>
       </div>
