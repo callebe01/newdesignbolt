@@ -14,7 +14,7 @@
       
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       position: fixed;
-      z-index: 9999;
+      z-index: 999999;
       pointer-events: none;
     }
 
@@ -25,8 +25,8 @@
     }
 
     .fab {
-      width: 56px;
-      height: 56px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
       background: var(--vc-primary);
       border: none;
@@ -34,15 +34,17 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
       transition: all 0.3s ease;
       pointer-events: auto;
       color: white;
+      position: relative;
+      z-index: 999999;
     }
 
     .fab:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+      transform: scale(1.1);
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
     }
 
     .fab.pulse {
@@ -50,22 +52,29 @@
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+      0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+      }
+      50% { 
+        opacity: 0.8; 
+        transform: scale(1.05);
+      }
     }
 
     .panel {
       position: fixed;
       background: var(--vc-background);
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-      width: 350px;
-      max-height: 500px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      width: 380px;
+      max-height: 600px;
       transform: translateY(100%);
-      transition: transform 0.3s ease;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: auto;
       border: 1px solid var(--vc-border);
       overflow: hidden;
+      z-index: 999998;
     }
 
     .panel.open {
@@ -73,50 +82,58 @@
     }
 
     .panel-header {
-      padding: 16px;
+      padding: 20px;
       border-bottom: 1px solid var(--vc-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      background: linear-gradient(135deg, var(--vc-primary) 0%, #1D4ED8 100%);
+      color: white;
     }
 
     .panel-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
-      color: var(--vc-text);
+      color: white;
     }
 
     .close-btn {
-      background: none;
+      background: rgba(255, 255, 255, 0.2);
       border: none;
       cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      color: var(--vc-muted);
+      padding: 8px;
+      border-radius: 8px;
+      color: white;
+      transition: background 0.2s ease;
     }
 
     .close-btn:hover {
-      background: var(--vc-border);
+      background: rgba(255, 255, 255, 0.3);
     }
 
     .panel-content {
-      padding: 16px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
+      max-height: 500px;
+      overflow-y: auto;
     }
 
     .status-indicator {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
       font-size: 14px;
       color: var(--vc-muted);
+      padding: 12px;
+      background: var(--vc-border);
+      border-radius: 8px;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--vc-muted);
     }
@@ -129,85 +146,97 @@
     .call-controls {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
     }
 
     .primary-btn {
       background: var(--vc-primary);
       color: white;
       border: none;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
     }
 
     .primary-btn:hover:not(:disabled) {
       background: #1D4ED8;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
     }
 
     .primary-btn:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
     }
 
     .danger-btn {
       background: var(--vc-error);
       color: white;
       border: none;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
     }
 
     .danger-btn:hover {
       background: #B91C1C;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
     }
 
     .timer {
-      font-family: monospace;
-      font-size: 18px;
-      font-weight: 600;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      font-size: 24px;
+      font-weight: 700;
       color: var(--vc-text);
       text-align: center;
-      padding: 8px;
-      background: var(--vc-border);
-      border-radius: 6px;
+      padding: 16px;
+      background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+      border-radius: 12px;
+      border: 2px solid var(--vc-border);
     }
 
     .screen-share-control {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px;
-      border: 1px solid var(--vc-border);
-      border-radius: 6px;
+      gap: 12px;
+      padding: 16px;
+      border: 2px solid var(--vc-border);
+      border-radius: 12px;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
+      background: var(--vc-background);
     }
 
     .screen-share-control:hover {
-      background: var(--vc-border);
+      border-color: var(--vc-primary);
+      background: rgba(37, 99, 235, 0.02);
     }
 
     .checkbox {
-      width: 16px;
-      height: 16px;
+      width: 20px;
+      height: 20px;
       border: 2px solid var(--vc-primary);
-      border-radius: 3px;
+      border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: white;
+      transition: all 0.2s ease;
     }
 
     .checkbox.checked {
       background: var(--vc-primary);
+      border-color: var(--vc-primary);
     }
 
     .modal-overlay {
@@ -216,23 +245,25 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding: 20px;
+      z-index: 999999;
     }
 
     .modal {
       background: var(--vc-background);
-      border-radius: 8px;
-      padding: 20px;
-      max-width: 300px;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 320px;
       text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
 
     .modal h3 {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       color: var(--vc-text);
       margin-bottom: 12px;
@@ -241,39 +272,48 @@
     .modal p {
       font-size: 14px;
       color: var(--vc-muted);
-      margin-bottom: 16px;
-      line-height: 1.4;
+      margin-bottom: 20px;
+      line-height: 1.5;
     }
 
     .modal-buttons {
       display: flex;
-      gap: 8px;
+      gap: 12px;
     }
 
     .secondary-btn {
       background: var(--vc-border);
       color: var(--vc-text);
       border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
+      padding: 12px 20px;
+      border-radius: 8px;
       font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
       flex: 1;
+      transition: background 0.2s ease;
+    }
+
+    .secondary-btn:hover {
+      background: #D1D5DB;
     }
 
     .toast {
       position: fixed;
-      bottom: 20px;
+      bottom: 100px;
       left: 50%;
       transform: translateX(-50%);
       background: var(--vc-text);
       color: white;
-      padding: 12px 16px;
-      border-radius: 6px;
+      padding: 16px 24px;
+      border-radius: 12px;
       font-size: 14px;
+      font-weight: 500;
       opacity: 0;
       transition: opacity 0.3s ease;
       pointer-events: none;
+      z-index: 999999;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
 
     .toast.show {
@@ -281,30 +321,87 @@
     }
 
     .transcript-area {
-      max-height: 120px;
+      max-height: 150px;
       overflow-y: auto;
-      padding: 8px;
-      background: var(--vc-border);
-      border-radius: 6px;
-      font-size: 12px;
-      line-height: 1.4;
+      padding: 16px;
+      background: #F9FAFB;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
       color: var(--vc-text);
       white-space: pre-wrap;
+      border: 1px solid var(--vc-border);
+    }
+
+    .transcript-area:empty::before {
+      content: "Conversation will appear here...";
+      color: var(--vc-muted);
+      font-style: italic;
+    }
+
+    /* Position classes */
+    .position-bottom-right {
+      bottom: 24px;
+      right: 24px;
+    }
+
+    .position-bottom-left {
+      bottom: 24px;
+      left: 24px;
+    }
+
+    .position-top-right {
+      top: 24px;
+      right: 24px;
+    }
+
+    .position-top-left {
+      top: 24px;
+      left: 24px;
+    }
+
+    .panel.position-bottom-right {
+      bottom: 100px;
+      right: 24px;
+    }
+
+    .panel.position-bottom-left {
+      bottom: 100px;
+      left: 24px;
+    }
+
+    .panel.position-top-right {
+      top: 100px;
+      right: 24px;
+    }
+
+    .panel.position-top-left {
+      top: 100px;
+      left: 24px;
     }
 
     @media (max-width: 480px) {
       .panel {
-        width: 100vw;
-        height: 100vh;
-        border-radius: 0;
+        width: calc(100vw - 32px);
+        height: calc(100vh - 120px);
+        border-radius: 16px;
         max-height: none;
+        left: 16px !important;
+        right: 16px !important;
+        bottom: 100px !important;
+        top: auto !important;
+      }
+
+      .fab {
+        width: 56px;
+        height: 56px;
       }
     }
   `;
 
   // SVG Icons
   const ICONS = {
-    headset: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    headset: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M3 11v3a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H4a9 9 0 0 1 18 0h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3"/>
       <path d="M19 14v2a2 2 0 0 1-2 2h-1"/>
     </svg>`,
@@ -334,7 +431,7 @@
 
   // Widget Panel Module (inline)
   const WidgetPanelModule = {
-    create(container, agentId, api) {
+    create(container, agentId, position, api) {
       let state = {
         callState: 'idle', // idle, connecting, live, ended
         isScreenSharing: false,
@@ -351,22 +448,22 @@
       };
 
       const panel = document.createElement('div');
-      panel.className = 'panel';
+      panel.className = `panel position-${position}`;
       
       panel.innerHTML = `
         <div class="panel-header">
-          <div class="panel-title">AI Assistant</div>
+          <div class="panel-title">🤖 AI Assistant</div>
           <button class="close-btn" aria-label="Close panel">${ICONS.close}</button>
         </div>
         <div class="panel-content">
           <div class="status-indicator">
             <div class="status-dot"></div>
-            <span class="status-text">Ready to help</span>
+            <span class="status-text">Ready to help you with the platform</span>
           </div>
           <div class="transcript-area" style="display: none;"></div>
           <div class="call-controls">
             <button class="primary-btn start-call-btn" aria-label="Start call">
-              Start Call
+              🎙️ Start Voice Chat
             </button>
             <div class="live-controls" style="display: none;">
               <div class="timer">00:00</div>
@@ -378,7 +475,7 @@
                 ${ICONS.monitor}
               </div>
               <button class="danger-btn end-call-btn" aria-label="End call">
-                End Call
+                📞 End Call
               </button>
             </div>
           </div>
@@ -426,7 +523,7 @@
 
         state.callState = 'connecting';
         startCallBtn.disabled = true;
-        startCallBtn.textContent = 'Connecting...';
+        startCallBtn.textContent = '🔄 Connecting...';
         updateUI();
 
         try {
@@ -462,7 +559,7 @@
                 inputAudioTranscription: {},
                 systemInstruction: {
                   parts: [{
-                    text: 'You are a helpful AI assistant for a design testing platform. Help users understand how to use the platform, create agents, run tests, and analyze results. Be concise and practical in your responses.'
+                    text: 'You are a helpful AI assistant for a design testing platform called "Design Insights". Help users understand how to use the platform, create agents, run tests, and analyze results. Be concise and practical in your responses. The platform allows users to create AI agents that can conduct user research sessions and provide insights.'
                   }]
                 }
               }
@@ -491,7 +588,7 @@
         } catch (error) {
           state.callState = 'idle';
           startCallBtn.disabled = false;
-          startCallBtn.textContent = 'Start Call';
+          startCallBtn.textContent = '🎙️ Start Voice Chat';
           updateUI();
           throw error;
         }
@@ -753,20 +850,20 @@
         
         startCallBtn.disabled = !isIdle;
         if (isConnecting) {
-          startCallBtn.textContent = 'Connecting...';
+          startCallBtn.textContent = '🔄 Connecting...';
         } else {
-          startCallBtn.textContent = 'Start Call';
+          startCallBtn.textContent = '🎙️ Start Voice Chat';
         }
 
         if (isLive) {
           statusDot.classList.add('live');
-          statusText.textContent = 'Live call in progress';
+          statusText.textContent = '🟢 Live call in progress';
         } else if (isConnecting) {
           statusDot.classList.add('live');
-          statusText.textContent = 'Connecting...';
+          statusText.textContent = '🔄 Connecting to AI...';
         } else {
           statusDot.classList.remove('live');
-          statusText.textContent = 'Ready to help';
+          statusText.textContent = 'Ready to help you with the platform';
         }
 
         // Update screen share UI
@@ -929,16 +1026,13 @@
 
       // Create FAB
       this.fab = document.createElement('button');
-      this.fab.className = 'fab';
+      this.fab.className = `fab position-${this.position}`;
       this.fab.setAttribute('aria-label', 'Open AI Assistant');
       this.fab.innerHTML = ICONS.headset;
       
       this.fab.addEventListener('click', () => this.toggle());
       
       shadow.appendChild(this.fab);
-      
-      // Position the widget
-      this.positionWidget();
       
       // Add to page
       document.body.appendChild(this.container);
@@ -957,19 +1051,6 @@
       });
     }
 
-    positionWidget() {
-      const [vertical, horizontal] = this.position.split('-');
-      
-      this.container.style[vertical] = '20px';
-      this.container.style[horizontal] = '20px';
-      
-      if (this.panel) {
-        const panelEl = this.panel.element;
-        panelEl.style[vertical] = '80px';
-        panelEl.style[horizontal] = '0px';
-      }
-    }
-
     async toggle() {
       if (this.isOpen) {
         this.close();
@@ -984,13 +1065,11 @@
       // Lazy load panel if not created
       if (!this.panel) {
         const shadow = this.container.shadowRoot;
-        this.panel = WidgetPanelModule.create(shadow, this.agentId, {
+        this.panel = WidgetPanelModule.create(shadow, this.agentId, this.position, {
           close: () => this.close(),
           startCall: () => this.panel?.startCall(),
           endCall: () => this.panel?.endCall()
         });
-        
-        this.positionWidget();
       }
       
       this.isOpen = true;
