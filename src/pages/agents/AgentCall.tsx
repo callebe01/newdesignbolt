@@ -1,5 +1,4 @@
 // src/components/AgentCall.tsx
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
@@ -8,78 +7,88 @@ import { Agent } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatTime } from '../../utils/format';
 
-// -- ICONS WITH FIXED SIZE + CONTRASTING STROKE --
+// -- ICONS WITH INLINE STYLE HACKS --
 
-const MicIcon = ({ className = "stroke-current text-white" }: { className?: string }) => (
+const MicIcon: React.FC = () => (
   <svg
-    width="24"
-    height="24"
-    className={className}
-    fill="none"
-    stroke="currentColor"
     viewBox="0 0 24 24"
+    style={{
+      width: '24px',
+      height: '24px',
+      stroke: '#ffffff',
+      fill: 'none',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <line x1="8"  y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8"  y1="23" x2="16" y2="23" />
   </svg>
 );
 
-const MicOffIcon = ({ className = "stroke-current text-gray-600" }: { className?: string }) => (
+const MicOffIcon: React.FC = () => (
   <svg
-    width="24"
-    height="24"
-    className={className}
-    fill="none"
-    stroke="currentColor"
     viewBox="0 0 24 24"
+    style={{
+      width: '24px',
+      height: '24px',
+      stroke: '#555555',
+      fill: 'none',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <line x1="8"  y1="23" x2="16" y2="23" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="1"  y1="1"  x2="23" y2="23" />
+    <path d="M9 9v3a3 3 0 0 0 5.12 2.12l1.88-1.88" />
+    <path d="M15 9.34V4a3 3 0 0 0-5.94-.6" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8"  y1="23" x2="16" y2="23" />
   </svg>
 );
 
-const MonitorIcon = ({ className = "stroke-current text-gray-600" }: { className?: string }) => (
+const MonitorIcon: React.FC = () => (
   <svg
-    width="24"
-    height="24"
-    className={className}
-    fill="none"
-    stroke="currentColor"
     viewBox="0 0 24 24"
+    style={{
+      width: '24px',
+      height: '24px',
+      stroke: '#555555',
+      fill: 'none',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"
-      strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <line x1="8"  y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+    <line x1="8"  y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
   </svg>
 );
 
-const XIcon = ({ className = "stroke-current text-white" }: { className?: string }) => (
+const XIcon: React.FC = () => (
   <svg
-    width="24"
-    height="24"
-    className={className}
-    fill="none"
-    stroke="currentColor"
     viewBox="0 0 24 24"
+    style={{
+      width: '24px',
+      height: '24px',
+      stroke: '#ffffff',
+      fill: 'none',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <line x1="18" y1="6"  x2="6"  y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
-    <line x1="6"  y1="6"  x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+    <line x1="18" y1="6"  x2="6"  y2="18" />
+    <line x1="6"  y1="6"  x2="18" y2="18" />
   </svg>
 );
 
@@ -103,11 +112,11 @@ export const AgentCall: React.FC = () => {
     setTranscript
   } = useLiveCall();
 
-  const [agent,   setAgent]   = useState<Agent | null>(null);
+  const [agent, setAgent] = useState<Agent | null>(null);
   const [notFound, setNotFound] = useState(false);
   const startedRef = useRef(false);
 
-  // Load agent
+  // Fetch agent once
   useEffect(() => {
     (async () => {
       if (!agentId) return;
