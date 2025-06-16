@@ -8,11 +8,7 @@ import { Agent } from '../../types';
 import { formatTime } from '../../utils/format';
 
 // a reusable pill button with 3 variants
-const ControlButton: React.FC<{
-  onClick: () => void;
-  label: string;
-  variant: 'primary' | 'outline' | 'destructive';
-}> = ({ onClick, label, variant }) => {
+const ControlButton: React.FC<{ onClick: () => void; label: string; variant: 'primary' | 'outline' | 'destructive'; }> = ({ onClick, label, variant }) => {
   const base = 'px-4 py-2 text-sm font-medium rounded-full transition';
   const variants = {
     primary:     'bg-blue-600 text-white hover:bg-blue-700',
@@ -21,10 +17,7 @@ const ControlButton: React.FC<{
   } as const;
 
   return (
-    <button
-      onClick={onClick}
-      className={`${base} ${variants[variant]}`}
-    >
+    <button onClick={onClick} className={`${base} ${variants[variant]}`}>
       {label}
     </button>
   );
@@ -121,7 +114,7 @@ export const AgentCall: React.FC = () => {
           <ControlButton
             onClick={toggleMicrophone}
             label={isMicrophoneActive ? 'Mute' : 'Unmute'}
-            variant={isMicrophoneActive ? 'primary' : 'outline'}
+            variant={isMicrophoneActive ? 'outline' : 'primary'}
           />
 
           {agent?.canSeeScreenshare && (
