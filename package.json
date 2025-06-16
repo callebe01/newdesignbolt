@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google-cloud/vertexai": "^1.10.0",
     "@google/generative-ai": "^0.2.1",
     "@supabase/supabase-js": "^2.42.7",
     "framer-motion": "^11.0.8",
@@ -22,7 +23,7 @@
     "wavefile": "^11.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1", 
+    "@eslint/js": "^9.9.1",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/sentiment": "^5.0.4",
