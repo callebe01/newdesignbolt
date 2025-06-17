@@ -4,7 +4,7 @@ A React + TypeScript project using Vite.
 
 ## Setup
 
-1. Create a `.env` file in the project root. Add the following keys:
+1. Copy `.env.example` to `.env` and fill in your keys:
 
 ```
 VITE_GOOGLE_API_KEY=your-google-api-key
@@ -17,7 +17,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 `VITE_OPENAI_API_KEY` is used for transcript analysis via OpenAI.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` connect the app to your Supabase backend for persistence.
 
-2. Create a `supabase/.env` file with the following format for deploying Edge Functions such as `analyze-transcripts`:
+2. Copy `supabase/.env.example` to `supabase/.env` for deploying Edge Functions such as `analyze-transcripts`:
 
 ```
 SUPABASE_URL=https://ljfidzppyflrrszkgusa.supabase.co
