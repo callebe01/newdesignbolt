@@ -4,7 +4,7 @@ A React + TypeScript project using Vite.
 
 ## Setup
 
-1. Create a `.env` file in the project root. Add the following keys:
+1. Create a `.env` file in the project root or copy `.env.example`. Add the following keys:
 
 ```
 VITE_GOOGLE_API_KEY=your-google-api-key
@@ -60,6 +60,19 @@ npm run dev
 ```
 
 This will launch Vite in development mode.
+
+6. Build the project:
+
+```bash
+npm run build # or npx vite build
+```
+
+7. Preview the production build:
+
+```bash
+npm run preview
+```
+
 
 ## Manual Testing
 
