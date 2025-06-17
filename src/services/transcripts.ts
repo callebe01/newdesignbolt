@@ -52,8 +52,9 @@ export async function saveTranscript(agentId: string, content: string) {
 
     console.log('Transcript saved successfully:', data.id);
     return data;
-  } catch (err: any) {
-    const message = err?.message || JSON.stringify(err);
+  } catch (err: unknown) {
+    const error = err as Error;
+    const message = error.message || JSON.stringify(err);
     console.error('Failed to save transcript:', message);
     throw new Error(`Save transcript failed: ${message}`);
   }
@@ -85,7 +86,7 @@ export async function saveTranscriptBeacon(agentId: string, content: string) {
   }
 }
 
-export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
+export async function analyzeTranscripts(transcripts: Transcript[]): Promise<AnalysisResult> {
   // Get the current session
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
