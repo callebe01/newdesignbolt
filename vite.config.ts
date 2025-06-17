@@ -10,9 +10,4 @@ export default defineConfig({
     // Handle client-side routing in development
     historyApiFallback: true,
   },
-  build: {
-    rollupOptions: {
-      input: 'index.html'
-    }
-  }
 });
