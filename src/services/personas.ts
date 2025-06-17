@@ -82,13 +82,11 @@ export async function updatePersona(
   id: string,
   updates: Partial<Pick<Persona, 'name' | 'instructions' | 'documentationUrls'>>
 ): Promise<Persona> {
-  const { documentationUrls, ...rest } = updates;
-
   const { data, error } = await supabase
     .from('personas')
     .update({
-      ...rest,
-      documentation_urls: documentationUrls,
+      ...updates,
+      documentation_urls: (updates as any).documentationUrls,
     })
     .eq('id', id)
     .select()
