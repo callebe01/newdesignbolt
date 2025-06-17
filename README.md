@@ -2,7 +2,12 @@
 
 A React + TypeScript project using Vite.
 
+This project is tested with **Node.js 18**. Using a different Node version may
+lead to unexpected issues during deployment.
+
 ## Setup
+
+0. Ensure you are running **Node.js 18**.
 
 1. Create a `.env` file in the project root. Add the following keys:
 
