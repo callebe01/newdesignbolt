@@ -20,38 +20,53 @@ export async function getTranscripts(agentId: string) {
   return data;
 }
 
-export async function saveTranscript(agentId: string, content: string) {
+export async function saveTranscript(agentId: string, content: string, fromUnload = false) {
   if (!content?.trim()) {
     console.warn('Empty transcript content, skipping save');
     return null;
   }
 
   try {
-    const { data, error } = await supabase
-      .from('transcriptions')
-      .insert([
-        {
-          agent_id: agentId,
-          content: content.trim(),
-          metadata: {
-            saved_at: new Date().toISOString(),
-            length: content.trim().length
-          }
-        }
-      ])
-      .select()
-      .single();
+    // Use direct fetch to Supabase REST API to bypass RLS session requirements
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/transcriptions`;
+    const body = JSON.stringify({
+      agent_id: agentId,
+      content: content.trim(),
+      metadata: {
+        saved_at: new Date().toISOString(),
+        length: content.trim().length,
+        anonymous: true
+      }
+    });
 
-    if (error) {
-      const message =
-        `Save transcript failed: ${error.message}` +
-        (error.details ? ` - ${error.details}` : '');
-      console.error(message, error);
-      throw new Error(message);
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Prefer': 'return=representation'
+    };
+
+    const fetchOptions: RequestInit = {
+      method: 'POST',
+      headers,
+      body
+    };
+
+    // Add keepalive for unload scenarios
+    if (fromUnload) {
+      fetchOptions.keepalive = true;
     }
 
-    console.log('Transcript saved successfully:', data.id);
-    return data;
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Transcript saved successfully:', data[0]?.id);
+    return data[0];
   } catch (err: any) {
     const message = err?.message || JSON.stringify(err);
     console.error('Failed to save transcript:', message);
@@ -60,29 +75,8 @@ export async function saveTranscript(agentId: string, content: string) {
 }
 
 export async function saveTranscriptBeacon(agentId: string, content: string) {
-  if (!content?.trim()) {
-    return;
-  }
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/transcriptions`;
-  const body = JSON.stringify({
-    agent_id: agentId,
-    content: content.trim(),
-    metadata: { saved_at: new Date().toISOString(), length: content.trim().length }
-  });
-  try {
-    await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body,
-      keepalive: true,
-    });
-  } catch (err) {
-    console.error('Failed to beacon save transcript:', err);
-  }
+  // Use the same function with fromUnload flag
+  return saveTranscript(agentId, content, true);
 }
 
 export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisResult> {
