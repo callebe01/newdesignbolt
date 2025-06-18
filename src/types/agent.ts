@@ -15,7 +15,7 @@ export interface Agent {
 
 export interface AgentConversation {
   id: string;
-  agentId: string;
+  agent_id: string;
   status: 'active' | 'completed' | 'error';
   startTime: Date;
   endTime?: Date;
@@ -36,7 +36,7 @@ export interface ConversationMessage {
 
 export interface AgentAnalytics {
   id: string;
-  agentId: string;
+  agent_id: string;
   totalConversations: number;
   avgDuration: number;
   avgSentiment: number;

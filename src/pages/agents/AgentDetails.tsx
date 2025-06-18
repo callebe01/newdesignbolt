@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
   Phone, 
@@ -142,6 +142,8 @@ export const AgentDetails: React.FC = () => {
 
   const getAgentConversations = async (agentId: string): Promise<AgentConversation[]> => {
     try {
+      console.log('Fetching conversations for agent:', agentId);
+      
       // Get conversations with their messages
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('agent_conversations')
@@ -164,6 +166,8 @@ export const AgentDetails: React.FC = () => {
         return [];
       }
 
+      console.log('Raw conversations data:', conversationsData?.length || 0, conversationsData);
+
       // Also get transcripts for conversations that might not have messages yet
       const { data: transcriptsData, error: transcriptsError } = await supabase
         .from('transcriptions')
@@ -174,6 +178,8 @@ export const AgentDetails: React.FC = () => {
       if (transcriptsError) {
         console.error('Error fetching transcripts:', transcriptsError);
       }
+
+      console.log('Raw transcripts data:', transcriptsData?.length || 0, transcriptsData);
 
       // Merge conversation data with transcript data
       const conversationsWithContent = (conversationsData || []).map(conversation => {
@@ -192,7 +198,48 @@ export const AgentDetails: React.FC = () => {
         };
       });
 
-      return conversationsWithContent;
+      // Also include transcripts that don't have matching conversations
+      // This might be the case for some conversations that were saved as transcripts only
+      const usedTranscriptIds = new Set();
+      conversationsWithContent.forEach(conv => {
+        if (conv.transcript) {
+          const conversationTime = new Date(conv.start_time).getTime();
+          const matchingTranscript = transcriptsData?.find(transcript => {
+            const transcriptTime = new Date(transcript.created_at).getTime();
+            const timeDiff = Math.abs(conversationTime - transcriptTime);
+            return timeDiff < 5 * 60 * 1000;
+          });
+          if (matchingTranscript) {
+            usedTranscriptIds.add(matchingTranscript.id);
+          }
+        }
+      });
+
+      // Add orphaned transcripts as conversations
+      const orphanedTranscripts = (transcriptsData || []).filter(transcript => 
+        !usedTranscriptIds.has(transcript.id)
+      );
+
+      console.log('Orphaned transcripts:', orphanedTranscripts.length, orphanedTranscripts);
+
+      const orphanedConversations = orphanedTranscripts.map(transcript => ({
+        id: `transcript-${transcript.id}`,
+        agent_id: transcript.agent_id,
+        start_time: transcript.created_at,
+        end_time: transcript.created_at,
+        status: 'completed' as const,
+        duration: 0,
+        created_at: transcript.created_at,
+        updated_at: transcript.created_at,
+        messages: [],
+        transcript: transcript.content
+      }));
+
+      const allConversations = [...conversationsWithContent, ...orphanedConversations]
+        .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+      console.log('Final conversations count:', allConversations.length, allConversations);
+      return allConversations;
     } catch (err) {
       console.error('Error fetching conversations:', err);
       return [];
@@ -218,9 +265,65 @@ export const AgentDetails: React.FC = () => {
     fetchData();
   }, [agentId]);
 
+  // Add real-time subscription for conversations and transcripts
+  useEffect(() => {
+    if (!agentId) return;
+
+    // Subscribe to changes in agent_conversations table
+    const conversationsSubscription = supabase
+      .channel(`agent_conversations_${agentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agent_conversations',
+          filter: `agent_id=eq.${agentId}`
+        },
+        (payload) => {
+          console.log('Conversation change detected:', payload);
+          // Add a small delay to ensure data consistency
+          setTimeout(() => {
+            refreshData();
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to changes in transcriptions table
+    const transcriptsSubscription = supabase
+      .channel(`transcriptions_${agentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transcriptions',
+          filter: `agent_id=eq.${agentId}`
+        },
+        (payload) => {
+          console.log('Transcript change detected:', payload);
+          // Add a small delay to ensure data consistency
+          setTimeout(() => {
+            refreshData();
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      conversationsSubscription.unsubscribe();
+      transcriptsSubscription.unsubscribe();
+    };
+  }, [agentId]);
+
   useEffect(() => {
     // Calculate metrics based on analysis results and time filter
     const calculateMetrics = () => {
+      console.log('Calculating metrics with conversations:', conversations.length);
+      console.log('Conversations data:', conversations);
+      
       const now = new Date();
       const filteredResults = analysisResults.filter(result => {
         const date = new Date(result.createdAt);
@@ -239,12 +342,14 @@ export const AgentDetails: React.FC = () => {
       });
 
       if (filteredResults.length === 0) {
-        setOverviewMetrics({
+        const metrics = {
           totalConversations: conversations.length,
           resolutionRate: 0,
           engagementScore: 0,
           avgDuration: 0
-        });
+        };
+        console.log('Setting metrics (no analysis results):', metrics);
+        setOverviewMetrics(metrics);
         return;
       }
 
@@ -267,6 +372,7 @@ export const AgentDetails: React.FC = () => {
         }
       };
 
+      console.log('Setting metrics (with analysis results):', metrics);
       setOverviewMetrics(metrics);
     };
 
@@ -711,7 +817,7 @@ export const AgentDetails: React.FC = () => {
           <div className="mt-4 p-3 bg-muted rounded-lg flex items-center gap-2">
             <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <code className="text-sm flex-1 break-all">
-              https://voicepilot.live/agent/{agent?.id}
+              https://voicepilot.live/agent/${agent?.id}
             </code>
           </div>
         </CardContent>

@@ -3,10 +3,10 @@ import { AnalysisResult } from '../types';
 
 export interface Transcript {
   id: string;
-  agentId: string;
+  agent_id: string;
   content: string;
   metadata: Record<string, unknown>;
-  createdAt: string;
+  created_at: string;
 }
 
 export async function getTranscripts(agentId: string) {
@@ -17,7 +17,7 @@ export async function getTranscripts(agentId: string) {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data;
+  return data as Transcript[];
 }
 
 export async function saveTranscript(agentId: string, content: string, fromUnload = false) {
@@ -27,49 +27,42 @@ export async function saveTranscript(agentId: string, content: string, fromUnloa
   }
 
   try {
-    // Use direct fetch to Supabase REST API to bypass RLS session requirements
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/transcriptions`;
-    const body = JSON.stringify({
+    // Prepare the insert payload
+    const insertPayload = {
       agent_id: agentId,
       content: content.trim(),
       metadata: {
         saved_at: new Date().toISOString(),
-        length: content.trim().length,
-        anonymous: true
+        length: content.trim().length
       }
-    });
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      'Prefer': 'return=representation'
     };
 
-    const fetchOptions: RequestInit = {
-      method: 'POST',
-      headers,
-      body
-    };
+    console.log('Saving transcript for agent:', agentId);
+    console.log('Content length:', content.trim().length);
 
-    // Add keepalive for unload scenarios
-    if (fromUnload) {
-      fetchOptions.keepalive = true;
+    // Use authenticated supabase client which handles RLS properly
+    const { data, error } = await supabase
+      .from('transcriptions')
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
     }
 
-    const response = await fetch(url, fetchOptions);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Transcript saved successfully:', data[0]?.id);
-    return data[0];
+    console.log('Transcript saved successfully:', data?.id);
+    return data;
   } catch (err: any) {
     const message = err?.message || JSON.stringify(err);
     console.error('Failed to save transcript:', message);
+    console.error('Full error object:', err);
     throw new Error(`Save transcript failed: ${message}`);
   }
 }

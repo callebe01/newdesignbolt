@@ -205,7 +205,7 @@ function mapAgent(row: Record<string, any>): Agent {
 function mapConversation(row: Record<string, any>): AgentConversation {
   return {
     id: row.id,
-    agentId: row.agent_id,
+    agent_id: row.agent_id,
     status: row.status,
     startTime: new Date(row.start_time),
     endTime: row.end_time ? new Date(row.end_time) : undefined,

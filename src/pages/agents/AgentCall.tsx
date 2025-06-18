@@ -43,6 +43,7 @@ export const AgentCall: React.FC = () => {
 
   const [agent, setAgent] = useState<Agent | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [callCompleted, setCallCompleted] = useState(false);
   const startedRef = useRef(false);
 
   // load agent metadata
@@ -71,7 +72,9 @@ export const AgentCall: React.FC = () => {
 
   const handleEnd = () => {
     endCall();
-    navigate('/agents');
+    setCallCompleted(true);
+    // For enterprise clients, don't redirect to protected routes
+    // Show completion message instead of navigating
   };
 
   if (notFound) {
@@ -79,6 +82,23 @@ export const AgentCall: React.FC = () => {
       <div className="bg-red-50 text-red-800 p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">Error</h2>
         <p>Agent not found</p>
+      </div>
+    );
+  }
+
+  if (callCompleted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold mb-2 text-gray-900">Call Completed</h2>
+          <p className="text-gray-600 mb-4">Thank you for using {agent?.name || 'our AI agent'}!</p>
+          <p className="text-sm text-gray-500">Duration: {formatTime(duration)}</p>
+        </div>
       </div>
     );
   }
