@@ -101,3 +101,7 @@ your Supabase credentials are correct and that your network connection is
 stable. The application surfaces the detailed error from Supabase to help you
 identify the issue.
 
+## Object Detection
+
+This project can highlight detected objects on your screen share using Gemini Live. Enable screen sharing and click **Show Boxes** in the session controls. Each captured frame is sent to Gemini Live for object detection and red bounding boxes appear over the shared video. Toggle **Hide Boxes** to disable the overlay.
+
