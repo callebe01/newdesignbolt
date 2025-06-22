@@ -5,6 +5,8 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
+import { ObjectDetectionOverlay } from '../components/overlay/ObjectDetectionOverlay';
+import { detectObjects, BoundingBox } from '../services/objectDetection';
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
 import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
@@ -18,6 +20,8 @@ interface LiveCallContextType {
   errorMessage: string | null;
   transcript: string;
   duration: number;
+  highlightObjects: boolean;
+  toggleHighlightObjects: () => void;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
   startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string) => Promise<void>;
   endCall: (fromUnload?: boolean) => void;
@@ -38,6 +42,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
   const [duration, setDuration] = useState(0);
+  const [highlightObjects, setHighlightObjects] = useState(false);
+  const [objectBoxes, setObjectBoxes] = useState<BoundingBox[]>([]);
   const { user } = useAuth();
 
   const DEFAULT_SYSTEM_INSTRUCTION =
@@ -66,6 +72,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
+  const detectionInProgressRef = useRef(false);
 
   const handleBeforeUnload = () => {
     endCall(true);
@@ -607,6 +614,27 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 console.error('[Live] Screen send error:', err);
                 setErrorMessage('Failed to send screen frame.');
               }
+
+              if (highlightObjects && !detectionInProgressRef.current) {
+                detectionInProgressRef.current = true;
+                detectObjects(base64)
+                  .then((boxes) => {
+                    const scaled = boxes.map((b) => ({
+                      x: (b.x / 1000) * canvas!.width,
+                      y: (b.y / 1000) * canvas!.height,
+                      width: (b.width / 1000) * canvas!.width,
+                      height: (b.height / 1000) * canvas!.height,
+                      label: b.label,
+                    }));
+                    setObjectBoxes(scaled);
+                  })
+                  .catch((err) => console.error('[Live] object detection error:', err))
+                  .finally(() => {
+                    detectionInProgressRef.current = false;
+                  });
+              } else if (!highlightObjects) {
+                setObjectBoxes([]);
+              }
             };
             reader.readAsDataURL(blob);
           },
@@ -630,6 +658,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       screenVideoRef.current.pause();
       screenVideoRef.current.srcObject = null;
     }
+    setObjectBoxes([]);
+    detectionInProgressRef.current = false;
   };
 
   const toggleMicrophone = (): void => {
@@ -706,6 +736,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error('[Live] Video toggle error:', err);
       setErrorMessage('Failed to toggle video.');
+    }
+  };
+
+  const toggleHighlightObjects = (): void => {
+    setHighlightObjects((prev) => !prev);
+    if (!highlightObjects) {
+      setObjectBoxes([]);
     }
   };
 
@@ -810,6 +847,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         errorMessage,
         transcript,
         duration,
+        highlightObjects,
+        toggleHighlightObjects,
         setTranscript,
         startCall,
         endCall,
@@ -819,6 +858,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }}
     >
       {children}
+      <ObjectDetectionOverlay
+        boxes={objectBoxes}
+        visible={highlightObjects && isScreenSharing}
+      />
     </LiveCallContext.Provider>
   );
 };
