@@ -35,6 +35,16 @@ supabase functions deploy analyze-transcripts --env-file ./supabase/.env
 
 If either variable is missing or incorrect, `analyze-transcripts` will return a **401 Unauthorized** error.
 
+The `live-call` Edge Function requires the following variables in the same `supabase/.env` file:
+
+```
+GOOGLE_API_KEY=your-google-api-key
+SUPABASE_URL=https://ljfidzppyflrrszkgusa.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+If any of these are not supplied, calls using the Gemini Live integration will fail during deployment.
+
 3. Initialize the Supabase schema:
 
 ```bash
