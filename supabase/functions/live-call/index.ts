@@ -16,6 +16,27 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (!GOOGLE_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'Missing GOOGLE_API_KEY environment variable' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  if (!SUPABASE_URL) {
+    return new Response(
+      JSON.stringify({ error: 'Missing SUPABASE_URL environment variable' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'Missing SUPABASE_ANON_KEY environment variable' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
     const { data: { session }, error: authError } = await supabase.auth.getSession();
