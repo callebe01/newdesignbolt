@@ -12,12 +12,12 @@
   - Only authenticated users can access their own agent conversations
 - **`agent_analytics`** - Inherits security from agents table
 
-#### ✅ Fully Secured Tables
-- **`transcriptions`** - RLS enabled with comprehensive policies
-  - **Security**: Authenticated users can only access their own agent transcripts
-  - **Risk Level**: Low - full authentication and ownership verification required
-  - **Policies**: INSERT, SELECT, UPDATE, DELETE all require user ownership
+#### ❌ RLS Disabled Table
+- **`transcriptions`** - RLS disabled to allow anonymous access to agent links
+  - **Migration**: `20250618000320_temporary_disable_rls_again.sql`
+  - **Rationale**: transcripts must remain publicly viewable until authenticated access is implemented
 
+This configuration allows agent links to work without requiring the visitor to sign in. Once token-based access is finished, RLS will be re-enabled and the policies below will apply.
 ### Current Security Measures
 
 1. **Authentication**: Supabase Auth with proper user management
@@ -38,6 +38,7 @@
 - [ ] Add audit logging for all data operations
 - [ ] Implement data encryption at rest for sensitive content
 - [ ] Add monitoring and alerting for suspicious activities
+- [ ] Re-enable RLS on `transcriptions` after implementing token-based access (target Q3 2025)
 
 ### Phase 3: Advanced Security (Future)
 - [ ] Add audit logging for all data operations
@@ -57,9 +58,11 @@ Authenticated User → Application → Supabase RLS → Database
 ### Security Benefits
 1. **Full Authentication**: All database operations require user authentication
 2. **Ownership Verification**: Users can only access their own data
-3. **Comprehensive RLS**: All tables protected with row-level security
+3. **Comprehensive RLS**: All tables except `transcriptions` are protected with row-level security
 4. **Audit Trail**: All operations logged with user context
-5. **Zero Public Access**: No anonymous database operations allowed
+5. **Limited Public Access**: Anonymous visitors can view transcripts via shared agent links while RLS is disabled
+
+The following policies remain defined in the database but are inactive until RLS on `transcriptions` is re-enabled.
 
 ## Current Security Implementation
 
