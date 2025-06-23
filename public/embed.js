@@ -558,6 +558,9 @@
     let audioQueueTime = 0;
     let transcript = '';
 
+    // ✅ AI TRANSCRIPTION BUFFER - USING FINISHED FLAG
+    let aiBuffer = '';
+
     // Create widget HTML
     function updateWidget() {
       widget.innerHTML = `
@@ -813,7 +816,7 @@
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO'], // AUDIO only - no TEXT
+                responseModalities: ['AUDIO'], // ✅ AUDIO only - no TEXT
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -822,8 +825,8 @@
                   }
                 }
               },
-              outputAudioTranscription: {}, // Enable transcription of AI speech
-              inputAudioTranscription: {},  // Enable transcription of user speech
+              outputAudioTranscription: {}, // ✅ Enable transcription of AI speech
+              inputAudioTranscription: {},  // ✅ Enable transcription of user speech
               systemInstruction: {
                 parts: [{
                   text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.'
@@ -863,25 +866,40 @@
             }
 
             if (parsed.serverContent) {
-              // Handle AI speech transcription (what the AI is saying)
-              if (parsed.serverContent.outputTranscription?.text) {
-                const aiText = parsed.serverContent.outputTranscription.text.trim();
+              const sc = parsed.serverContent;
+
+              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH FINISHED FLAG - CORRECT FIELD NAME
+              if (sc.outputTranscription) {
+                const { text, finished } = sc.outputTranscription;
                 
-                // Add proper spacing to transcript
-                if (transcript.length > 0 && !transcript.endsWith(' ') && !aiText.startsWith(' ')) {
-                  transcript += ' ';
+                if (text) {
+                  // 1) Accumulate every piece
+                  aiBuffer += text;
+                  console.log('[VoicePilot] AI transcription fragment:', text);
                 }
-                transcript += aiText;
-                updateWidget();
-                
-                // ✅ SMART HIGHLIGHTING BASED ON AI SPEECH TRANSCRIPTION
-                console.log('[VoicePilot] AI said:', aiText);
-                window.voicePilotHighlight(aiText);
+
+                // 2) When Vertex signals end of this transcription chunk, flush the whole phrase
+                if (finished) {
+                  const phrase = aiBuffer.trim();
+                  if (phrase) {
+                    // Add proper spacing to transcript
+                    if (transcript.length > 0 && !transcript.endsWith(' ') && !phrase.startsWith(' ')) {
+                      transcript += ' ';
+                    }
+                    transcript += phrase;
+                    updateWidget();
+                    
+                    // ✅ SMART HIGHLIGHTING BASED ON AI SPEECH TRANSCRIPTION
+                    console.log('[VoicePilot] AI said (complete phrase):', phrase);
+                    window.voicePilotHighlight(phrase);
+                  }
+                  aiBuffer = '';
+                }
               }
 
-              // Handle user speech transcription (what the user is saying)
-              if (parsed.serverContent.inputTranscription?.text) {
-                const userText = parsed.serverContent.inputTranscription.text.trim();
+              // ✅ HANDLE USER SPEECH TRANSCRIPTION - CORRECT FIELD NAME
+              if (sc.inputTranscription?.text) {
+                const userText = sc.inputTranscription.text.trim();
                 
                 // Add proper spacing to transcript
                 if (transcript.length > 0 && !transcript.endsWith(' ') && !userText.startsWith(' ')) {
@@ -889,6 +907,7 @@
                 }
                 transcript += userText;
                 updateWidget();
+                console.log('[VoicePilot] User transcription:', userText);
               }
 
               // Handle audio data from AI responses
@@ -912,6 +931,24 @@
                       console.error('[VoicePilot] Error decoding audio:', err);
                     }
                   }
+                }
+              }
+
+              // ✅ CHECK FOR TURN COMPLETE TO FORCE FLUSH AI BUFFER
+              if (sc.turnComplete) {
+                console.log('[VoicePilot] Turn complete - force flushing AI buffer if needed');
+                const phrase = aiBuffer.trim();
+                if (phrase) {
+                  // Add proper spacing to transcript
+                  if (transcript.length > 0 && !transcript.endsWith(' ') && !phrase.startsWith(' ')) {
+                    transcript += ' ';
+                  }
+                  transcript += phrase;
+                  updateWidget();
+                  
+                  console.log('[VoicePilot] AI said (turn complete flush):', phrase);
+                  window.voicePilotHighlight(phrase);
+                  aiBuffer = '';
                 }
               }
             }
@@ -1002,6 +1039,14 @@
       isCallActive = false;
       transcript = '';
       audioQueueTime = 0;
+      
+      // ✅ FORCE FLUSH ANY REMAINING AI BUFFER
+      const phrase = aiBuffer.trim();
+      if (phrase) {
+        transcript += (transcript ? ' ' : '') + phrase;
+        aiBuffer = '';
+        console.log('[VoicePilot] Final AI buffer flush:', phrase);
+      }
       
       if (callTimer) {
         clearInterval(callTimer);
