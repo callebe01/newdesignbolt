@@ -46,6 +46,36 @@ function mount(options: EmbedOptions) {
 
   document.body.appendChild(container);
 
+  if (!document.getElementById('voicepilot-highlight-style')) {
+    const style = document.createElement('style');
+    style.id = 'voicepilot-highlight-style';
+    style.textContent = `.agent-highlight {\n  outline: 3px solid #f00;\n  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.6);\n  transition: outline-color 0.2s;\n}`;
+    document.head.appendChild(style);
+  }
+
+  if (typeof (window as any).highlightTextMatch === 'undefined') {
+    (window as any).highlightTextMatch = (message: string) => {
+      if (!message) return;
+      const lower = message.toLowerCase();
+      const candidates = Array.from(
+        document.querySelectorAll('[data-agent-id],button,a,[role="button"],input')
+      );
+      for (const el of candidates) {
+        const label = (
+          el.getAttribute('data-agent-id') ||
+          el.getAttribute('aria-label') ||
+          (el as HTMLElement).innerText ||
+          ''
+        ).trim();
+        if (label && label.length > 2 && lower.includes(label.toLowerCase())) {
+          el.classList.add('agent-highlight');
+          setTimeout(() => el.classList.remove('agent-highlight'), 3000);
+          break;
+        }
+      }
+    };
+  }
+
   let api: any = null;
 
   const root = createRoot(container);
