@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { EmbeddedWidget } from '../widget/EmbeddedWidget';
+import { VoiceChatWidget } from '../widget/VoiceChatWidget';
 import { useAuth } from '../../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
@@ -30,12 +30,8 @@ export const MainLayout: React.FC = () => {
         </main>
       </div>
       
-      {/* Embedded Widget - Your AI Assistant */}
-      <EmbeddedWidget 
-        agentId="2d85d376-15e2-4eb6-8495-7023559b886a"
-        position="bottom-right"
-        googleApiKey={import.meta.env.VITE_GOOGLE_API_KEY}
-      />
+      {/* Voice Chat Widget */}
+      <VoiceChatWidget agentId="2d85d376-15e2-4eb6-8495-7023559b886a" />
     </div>
   );
 };
