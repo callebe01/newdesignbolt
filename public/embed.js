@@ -692,7 +692,7 @@
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO'],
+                responseModalities: ['AUDIO', 'TEXT'], // ✅ Request both AUDIO and TEXT
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -742,6 +742,7 @@
             }
 
             if (parsed.serverContent) {
+              // Handle transcription updates
               if (parsed.serverContent.outputTranscription?.text) {
                 transcript += parsed.serverContent.outputTranscription.text;
                 updateWidget();
@@ -752,19 +753,24 @@
                 updateWidget();
               }
 
+              // Handle model responses
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
+                  // ✅ Handle TEXT responses for highlighting
                   if (part.text) {
+                    console.log('[VoicePilot] AI text response:', part.text);
                     transcript += part.text;
                     updateWidget();
                     
                     // Auto-highlight UI elements mentioned in AI response
                     setTimeout(() => {
+                      console.log('[VoicePilot] Triggering auto-highlight for:', part.text);
                       window.voicePilotHighlight(part.text);
                     }, 200);
                   }
 
+                  // ✅ Handle AUDIO responses for playback
                   if (part.inlineData?.data) {
                     try {
                       const base64str = part.inlineData.data;
