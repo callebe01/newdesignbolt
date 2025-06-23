@@ -692,7 +692,7 @@
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO'],
+                responseModalities: ['AUDIO', 'TEXT'],
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -742,9 +742,14 @@
             }
 
             if (parsed.serverContent) {
-              if (parsed.serverContent.outputTranscription?.text) {
-                transcript += parsed.serverContent.outputTranscription.text;
+              // Handle audio transcription (fallback highlighting)
+              if (parsed.serverContent.outputAudioTranscription?.text) {
+                const txt = parsed.serverContent.outputAudioTranscription.text;
+                transcript += txt;
                 updateWidget();
+                
+                // Auto-highlight from audio transcription as fallback
+                setTimeout(() => window.voicePilotHighlight(txt), 200);
               }
 
               if (parsed.serverContent.inputTranscription?.text) {
@@ -752,6 +757,7 @@
                 updateWidget();
               }
 
+              // Handle text turns (primary highlighting)
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
