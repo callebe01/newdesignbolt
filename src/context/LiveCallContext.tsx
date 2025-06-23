@@ -424,25 +424,25 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
                 
-                // Clear any pending update
+                // reset debounce timer
                 if (transcriptTimerRef.current) {
                   clearTimeout(transcriptTimerRef.current);
                 }
-                
-                // Buffer with proper spacing
+
+                // buffer fragments
                 transcriptBufferRef.current += (transcript.endsWith(' ') ? '' : ' ') + aiText;
-                
-                // Wait 300ms after the last fragment, then flush to UI
+
+                // flush after 300ms of silence, then highlight the full phrase
                 transcriptTimerRef.current = window.setTimeout(() => {
-                  setTranscript(prev => prev + transcriptBufferRef.current);
+                  const phrase = transcriptBufferRef.current.trim();
+                  setTranscript(prev => prev + (prev.endsWith(' ') ? '' : ' ') + phrase);
                   transcriptBufferRef.current = '';
+
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(phrase);
+                  }
                 }, 300);
 
-                // Still highlight immediately for responsiveness
-                if (window.voicePilotHighlight) {
-                  window.voicePilotHighlight(aiText);
-                }
-                
                 console.log('[Live] AI said (transcribed):', aiText);
               }
               
