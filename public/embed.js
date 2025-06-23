@@ -813,7 +813,7 @@
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO'], // AUDIO only - no TEXT
+                responseModalities: ['AUDIO', 'TEXT'], // ✅ BOTH AUDIO AND TEXT
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -863,38 +863,21 @@
             }
 
             if (parsed.serverContent) {
-              // Handle AI speech transcription (what the AI is saying)
-              if (parsed.serverContent.outputTranscription?.text) {
-                const aiText = parsed.serverContent.outputTranscription.text.trim();
-                
-                // Add proper spacing to transcript
-                if (transcript.length > 0 && !transcript.endsWith(' ') && !aiText.startsWith(' ')) {
-                  transcript += ' ';
-                }
-                transcript += aiText;
-                updateWidget();
-                
-                // ✅ SMART HIGHLIGHTING BASED ON AI SPEECH TRANSCRIPTION
-                console.log('[VoicePilot] AI said:', aiText);
-                window.voicePilotHighlight(aiText);
-              }
-
-              // Handle user speech transcription (what the user is saying)
-              if (parsed.serverContent.inputTranscription?.text) {
-                const userText = parsed.serverContent.inputTranscription.text.trim();
-                
-                // Add proper spacing to transcript
-                if (transcript.length > 0 && !transcript.endsWith(' ') && !userText.startsWith(' ')) {
-                  transcript += ' ';
-                }
-                transcript += userText;
-                updateWidget();
-              }
-
-              // Handle audio data from AI responses
+              // ✅ PRIORITY 1: Handle complete text responses from modelTurn.parts
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
+                  if (part.text) {
+                    // ✅ Complete sentence from Gemini - add to transcript and highlight
+                    transcript = transcript ? transcript + ' ' + part.text : part.text;
+                    updateWidget();
+                    
+                    // ✅ Highlight the complete sentence
+                    console.log('[VoicePilot] AI complete sentence:', part.text);
+                    window.voicePilotHighlight(part.text);
+                  }
+                  
+                  // Handle audio data
                   if (part.inlineData?.data) {
                     try {
                       const base64str = part.inlineData.data;
@@ -912,6 +895,25 @@
                       console.error('[VoicePilot] Error decoding audio:', err);
                     }
                   }
+                }
+              }
+
+              // ✅ FALLBACK: Handle transcriptions only if no text parts were received
+              if (!modelTurn?.parts?.some(part => part.text)) {
+                // Handle AI speech transcription (what the AI is saying)
+                if (parsed.serverContent.outputTranscription?.text) {
+                  const aiText = parsed.serverContent.outputTranscription.text.trim();
+                  transcript = transcript ? transcript + ' ' + aiText : aiText;
+                  updateWidget();
+                  console.log('[VoicePilot] AI transcription fallback:', aiText);
+                }
+
+                // Handle user speech transcription (what the user is saying)
+                if (parsed.serverContent.inputTranscription?.text) {
+                  const userText = parsed.serverContent.inputTranscription.text.trim();
+                  transcript = transcript ? transcript + ' ' + userText : userText;
+                  updateWidget();
+                  console.log('[VoicePilot] User transcription:', userText);
                 }
               }
             }

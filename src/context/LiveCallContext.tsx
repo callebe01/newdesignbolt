@@ -338,12 +338,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // Setup message with tools and Kore voice - AUDIO ONLY
+        // ✅ FIXED: Setup message with BOTH AUDIO AND TEXT modalities
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
             generationConfig: {
-              responseModalities: ['AUDIO'], // ✅ AUDIO ONLY - no TEXT
+              responseModalities: ['AUDIO', 'TEXT'], // ✅ BOTH AUDIO AND TEXT
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
@@ -412,21 +412,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             if (parsed.serverContent) {
-              // Handle AI speech transcription (what the AI is saying)
-              if (parsed.serverContent.outputTranscription?.text) {
-                const aiText = parsed.serverContent.outputTranscription.text.trim();
-                setTranscript(prev => prev ? prev + ' ' + aiText : aiText);
-                console.log('[Live] AI transcription:', aiText);
-              }
-              
-              // Handle user speech transcription (what the user is saying)
-              if (parsed.serverContent.inputTranscription?.text) {
-                const userText = parsed.serverContent.inputTranscription.text.trim();
-                setTranscript(prev => prev ? prev + ' ' + userText : userText);
-                console.log('[Live] User transcription:', userText);
-              }
-              
-              // ✅ BATCH ON modelTurn.parts FOR COMPLETE SENTENCES
+              // ✅ PRIORITY 1: Handle complete text responses from modelTurn.parts
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
@@ -472,7 +458,24 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     }
                   }
                 }
-                return;
+              }
+
+              // ✅ FALLBACK: Handle transcriptions only if no text parts were received
+              // (This handles user speech transcription and any edge cases)
+              if (!modelTurn?.parts?.some(part => part.text)) {
+                // Handle AI speech transcription (what the AI is saying)
+                if (parsed.serverContent.outputTranscription?.text) {
+                  const aiText = parsed.serverContent.outputTranscription.text.trim();
+                  setTranscript(prev => prev ? prev + ' ' + aiText : aiText);
+                  console.log('[Live] AI transcription fallback:', aiText);
+                }
+                
+                // Handle user speech transcription (what the user is saying)
+                if (parsed.serverContent.inputTranscription?.text) {
+                  const userText = parsed.serverContent.inputTranscription.text.trim();
+                  setTranscript(prev => prev ? prev + ' ' + userText : userText);
+                  console.log('[Live] User transcription:', userText);
+                }
               }
             }
 
