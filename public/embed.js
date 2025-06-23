@@ -17,7 +17,7 @@
     window.voicepilotGoogleApiKey = googleApiKey;
   }
 
-  // Enhanced DOM Highlighting System
+  // Enhanced DOM Highlighting System - STRICT BUTTONS/INPUTS ONLY
   class DOMHighlighter {
     constructor() {
       this.highlightedElements = new Set();
@@ -70,14 +70,6 @@
           }
         }
         
-        .${this.highlightClass}-text {
-          background: linear-gradient(120deg, #3b82f6, #8b5cf6) !important;
-          -webkit-background-clip: text !important;
-          -webkit-text-fill-color: transparent !important;
-          background-clip: text !important;
-          font-weight: 600 !important;
-        }
-
         .${this.highlightClass}-badge {
           position: absolute;
           top: -12px;
@@ -101,90 +93,6 @@
       document.head.appendChild(this.highlightStyle);
     }
 
-    extractSearchTerms(text) {
-      // Enhanced term extraction with better UI element detection
-      const commonWords = new Set([
-        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-        'click', 'press', 'tap', 'select', 'choose', 'find', 'locate', 'go', 'navigate', 'see',
-        'button', 'link', 'menu', 'option', 'item', 'element', 'here', 'there', 'this', 'that'
-      ]);
-
-      // Extract quoted text first (highest priority)
-      const quotedTerms = [];
-      const quoteMatches = text.match(/"([^"]+)"|'([^']+)'/g);
-      if (quoteMatches) {
-        quoteMatches.forEach(match => {
-          const term = match.slice(1, -1).trim();
-          if (term.length > 1) quotedTerms.push(term);
-        });
-      }
-
-      // Extract capitalized phrases (medium priority)
-      const allCaps = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
-      const capitalizedPhrases = allCaps.length ? [ allCaps[0] ] : [];
-      
-      // Extract general words (lower priority)
-      const words = text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, ' ')
-        .split(/\s+/)
-        .filter(word => word.length > 2 && !commonWords.has(word))
-        .slice(0, 8);
-
-      // Combine all terms with priority order
-      return [...quotedTerms, ...capitalizedPhrases, ...words];
-    }
-
-    calculateMatchConfidence(element, searchTerms) {
-      const texts = [
-        element.textContent?.toLowerCase() || '',
-        element.getAttribute('aria-label')?.toLowerCase() || '',
-        element.getAttribute('title')?.toLowerCase() || '',
-        element.getAttribute('data-testid')?.toLowerCase() || '',
-        element.getAttribute('data-agent-id')?.toLowerCase() || '',
-        element.getAttribute('placeholder')?.toLowerCase() || '',
-        (element.className.baseVal || element.className).toLowerCase(),
-        element.id.toLowerCase()
-      ].filter(Boolean);
-
-      let totalScore = 0;
-      let maxPossibleScore = searchTerms.length;
-
-      searchTerms.forEach((term, index) => {
-        let termScore = 0;
-        const termLower = term.toLowerCase();
-        
-        texts.forEach((text, textIndex) => {
-          // Weight different text sources
-          const weights = [1.0, 0.95, 0.9, 0.85, 0.95, 0.8, 0.6, 0.7];
-          const weight = weights[textIndex] || 0.5;
-          
-          if (text.includes(termLower)) {
-            // Exact match bonus
-            if (text === termLower) {
-              termScore = Math.max(termScore, weight + 0.3);
-            }
-            // Word boundary match bonus
-            else if (new RegExp(`\\b${termLower}\\b`).test(text)) {
-              termScore = Math.max(termScore, weight + 0.2);
-            }
-            // Partial match
-            else {
-              termScore = Math.max(termScore, weight);
-            }
-          }
-        });
-
-        // Priority bonus for earlier terms (quoted text, etc.)
-        const priorityBonus = Math.max(0, (searchTerms.length - index) * 0.1);
-        termScore += priorityBonus;
-
-        totalScore += Math.min(1.0, termScore);
-      });
-
-      return totalScore / maxPossibleScore;
-    }
-
     isElementVisible(element) {
       const rect = element.getBoundingClientRect();
       const style = window.getComputedStyle(element);
@@ -202,146 +110,46 @@
       );
     }
 
-    searchElements(searchText) {
-      const matches = [];
-      const searchTerms = this.extractSearchTerms(searchText);
-      
-      if (searchTerms.length === 0) return matches;
-
-      console.log('[VoicePilot] Searching for terms:', searchTerms);
-
-      // Enhanced selectors for better UI element detection
-      const selectors = [
-        'button',
-        'a[href]',
-        '[role="button"]',
-        '[role="link"]',
-        '[role="tab"]',
-        '[role="menuitem"]',
-        'input[type="button"]',
-        'input[type="submit"]',
-        'input[type="reset"]',
-        '[data-testid]',
-        '[data-agent-id]',
-        '[aria-label]',
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        '[class*="button"]',
-        '[class*="btn"]',
-        '[class*="link"]',
-        '[class*="nav"]',
-        '[class*="menu"]',
-        '[class*="tab"]',
-        '[class*="card"]',
-        'label',
-        '.card-title',
-        '.title',
-        'nav a',
-        'nav button',
-        '[onclick]',
-        'form input',
-        'form button',
-        'form select',
-        'form textarea'
-      ];
-
-      const elements = document.querySelectorAll(selectors.join(','));
-      
-      elements.forEach((element) => {
-        if (!this.isElementVisible(element)) return;
-        
-        const confidence = this.calculateMatchConfidence(element, searchTerms);
-        
-        if (confidence > 0.2) {
-          matches.push({
-            element: element,
-            text: this.getElementText(element),
-            confidence: confidence
-          });
-        }
-      });
-
-      const sortedMatches = matches.sort((a, b) => b.confidence - a.confidence);
-      console.log('[VoicePilot] Found matches:', sortedMatches.slice(0, 3).map(m => ({
-        text: m.text,
-        confidence: m.confidence.toFixed(2)
-      })));
-
-      return sortedMatches;
-    }
-
-    getElementText(element) {
-      return (
-        element.getAttribute('aria-label') ||
-        element.getAttribute('title') ||
-        element.textContent?.trim() ||
-        element.getAttribute('data-testid') ||
-        element.getAttribute('placeholder') ||
-        element.className ||
-        'Element'
-      ).substring(0, 50);
-    }
-
     highlightElement(searchText) {
-      const phrase = searchText.trim();
-      const normalized = phrase.replace(/[?!.]+$/, '').toLowerCase();
+      const phrase = searchText.trim().toLowerCase();
+      if (!phrase) return false;
 
-      // 1) Get all of our fuzzy matches
-      let matches = this.searchElements(searchText);
+      // 1) Grab _only_ <button> and <input> candidates
+      const controls = Array.from(document.querySelectorAll('button, input'));
+      
+      // 2) Filter out ones that aren't visible
+      const visible = controls.filter(el => this.isElementVisible(el));
+
+      // 3) Score each by exact‐match first, then substring fallback
+      const matches = visible
+        .map(el => {
+          const label = (el.getAttribute('aria-label') ||
+                         el.getAttribute('value') ||
+                         el.textContent ||
+                         '').trim();
+          const lower = label.toLowerCase();
+          let score = 0;
+          if (lower === phrase) {
+            score = 2;           // exact = highest
+          } else if (lower.includes(phrase)) {
+            score = 1;           // substring = next
+          }
+          return { el, label, score };
+        })
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score);
+
       if (matches.length === 0) {
-        console.log('[VoicePilot] No matches at all for:', phrase);
+        console.log('[VoicePilot] No buttons/inputs matching:', phrase);
         return false;
       }
 
-      // 2) Look for an exact text-content match (ignoring trailing punctuation)
-      const exact = matches.filter(m =>
-        m.text.trim().toLowerCase() === normalized
-      );
-      if (exact.length) {
-        console.log('[VoicePilot] Exact match override:', exact[0].text);
-        matches = exact;
-      }
-
-      // 3) Prefer actual interactive controls (buttons/links/ARIA buttons)
-      const interactive = matches.filter(m => {
-        const el = m.element;
-        return (
-          el.tagName === 'BUTTON' ||
-          (el.tagName === 'A' && el.hasAttribute('href')) ||
-          el.getAttribute('role') === 'button'
-        );
-      });
-      if (interactive.length) {
-        console.log('[VoicePilot] Elevating interactive elements:', interactive.map(m => m.text));
-        matches = interactive;
-      }
-
-      // Now fall through to existing "bestMatch = matches[0]" logic
+      // 4) We've got at least one; highlight the best
       this.clearHighlights();
-      const bestMatch = matches[0];
-      
-      console.log('[VoicePilot] Best match:', bestMatch.text, 'confidence:', bestMatch.confidence.toFixed(2));
-      
-      // More lenient threshold for highlighting
-      const threshold = Math.max(0.3, bestMatch.confidence - 0.3);
-      
-      const elementsToHighlight = matches
-        .filter(match => match.confidence >= threshold)
-        .slice(0, 2) // Highlight top 2 matches
-        .map(match => match.element);
-
-      elementsToHighlight.forEach((element, index) => {
-        this.addHighlight(element, index === 0);
-      });
-
-      if (elementsToHighlight.length > 0) {
-        this.scrollToElement(bestMatch.element);
-      }
-
-      // Auto-clear after 4 seconds
-      setTimeout(() => {
-        this.clearHighlights();
-      }, 4000);
-
+      const best = matches[0].el;
+      this.addHighlight(best, true);
+      best.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[VoicePilot] Highlighting control:', matches[0].label);
       return true;
     }
 
@@ -364,24 +172,11 @@
         element.style.position = 'relative';
         element.appendChild(badge);
       }
-
-      // Add text highlighting for text-only elements
-      if (element.children.length === 0 && element.textContent?.trim()) {
-        element.classList.add(`${this.highlightClass}-text`);
-      }
-    }
-
-    scrollToElement(element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'center'
-      });
     }
 
     clearHighlights() {
       this.highlightedElements.forEach(element => {
-        element.classList.remove(this.highlightClass, `${this.highlightClass}-text`);
+        element.classList.remove(this.highlightClass);
         
         // Remove badges
         const badges = element.querySelectorAll(`.${this.highlightClass}-badge`);
