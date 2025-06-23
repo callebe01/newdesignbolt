@@ -142,7 +142,7 @@
         element.getAttribute('data-testid')?.toLowerCase() || '',
         element.getAttribute('data-agent-id')?.toLowerCase() || '',
         element.getAttribute('placeholder')?.toLowerCase() || '',
-        element.className.toLowerCase(),
+        (element.className.baseVal || element.className).toLowerCase(),
         element.id.toLowerCase()
       ].filter(Boolean);
 
