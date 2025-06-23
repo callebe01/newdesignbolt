@@ -89,54 +89,58 @@
       );
     }
 
-    highlightElement(searchText) {
-      const phrase = searchText.trim().toLowerCase();
-      if (!phrase) return false;
+highlightElement(searchText) {
+  // 1) pull out anything in single or double quotes (highest priority)
+  let phrase = searchText.trim();
+  const qm = phrase.match(/['"]([^'"]+)['"]/);
+  if (qm) {
+    phrase = qm[1];      // e.g. "New Agent"
+  }
 
-      // 1) Grab _only_ <button> + clickable <input> candidates
-      const controls = Array.from(
-        document.querySelectorAll(
-          'button,' +
-          'input[type="button"],' +
-          'input[type="submit"],' +
-          'input[type="reset"]'
-        )
-      );
+  phrase = phrase.toLowerCase();
+  if (!phrase) return false;
 
-      // 2) Keep only visible ones
-      const visible = controls.filter(el => this.isElementVisible(el));
+  // 2) grab _only_ buttons + clickable inputs
+  const controls = Array.from(
+    document.querySelectorAll(
+      'button,' +
+      'input[type="button"],' +
+      'input[type="submit"],' +
+      'input[type="reset"]'
+    )
+  ).filter(el => this.isElementVisible(el));
 
-      // 3) Score by exact‐match → substring
-      const matches = visible
-        .map(el => {
-          // label = aria-label || value || textContent
-          const rawLabel = el.getAttribute('aria-label')
-                        || el.value
-                        || el.textContent
-                        || '';
-          const label = rawLabel.trim();
-          const lower = label.toLowerCase();
-          let score = 0;
-          if (lower === phrase) score = 2;        // exact
-          else if (lower.includes(phrase)) score = 1; // substring
-          return { el, label, score };
-        })
-        .filter(x => x.score > 0)
-        .sort((a,b) => b.score - a.score);
+  // 3) score each by exact (2) → substring (1)
+  const matches = controls
+    .map(el => {
+      const label = (el.getAttribute('aria-label')
+                   || el.value
+                   || el.textContent
+                   || ''
+                  ).trim();
+      const lower = label.toLowerCase();
+      let score = 0;
+      if (lower === phrase)      score = 2;
+      else if (lower.includes(phrase)) score = 1;
+      return { el, label, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a,b) => b.score - a.score);
 
-      if (!matches.length) {
-        console.log('[VoicePilot] No buttons/inputs matching:', phrase);
-        return false;
-      }
+  if (!matches.length) {
+    console.log('[VoicePilot] No buttons/inputs matching:', phrase);
+    return false;
+  }
 
-      // 4) Highlight the top match
-      this.clearHighlights();
-      const best = matches[0].el;
-      this.addHighlight(best, true);
-      best.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      console.log('[VoicePilot] Highlighting control:', matches[0].label);
-      return true;
-    }
+  // 4) highlight the top one
+  this.clearHighlights();
+  const best = matches[0].el;
+  this.addHighlight(best, true);
+  best.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  console.log('[VoicePilot] Highlighting control:', matches[0].label);
+  return true;
+}
+
 
     addHighlight(el, isPrimary=false) {
       el.classList.add(this.highlightClass);
