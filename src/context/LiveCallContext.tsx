@@ -421,9 +421,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH FINISHED FLAG
-              if (sc.outputAudioTranscription) {
-                const { text, finished } = sc.outputAudioTranscription;
+              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH FINISHED FLAG - CORRECT FIELD NAME
+              if (sc.outputTranscription) {
+                const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
                   // 1) Accumulate every piece
@@ -448,9 +448,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
               }
 
-              // ✅ HANDLE USER SPEECH TRANSCRIPTION
-              if (sc.inputAudioTranscription?.text) {
-                const userText = sc.inputAudioTranscription.text.trim();
+              // ✅ HANDLE USER SPEECH TRANSCRIPTION - CORRECT FIELD NAME
+              if (sc.inputTranscription?.text) {
+                const userText = sc.inputTranscription.text.trim();
                 if (userText) {
                   setTranscript(prev => prev ? prev + ' ' + userText : userText);
                   console.log('[Live] User transcription:', userText);
