@@ -318,6 +318,7 @@
     let websocket = null;
     let microphoneStream = null;
     let audioContext = null;
+    let audioQueueTime = 0;
     let transcript = '';
 
     // Create widget HTML
@@ -520,11 +521,48 @@
       `;
     }
 
+    // Audio playback functionality
+    async function playAudioBuffer(pcmBlob) {
+      try {
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        
+        // Convert PCM16 to Float32
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        const buffer = audioContext.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+
+        // Queue audio to play smoothly
+        let startAt = audioContext.currentTime;
+        if (audioQueueTime > audioContext.currentTime) {
+          startAt = audioQueueTime;
+        }
+        source.start(startAt);
+        audioQueueTime = startAt + buffer.duration;
+
+        console.log('[VoicePilot] Playing audio buffer, duration:', buffer.duration);
+      } catch (error) {
+        console.error('[VoicePilot] Audio playback error:', error);
+      }
+    }
+
     // Voice call functionality
     async function startCall() {
       try {
-        const apiKey = window.voicepilotGoogleApiKey || 'YOUR_DEFAULT_API_KEY';
-        if (!apiKey || apiKey === 'YOUR_DEFAULT_API_KEY') {
+        const apiKey = window.voicepilotGoogleApiKey;
+        if (!apiKey) {
           throw new Error('Google API key not configured');
         }
 
@@ -609,6 +647,11 @@
                 updateWidget();
               }
 
+              if (parsed.serverContent.inputTranscription?.text) {
+                transcript += parsed.serverContent.inputTranscription.text;
+                updateWidget();
+              }
+
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
@@ -618,18 +661,34 @@
                   }
 
                   if (part.functionCall?.name === 'highlight_element' && part.functionCall.args?.text) {
+                    console.log('[VoicePilot] Highlighting element:', part.functionCall.args.text);
                     window.voicePilotHighlight(part.functionCall.args.text);
                   }
 
                   if (part.inlineData?.data) {
-                    playAudio(part.inlineData.data);
+                    try {
+                      const base64str = part.inlineData.data;
+                      const binaryStr = atob(base64str);
+                      const len = binaryStr.length;
+                      const rawBuffer = new Uint8Array(len);
+                      for (let i = 0; i < len; i++) {
+                        rawBuffer[i] = binaryStr.charCodeAt(i);
+                      }
+                      const pcmBlob = new Blob([rawBuffer.buffer], {
+                        type: 'audio/pcm;rate=24000',
+                      });
+                      await playAudioBuffer(pcmBlob);
+                    } catch (err) {
+                      console.error('[VoicePilot] Error decoding audio:', err);
+                    }
                   }
                 }
               }
             }
           } catch (e) {
-            // Handle binary audio data
-            playAudio(event.data);
+            // Handle binary audio data directly
+            console.log('[VoicePilot] Received binary audio data');
+            await playAudioBuffer(event.data);
           }
         };
 
@@ -652,7 +711,10 @@
     async function startMicrophone() {
       try {
         microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
         
         const source = audioContext.createMediaStreamSource(microphoneStream);
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -664,14 +726,25 @@
           if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
           
           const inputData = event.inputBuffer.getChannelData(0);
-          const pcm16 = new Int16Array(inputData.length);
-          
-          for (let i = 0; i < inputData.length; i++) {
-            const sample = Math.max(-1, Math.min(1, inputData[i]));
+          const inRate = audioContext.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(inputData.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = inputData[idx];
+            sample = Math.max(-1, Math.min(1, sample));
             pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
           }
           
-          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
           
           websocket.send(JSON.stringify({
             realtime_input: {
@@ -687,12 +760,6 @@
       }
     }
 
-    function playAudio(audioData) {
-      // Audio playback implementation would go here
-      // This is a simplified version
-      console.log('[VoicePilot] Playing audio...');
-    }
-
     function startCallTimer() {
       callDuration = 0;
       callTimer = setInterval(() => {
@@ -704,6 +771,7 @@
     function endCall() {
       isCallActive = false;
       transcript = '';
+      audioQueueTime = 0;
       
       if (callTimer) {
         clearInterval(callTimer);
