@@ -427,6 +427,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   if (typeof part.text === 'string') {
                     console.log('[Live] AI says (text):', part.text);
                     setTranscript((prev) => prev + part.text);
+                    try {
+                      window.highlightTextMatch?.(part.text);
+                    } catch {
+                      /* ignore */
+                    }
                   }
                   if (
                     part.inlineData &&

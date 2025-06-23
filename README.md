@@ -105,3 +105,9 @@ identify the issue.
 
 This project can highlight detected objects on your screen share using Gemini Live. Enable screen sharing and click **Show Boxes** in the session controls. Each captured frame is sent to Gemini Live for object detection and red bounding boxes appear over the shared video. Toggle **Hide Boxes** to disable the overlay.
 
+### DOM element highlights
+
+When the agent's response mentions text that matches a visible label on the page,
+the corresponding element is briefly outlined. You can optionally tag elements
+with `data-agent-id` attributes to make matching more reliable.
+

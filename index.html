@@ -8,6 +8,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.highlightTextMatch = (message) => {
+        if (!message) return;
+        const lower = message.toLowerCase();
+        const candidates = Array.from(
+          document.querySelectorAll('[data-agent-id],button,a,[role="button"],input')
+        );
+        for (const el of candidates) {
+          const label = (
+            el.getAttribute('data-agent-id') ||
+            el.getAttribute('aria-label') ||
+            el.innerText ||
+            ''
+          ).trim();
+          if (label && label.length > 2 && lower.includes(label.toLowerCase())) {
+            el.classList.add('agent-highlight');
+            setTimeout(() => el.classList.remove('agent-highlight'), 3000);
+            break;
+          }
+        }
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

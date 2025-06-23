@@ -78,6 +78,12 @@
   }
 }
 
+.agent-highlight {
+  outline: 3px solid #f00;
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.6);
+  transition: outline-color 0.2s;
+}
+
 @layer base {
   * {
     @apply border-border;
