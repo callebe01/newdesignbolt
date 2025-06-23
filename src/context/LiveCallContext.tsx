@@ -699,7 +699,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     setTranscript((prev) => prev + part.text);
                   }
                   
-                  // Handle function calls (tool usage)
+                  // Handle function calls (tool usage) - CRITICAL FIX
                   if (part.functionCall) {
                     const { name, args } = part.functionCall;
                     console.log('[Live] Function call received:', name, args);
@@ -710,29 +710,35 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                         const highlighted = domHighlighterRef.current.highlightElement(args.text);
                         console.log(`[Live] Highlight result:`, highlighted);
                         
-                        // Send function response back to the model
-                        const functionResponse = {
-                          clientContent: {
-                            turns: [{
-                              role: 'model',
-                              parts: [{
-                                functionResponse: {
-                                  name: 'highlight_element',
-                                  response: {
-                                    success: highlighted,
-                                    message: highlighted ? 'Element highlighted successfully' : 'No matching element found'
-                                  }
-                                }
-                              }]
-                            }],
-                            turnComplete: true
+                        // Send function response back to the model - ASYNC to prevent blocking
+                        setTimeout(() => {
+                          if (ws.readyState === WebSocket.OPEN) {
+                            const functionResponse = {
+                              clientContent: {
+                                turns: [{
+                                  role: 'model',
+                                  parts: [{
+                                    functionResponse: {
+                                      name: 'highlight_element',
+                                      response: {
+                                        success: highlighted,
+                                        message: highlighted ? 'Element highlighted successfully' : 'No matching element found'
+                                      }
+                                    }
+                                  }]
+                                }],
+                                turnComplete: true
+                              }
+                            };
+                            
+                            try {
+                              ws.send(JSON.stringify(functionResponse));
+                              console.log('[Live] Sent function response');
+                            } catch (sendError) {
+                              console.error('[Live] Error sending function response:', sendError);
+                            }
                           }
-                        };
-                        
-                        if (ws.readyState === WebSocket.OPEN) {
-                          ws.send(JSON.stringify(functionResponse));
-                          console.log('[Live] Sent function response');
-                        }
+                        }, 100); // Small delay to prevent race conditions
                       }
                     }
                   }
@@ -769,8 +775,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             return;
-          } catch {
-            // JSON.parse failed → go to fallback
+          } catch (parseError) {
+            console.error('[Live] JSON parse error:', parseError);
+            // Continue to fallback for binary data
           }
         }
 
