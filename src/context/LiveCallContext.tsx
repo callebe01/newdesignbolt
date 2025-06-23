@@ -64,6 +64,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
+  // ✅ AI TRANSCRIPTION BUFFERING REFS
+  const aiBufferRef = useRef<string>('');
+  const aiBufferTimerRef = useRef<number | undefined>(undefined);
+
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
@@ -80,6 +84,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
+      }
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -262,6 +269,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = agentId || null;
       conversationIdRef.current = null;
       callEndedRef.current = false;
+      
+      // ✅ RESET AI BUFFER
+      aiBufferRef.current = '';
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
+        aiBufferTimerRef.current = undefined;
+      }
+      
       window.addEventListener('beforeunload', handleBeforeUnload);
 
       // Check agent owner's usage limits if agentId is provided
@@ -412,38 +427,60 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             if (parsed.serverContent) {
-              // Handle AI speech transcription (what the AI is saying)
-              if (parsed.serverContent.outputTranscription?.text) {
-                const aiText = parsed.serverContent.outputTranscription.text.trim();
-                setTranscript(prev => prev ? prev + ' ' + aiText : aiText);
-                console.log('[Live] AI transcription:', aiText);
+              const sc = parsed.serverContent;
+
+              // ✅ 1) COLLECT EVERY TINY AI TRANSCRIPTION FRAGMENT
+              if (sc.outputAudioTranscription?.text) {
+                const fragment = sc.outputAudioTranscription.text;
+                aiBufferRef.current += fragment;
+                console.log('[Live] AI fragment buffered:', fragment);
+                
+                // Debounce UI updates so you don't re-render every char
+                if (aiBufferTimerRef.current) {
+                  clearTimeout(aiBufferTimerRef.current);
+                }
+                aiBufferTimerRef.current = window.setTimeout(() => {
+                  // Flush mid-turn if you want "live" text
+                  const bufferedText = aiBufferRef.current.trim();
+                  if (bufferedText) {
+                    setTranscript(prev => prev ? prev + ' ' + bufferedText : bufferedText);
+                    aiBufferRef.current = '';
+                  }
+                }, 200);
+              }
+
+              // ✅ 2) AS SOON AS THE AI'S TURN IS COMPLETE, FORCE-FLUSH WHATEVER'S LEFT
+              if (sc.turnComplete) {
+                console.log('[Live] Turn complete - force flushing AI buffer');
+                if (aiBufferTimerRef.current) {
+                  clearTimeout(aiBufferTimerRef.current);
+                  aiBufferTimerRef.current = undefined;
+                }
+                if (aiBufferRef.current.trim()) {
+                  const finalText = aiBufferRef.current.trim();
+                  setTranscript(prev => prev ? prev + ' ' + finalText : finalText);
+                  
+                  // ✅ HIGHLIGHT THE COMPLETE AI RESPONSE
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(finalText);
+                  }
+                  
+                  console.log('[Live] AI complete response:', finalText);
+                  aiBufferRef.current = '';
+                }
               }
               
               // Handle user speech transcription (what the user is saying)
-              if (parsed.serverContent.inputTranscription?.text) {
-                const userText = parsed.serverContent.inputTranscription.text.trim();
+              if (sc.inputTranscription?.text) {
+                const userText = sc.inputTranscription.text.trim();
                 setTranscript(prev => prev ? prev + ' ' + userText : userText);
                 console.log('[Live] User transcription:', userText);
               }
               
-              // ✅ BATCH ON modelTurn.parts FOR COMPLETE SENTENCES
-              const modelTurn = parsed.serverContent.modelTurn;
+              // Handle audio data from modelTurn.parts
+              const modelTurn = sc.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
-                  if (part.text) {
-                    // ✅ Complete sentence from Gemini - add to transcript and highlight
-                    setTranscript(prev =>
-                      prev ? prev + ' ' + part.text : part.text
-                    );
-                    
-                    // ✅ Highlight the complete sentence
-                    if (window.voicePilotHighlight) {
-                      window.voicePilotHighlight(part.text);
-                    }
-                    
-                    console.log('[Live] AI complete sentence:', part.text);
-                  }
-                  
                   // Handle audio data
                   if (
                     part.inlineData &&
@@ -776,6 +813,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const finalTranscript = transcript.trim();
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
+
+      // ✅ CLEAR AI BUFFER ON END CALL
+      aiBufferRef.current = '';
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
+        aiBufferTimerRef.current = undefined;
+      }
 
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
