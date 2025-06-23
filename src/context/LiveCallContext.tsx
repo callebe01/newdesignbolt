@@ -64,10 +64,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
-  // ✅ AI TRANSCRIPTION BUFFERING REFS
-  const aiBufferRef = useRef<string>('');
-  const aiBufferTimerRef = useRef<number | undefined>(undefined);
-
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
@@ -84,9 +80,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
-      }
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -270,13 +263,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       conversationIdRef.current = null;
       callEndedRef.current = false;
       
-      // ✅ RESET AI BUFFER
-      aiBufferRef.current = '';
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
-        aiBufferTimerRef.current = undefined;
-      }
-      
       window.addEventListener('beforeunload', handleBeforeUnload);
 
       // Check agent owner's usage limits if agentId is provided
@@ -429,58 +415,25 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ 1) COLLECT EVERY TINY AI TRANSCRIPTION FRAGMENT
-              if (sc.outputAudioTranscription?.text) {
-                const fragment = sc.outputAudioTranscription.text;
-                aiBufferRef.current += fragment;
-                console.log('[Live] AI fragment buffered:', fragment);
-                
-                // Debounce UI updates so you don't re-render every char
-                if (aiBufferTimerRef.current) {
-                  clearTimeout(aiBufferTimerRef.current);
-                }
-                aiBufferTimerRef.current = window.setTimeout(() => {
-                  // Flush mid-turn if you want "live" text
-                  const bufferedText = aiBufferRef.current.trim();
-                  if (bufferedText) {
-                    setTranscript(prev => prev ? prev + ' ' + bufferedText : bufferedText);
-                    aiBufferRef.current = '';
+              // ✅ PULL IN THE FULL TEXT PAYLOAD FROM THE MODELTURN PARTS ✅
+              const mt = sc.modelTurn;
+              if (mt?.parts) {
+                for (const part of mt.parts) {
+                  if (typeof part.text === 'string' && part.text.trim()) {
+                    const txt = part.text.trim();
+                    setTranscript(prev => prev
+                      ? prev + ' ' + txt
+                      : txt
+                    );
+                    
+                    // ✅ HIGHLIGHT THE COMPLETE AI RESPONSE
+                    if (window.voicePilotHighlight) {
+                      window.voicePilotHighlight(txt);
+                    }
+                    
+                    console.log('[Live] AI says (complete text):', txt);
                   }
-                }, 200);
-              }
 
-              // ✅ 2) AS SOON AS THE AI'S TURN IS COMPLETE, FORCE-FLUSH WHATEVER'S LEFT
-              if (sc.turnComplete) {
-                console.log('[Live] Turn complete - force flushing AI buffer');
-                if (aiBufferTimerRef.current) {
-                  clearTimeout(aiBufferTimerRef.current);
-                  aiBufferTimerRef.current = undefined;
-                }
-                if (aiBufferRef.current.trim()) {
-                  const finalText = aiBufferRef.current.trim();
-                  setTranscript(prev => prev ? prev + ' ' + finalText : finalText);
-                  
-                  // ✅ HIGHLIGHT THE COMPLETE AI RESPONSE
-                  if (window.voicePilotHighlight) {
-                    window.voicePilotHighlight(finalText);
-                  }
-                  
-                  console.log('[Live] AI complete response:', finalText);
-                  aiBufferRef.current = '';
-                }
-              }
-              
-              // Handle user speech transcription (what the user is saying)
-              if (sc.inputTranscription?.text) {
-                const userText = sc.inputTranscription.text.trim();
-                setTranscript(prev => prev ? prev + ' ' + userText : userText);
-                console.log('[Live] User transcription:', userText);
-              }
-              
-              // Handle audio data from modelTurn.parts
-              const modelTurn = sc.modelTurn;
-              if (modelTurn?.parts) {
-                for (const part of modelTurn.parts) {
                   // Handle audio data
                   if (
                     part.inlineData &&
@@ -509,7 +462,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     }
                   }
                 }
-                return;
+                return; // ✅ BAIL OUT AFTER HANDLING BOTH TEXT & AUDIO
+              }
+              
+              // Handle user speech transcription (what the user is saying)
+              if (sc.inputTranscription?.text) {
+                const userText = sc.inputTranscription.text.trim();
+                setTranscript(prev => prev ? prev + ' ' + userText : userText);
+                console.log('[Live] User transcription:', userText);
               }
             }
 
@@ -813,13 +773,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const finalTranscript = transcript.trim();
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
-
-      // ✅ CLEAR AI BUFFER ON END CALL
-      aiBufferRef.current = '';
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
-        aiBufferTimerRef.current = undefined;
-      }
 
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
