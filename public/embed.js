@@ -713,38 +713,32 @@
           console.log('[VoicePilot] WebSocket connected successfully');
           connectionAttempts = 0; // Reset on successful connection
           
-          // Wait a moment before sending setup to ensure connection is stable
-          setTimeout(() => {
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-              const setupMsg = {
-                setup: {
-                  model: 'models/gemini-2.0-flash-live-001',
-                  generationConfig: {
-                    responseModalities: ['AUDIO', 'TEXT'],
-                    speechConfig: {
-                      voiceConfig: {
-                        prebuiltVoiceConfig: {
-                          voiceName: 'Kore'
-                        }
-                      }
+          // Send setup message immediately upon connection
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO', 'TEXT'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
                     }
-                  },
-                  outputAudioTranscription: {},
-                  inputAudioTranscription: {},
-                  systemInstruction: {
-                    parts: [{
-                      text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.'
-                    }]
                   }
                 }
-              };
-
-              console.log('[VoicePilot] Sending setup message...');
-              websocket.send(JSON.stringify(setupMsg));
-            } else {
-              console.error('[VoicePilot] WebSocket not ready for setup message');
+              },
+              outputAudioTranscription: {},
+              inputAudioTranscription: {},
+              systemInstruction: {
+                parts: [{
+                  text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.'
+                }]
+              }
             }
-          }, 100);
+          };
+
+          console.log('[VoicePilot] Sending setup message...');
+          websocket.send(JSON.stringify(setupMsg));
         };
 
         websocket.onmessage = async (event) => {
