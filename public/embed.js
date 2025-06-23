@@ -120,7 +120,8 @@
       }
 
       // Extract capitalized phrases (medium priority)
-      const capitalizedPhrases = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
+      const allCaps = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
+      const capitalizedPhrases = allCaps.length ? [ allCaps[0] ] : [];
       
       // Extract general words (lower priority)
       const words = text
