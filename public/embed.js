@@ -17,7 +17,7 @@
     window.voicepilotGoogleApiKey = googleApiKey;
   }
 
-  // DOM Highlighting System
+  // Enhanced DOM Highlighting System
   class DOMHighlighter {
     constructor() {
       this.highlightedElements = new Set();
@@ -38,9 +38,9 @@
           position: relative !important;
           outline: 3px solid #3b82f6 !important;
           outline-offset: 2px !important;
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
-          border-radius: 6px !important;
-          background-color: rgba(59, 130, 246, 0.05) !important;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.2) !important;
+          border-radius: 8px !important;
+          background-color: rgba(59, 130, 246, 0.08) !important;
           transition: all 0.3s ease !important;
           z-index: 9999 !important;
         }
@@ -48,19 +48,26 @@
         .${this.highlightClass}::before {
           content: '';
           position: absolute;
-          top: -8px;
-          left: -8px;
-          right: -8px;
-          bottom: -8px;
-          background: linear-gradient(45deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.2));
-          border-radius: 10px;
+          top: -6px;
+          left: -6px;
+          right: -6px;
+          bottom: -6px;
+          background: linear-gradient(45deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+          border-radius: 12px;
           z-index: -1;
           animation: voicepilot-pulse 2s infinite;
+          pointer-events: none;
         }
         
         @keyframes voicepilot-pulse {
-          0%, 100% { opacity: 0.3; transform: scale(1); }
-          50% { opacity: 0.6; transform: scale(1.02); }
+          0%, 100% { 
+            opacity: 0.4; 
+            transform: scale(1); 
+          }
+          50% { 
+            opacity: 0.8; 
+            transform: scale(1.02); 
+          }
         }
         
         .${this.highlightClass}-text {
@@ -70,23 +77,61 @@
           background-clip: text !important;
           font-weight: 600 !important;
         }
+
+        .${this.highlightClass}-badge {
+          position: absolute;
+          top: -12px;
+          left: -8px;
+          background: #3b82f6;
+          color: white;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 4px;
+          z-index: 10000;
+          pointer-events: none;
+          animation: voicepilot-badge-appear 0.3s ease;
+        }
+
+        @keyframes voicepilot-badge-appear {
+          0% { opacity: 0; transform: translateY(-5px) scale(0.8); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
       `;
       document.head.appendChild(this.highlightStyle);
     }
 
     extractSearchTerms(text) {
+      // Enhanced term extraction with better UI element detection
       const commonWords = new Set([
         'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-        'click', 'press', 'tap', 'select', 'choose', 'find', 'locate', 'go', 'navigate',
-        'button', 'link', 'menu', 'option', 'item', 'element'
+        'click', 'press', 'tap', 'select', 'choose', 'find', 'locate', 'go', 'navigate', 'see',
+        'button', 'link', 'menu', 'option', 'item', 'element', 'here', 'there', 'this', 'that'
       ]);
 
-      return text
+      // Extract quoted text first (highest priority)
+      const quotedTerms = [];
+      const quoteMatches = text.match(/"([^"]+)"|'([^']+)'/g);
+      if (quoteMatches) {
+        quoteMatches.forEach(match => {
+          const term = match.slice(1, -1).trim();
+          if (term.length > 1) quotedTerms.push(term);
+        });
+      }
+
+      // Extract capitalized phrases (medium priority)
+      const capitalizedPhrases = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
+      
+      // Extract general words (lower priority)
+      const words = text
         .toLowerCase()
         .replace(/[^\w\s]/g, ' ')
         .split(/\s+/)
         .filter(word => word.length > 2 && !commonWords.has(word))
-        .slice(0, 5);
+        .slice(0, 8);
+
+      // Combine all terms with priority order
+      return [...quotedTerms, ...capitalizedPhrases, ...words];
     }
 
     calculateMatchConfidence(element, searchTerms) {
@@ -96,6 +141,7 @@
         element.getAttribute('title')?.toLowerCase() || '',
         element.getAttribute('data-testid')?.toLowerCase() || '',
         element.getAttribute('data-agent-id')?.toLowerCase() || '',
+        element.getAttribute('placeholder')?.toLowerCase() || '',
         element.className.toLowerCase(),
         element.id.toLowerCase()
       ].filter(Boolean);
@@ -103,25 +149,36 @@
       let totalScore = 0;
       let maxPossibleScore = searchTerms.length;
 
-      searchTerms.forEach(term => {
+      searchTerms.forEach((term, index) => {
         let termScore = 0;
+        const termLower = term.toLowerCase();
         
-        texts.forEach((text, index) => {
-          if (text.includes(term)) {
-            const weights = [1.0, 0.9, 0.8, 0.7, 0.9, 0.5, 0.6];
-            termScore = Math.max(termScore, weights[index] || 0.3);
+        texts.forEach((text, textIndex) => {
+          // Weight different text sources
+          const weights = [1.0, 0.95, 0.9, 0.85, 0.95, 0.8, 0.6, 0.7];
+          const weight = weights[textIndex] || 0.5;
+          
+          if (text.includes(termLower)) {
+            // Exact match bonus
+            if (text === termLower) {
+              termScore = Math.max(termScore, weight + 0.3);
+            }
+            // Word boundary match bonus
+            else if (new RegExp(`\\b${termLower}\\b`).test(text)) {
+              termScore = Math.max(termScore, weight + 0.2);
+            }
+            // Partial match
+            else {
+              termScore = Math.max(termScore, weight);
+            }
           }
         });
 
-        if (texts.some(text => text === term)) {
-          termScore = Math.min(1.0, termScore + 0.3);
-        }
+        // Priority bonus for earlier terms (quoted text, etc.)
+        const priorityBonus = Math.max(0, (searchTerms.length - index) * 0.1);
+        termScore += priorityBonus;
 
-        if (texts.some(text => new RegExp(`\\b${term}\\b`).test(text))) {
-          termScore = Math.min(1.0, termScore + 0.2);
-        }
-
-        totalScore += termScore;
+        totalScore += Math.min(1.0, termScore);
       });
 
       return totalScore / maxPossibleScore;
@@ -150,14 +207,21 @@
       
       if (searchTerms.length === 0) return matches;
 
+      console.log('[VoicePilot] Searching for terms:', searchTerms);
+
+      // Enhanced selectors for better UI element detection
       const selectors = [
         'button',
-        'a',
+        'a[href]',
         '[role="button"]',
         '[role="link"]',
+        '[role="tab"]',
+        '[role="menuitem"]',
         'input[type="button"]',
         'input[type="submit"]',
+        'input[type="reset"]',
         '[data-testid]',
+        '[data-agent-id]',
         '[aria-label]',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         '[class*="button"]',
@@ -165,10 +229,18 @@
         '[class*="link"]',
         '[class*="nav"]',
         '[class*="menu"]',
+        '[class*="tab"]',
+        '[class*="card"]',
         'label',
         '.card-title',
         '.title',
-        '[data-agent-id]'
+        'nav a',
+        'nav button',
+        '[onclick]',
+        'form input',
+        'form button',
+        'form select',
+        'form textarea'
       ];
 
       const elements = document.querySelectorAll(selectors.join(','));
@@ -178,7 +250,7 @@
         
         const confidence = this.calculateMatchConfidence(element, searchTerms);
         
-        if (confidence > 0.3) {
+        if (confidence > 0.2) {
           matches.push({
             element: element,
             text: this.getElementText(element),
@@ -187,7 +259,13 @@
         }
       });
 
-      return matches.sort((a, b) => b.confidence - a.confidence);
+      const sortedMatches = matches.sort((a, b) => b.confidence - a.confidence);
+      console.log('[VoicePilot] Found matches:', sortedMatches.slice(0, 3).map(m => ({
+        text: m.text,
+        confidence: m.confidence.toFixed(2)
+      })));
+
+      return sortedMatches;
     }
 
     getElementText(element) {
@@ -196,6 +274,7 @@
         element.getAttribute('title') ||
         element.textContent?.trim() ||
         element.getAttribute('data-testid') ||
+        element.getAttribute('placeholder') ||
         element.className ||
         'Element'
       ).substring(0, 50);
@@ -204,35 +283,61 @@
     highlightElement(searchText) {
       const matches = this.searchElements(searchText);
       
-      if (matches.length === 0) return false;
+      if (matches.length === 0) {
+        console.log('[VoicePilot] No matches found for:', searchText);
+        return false;
+      }
 
       this.clearHighlights();
 
       const bestMatch = matches[0];
-      const threshold = Math.max(0.7, bestMatch.confidence - 0.2);
+      console.log('[VoicePilot] Best match:', bestMatch.text, 'confidence:', bestMatch.confidence.toFixed(2));
+      
+      // More lenient threshold for highlighting
+      const threshold = Math.max(0.3, bestMatch.confidence - 0.3);
       
       const elementsToHighlight = matches
         .filter(match => match.confidence >= threshold)
-        .slice(0, 3)
+        .slice(0, 2) // Highlight top 2 matches
         .map(match => match.element);
 
-      elementsToHighlight.forEach(element => {
-        this.addHighlight(element);
+      elementsToHighlight.forEach((element, index) => {
+        this.addHighlight(element, index === 0);
       });
 
-      this.scrollToElement(bestMatch.element);
+      if (elementsToHighlight.length > 0) {
+        this.scrollToElement(bestMatch.element);
+      }
 
+      // Auto-clear after 4 seconds
       setTimeout(() => {
         this.clearHighlights();
-      }, 5000);
+      }, 4000);
 
       return true;
     }
 
-    addHighlight(element) {
+    addHighlight(element, isPrimary = false) {
       element.classList.add(this.highlightClass);
       this.highlightedElements.add(element);
 
+      // Add badge for primary match
+      if (isPrimary) {
+        const badge = document.createElement('div');
+        badge.className = `${this.highlightClass}-badge`;
+        badge.textContent = 'AI';
+        badge.style.position = 'absolute';
+        
+        // Position badge relative to element
+        const rect = element.getBoundingClientRect();
+        badge.style.top = '-12px';
+        badge.style.left = '-8px';
+        
+        element.style.position = 'relative';
+        element.appendChild(badge);
+      }
+
+      // Add text highlighting for text-only elements
       if (element.children.length === 0 && element.textContent?.trim()) {
         element.classList.add(`${this.highlightClass}-text`);
       }
@@ -249,6 +354,10 @@
     clearHighlights() {
       this.highlightedElements.forEach(element => {
         element.classList.remove(this.highlightClass, `${this.highlightClass}-text`);
+        
+        // Remove badges
+        const badges = element.querySelectorAll(`.${this.highlightClass}-badge`);
+        badges.forEach(badge => badge.remove());
       });
       this.highlightedElements.clear();
     }
@@ -266,8 +375,15 @@
   const domHighlighter = new DOMHighlighter();
 
   // Expose global functions
-  window.voicePilotHighlight = (text) => domHighlighter.highlightElement(text);
-  window.voicePilotClearHighlights = () => domHighlighter.clearHighlights();
+  window.voicePilotHighlight = (text) => {
+    console.log('[VoicePilot] Highlighting request for:', text);
+    return domHighlighter.highlightElement(text);
+  };
+  
+  window.voicePilotClearHighlights = () => {
+    console.log('[VoicePilot] Clearing highlights');
+    domHighlighter.clearHighlights();
+  };
 
   // Legacy function for backward compatibility
   window.highlightTextMatch = window.voicePilotHighlight;
@@ -585,27 +701,11 @@
                   }
                 }
               },
-              tools: [{
-                function_declarations: [{
-                  name: 'highlight_element',
-                  description: 'Highlight a UI element on the page when mentioning it in conversation.',
-                  parameters: {
-                    type: 'object',
-                    properties: {
-                      text: {
-                        type: 'string',
-                        description: 'The text or description of the element to highlight'
-                      }
-                    },
-                    required: ['text']
-                  }
-                }]
-              }],
               outputAudioTranscription: {},
               inputAudioTranscription: {},
               systemInstruction: {
                 parts: [{
-                  text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface, use the highlight_element tool to help users see what you\'re referring to. For example, if you say "click the New Post button", call highlight_element with "New Post button" as the text parameter.'
+                  text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.'
                 }]
               }
             }
@@ -658,42 +758,11 @@
                   if (part.text) {
                     transcript += part.text;
                     updateWidget();
-                  }
-
-                  // Handle function calls - CRITICAL FIX
-                  if (part.functionCall?.name === 'highlight_element' && part.functionCall.args?.text) {
-                    console.log('[VoicePilot] Highlighting element:', part.functionCall.args.text);
-                    const highlighted = window.voicePilotHighlight(part.functionCall.args.text);
                     
-                    // Send function response back to the model - ASYNC to prevent blocking
+                    // Auto-highlight UI elements mentioned in AI response
                     setTimeout(() => {
-                      if (websocket && websocket.readyState === WebSocket.OPEN) {
-                        const functionResponse = {
-                          clientContent: {
-                            turns: [{
-                              role: 'model',
-                              parts: [{
-                                functionResponse: {
-                                  name: 'highlight_element',
-                                  response: {
-                                    success: highlighted,
-                                    message: highlighted ? 'Element highlighted successfully' : 'No matching element found'
-                                  }
-                                }
-                              }]
-                            }],
-                            turnComplete: true
-                          }
-                        };
-                        
-                        try {
-                          websocket.send(JSON.stringify(functionResponse));
-                          console.log('[VoicePilot] Sent function response:', highlighted);
-                        } catch (sendError) {
-                          console.error('[VoicePilot] Error sending function response:', sendError);
-                        }
-                      }
-                    }, 100); // Small delay to prevent race conditions
+                      window.voicePilotHighlight(part.text);
+                    }, 200);
                   }
 
                   if (part.inlineData?.data) {

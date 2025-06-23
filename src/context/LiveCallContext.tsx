@@ -55,8 +55,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It\'s okay to feel stuck or ramble a bit—don\'t tidy your sentences. Use natural phrases: "Hmm…", "Let me read this…", "Not sure what that means…" Focus on what your eyes land on first. Don\'t describe everything at once. Don\'t try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don\'t explain unless it feels obvious. Keep answers short. You don\'t need to keep the conversation going unless you have a reaction.' +
     'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. "Okay… first thing I see is…" Pause to read or scan — You should react like someone figuring it out in real time. "Let me read this real quick…" " "Wait — what\'s this down here…" Guess or think aloud — Share your thoughts as they form. Don\'t rush to a final answer. ' +
     'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you\'d take. 2. Say why you chose it (brief). Only list other ideas if the designer asks "anything else?"' +
-    'Important: You are not supposed to summarize or label the tool right away. You\'re reacting moment by moment, like someone thinking out loud in a real usability session.' +
-    'HIGHLIGHTING TOOL: You have access to a highlight_element tool. Use it when you mention specific UI elements, buttons, or parts of the interface. For example, if you say "click the New Post button", call highlight_element with "New Post button" as the text parameter. This helps users see exactly what you\'re referring to.';
+    'Important: You are not supposed to summarize or label the tool right away. You\'re reacting moment by moment, like someone thinking out loud in a real usability session.';
 
   const websocketRef = useRef<WebSocket | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
@@ -109,6 +108,72 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  // Auto-highlighting function that analyzes AI text and highlights matching elements
+  const autoHighlightFromText = (text: string) => {
+    if (!text || typeof window.voicePilotHighlight !== 'function') return;
+
+    // Extract potential UI element references from the AI's text
+    const uiPatterns = [
+      // Button patterns
+      /(?:click|press|tap|hit)\s+(?:the\s+)?([^.!?]+?)\s*(?:button|btn)/gi,
+      /(?:the\s+)?([^.!?]+?)\s*(?:button|btn)/gi,
+      
+      // Link patterns
+      /(?:click|follow|go to)\s+(?:the\s+)?([^.!?]+?)\s*(?:link|url)/gi,
+      /(?:the\s+)?([^.!?]+?)\s*(?:link|url)/gi,
+      
+      // Menu/navigation patterns
+      /(?:open|click|go to)\s+(?:the\s+)?([^.!?]+?)\s*(?:menu|nav|navigation)/gi,
+      /(?:the\s+)?([^.!?]+?)\s*(?:menu|nav|navigation)/gi,
+      
+      // Form patterns
+      /(?:fill|enter|type in)\s+(?:the\s+)?([^.!?]+?)\s*(?:field|input|form)/gi,
+      /(?:the\s+)?([^.!?]+?)\s*(?:field|input|form)/gi,
+      
+      // General element patterns
+      /(?:see|find|look at|notice)\s+(?:the\s+)?([^.!?]+?)(?:\s+(?:here|there|above|below))?/gi,
+      /(?:the\s+)?([A-Z][^.!?]*?)(?:\s+(?:section|area|part))/gi,
+      
+      // Quoted elements
+      /"([^"]+)"/g,
+      /'([^']+)'/g,
+    ];
+
+    const extractedTerms = new Set<string>();
+
+    // Extract terms using patterns
+    uiPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const term = match[1]?.trim();
+        if (term && term.length > 2 && term.length < 50) {
+          extractedTerms.add(term);
+        }
+      }
+    });
+
+    // Also look for capitalized words that might be UI elements
+    const capitalizedWords = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g);
+    if (capitalizedWords) {
+      capitalizedWords.forEach(word => {
+        if (word.length > 2 && word.length < 30) {
+          extractedTerms.add(word);
+        }
+      });
+    }
+
+    // Try to highlight each extracted term
+    extractedTerms.forEach(term => {
+      setTimeout(() => {
+        try {
+          window.voicePilotHighlight(term);
+        } catch (error) {
+          console.log('[AutoHighlight] Failed to highlight:', term, error);
+        }
+      }, 100);
+    });
+  };
 
   const playAudioBuffer = async (pcmBlob: Blob) => {
     try {
@@ -347,24 +412,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // Add DOM highlighting tool
-        tools.push({
-          function_declarations: [{
-            name: 'highlight_element',
-            description: 'Highlight a UI element on the page when mentioning it in conversation. Use this when referring to specific buttons, links, or interface elements.',
-            parameters: {
-              type: 'object',
-              properties: {
-                text: {
-                  type: 'string',
-                  description: 'The text or description of the element to highlight (e.g., "New Post button", "Settings menu", "Login form")'
-                }
-              },
-              required: ['text']
-            }
-          }]
-        });
-
         // Setup message with tools and Kore voice
         const setupMsg = {
           setup: {
@@ -379,7 +426,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
               }
             },
-            tools,
+            tools: tools.length > 0 ? tools : undefined,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
             systemInstruction: {
@@ -456,49 +503,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   if (typeof part.text === 'string') {
                     console.log('[Live] AI says (text):', part.text);
                     setTranscript((prev) => prev + part.text);
-                  }
-                  
-                  // Handle function calls (tool usage) - CRITICAL FIX
-                  if (part.functionCall) {
-                    const { name, args } = part.functionCall;
-                    console.log('[Live] Function call received:', name, args);
                     
-                    if (name === 'highlight_element' && args?.text) {
-                      console.log('[Live] Highlighting element for text:', args.text);
-                      // Use the global highlighting function from embed.js
-                      const highlighted = window.voicePilotHighlight?.(args.text) || false;
-                      console.log(`[Live] Highlight result:`, highlighted);
-                      
-                      // Send function response back to the model - ASYNC to prevent blocking
-                      setTimeout(() => {
-                        if (ws.readyState === WebSocket.OPEN) {
-                          const functionResponse = {
-                            clientContent: {
-                              turns: [{
-                                role: 'model',
-                                parts: [{
-                                  functionResponse: {
-                                    name: 'highlight_element',
-                                    response: {
-                                      success: highlighted,
-                                      message: highlighted ? 'Element highlighted successfully' : 'No matching element found'
-                                    }
-                                  }
-                                }]
-                              }],
-                              turnComplete: true
-                            }
-                          };
-                          
-                          try {
-                            ws.send(JSON.stringify(functionResponse));
-                            console.log('[Live] Sent function response');
-                          } catch (sendError) {
-                            console.error('[Live] Error sending function response:', sendError);
-                          }
-                        }
-                      }, 100); // Small delay to prevent race conditions
-                    }
+                    // Auto-highlight UI elements mentioned in the AI's response
+                    autoHighlightFromText(part.text);
                   }
                   
                   if (
