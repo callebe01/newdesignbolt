@@ -1,7 +1,7 @@
 // src/components/AgentCall.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { Agent } from '../../types';
@@ -24,7 +24,6 @@ const ControlButton: React.FC<{ onClick: () => void; label: string; variant: 'pr
 };
 
 export const AgentCall: React.FC = () => {
-  const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const { getAgent } = useAgents();
   const {
@@ -34,8 +33,10 @@ export const AgentCall: React.FC = () => {
     transcript,
     toggleMicrophone,
     toggleScreenShare,
+    toggleHighlightObjects,
     isScreenSharing,
     isMicrophoneActive,
+    highlightObjects,
     duration,
     errorMessage,
     setTranscript
@@ -144,6 +145,12 @@ export const AgentCall: React.FC = () => {
               variant={isScreenSharing ? 'primary' : 'outline'}
             />
           )}
+
+          <ControlButton
+            onClick={toggleHighlightObjects}
+            label={highlightObjects ? 'Hide Boxes' : 'Show Boxes'}
+            variant={highlightObjects ? 'primary' : 'outline'}
+          />
 
           <ControlButton
             onClick={handleEnd}
