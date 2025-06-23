@@ -436,8 +436,6 @@
     let audioContext = null;
     let audioQueueTime = 0;
     let transcript = '';
-    let connectionAttempts = 0;
-    let maxConnectionAttempts = 3;
 
     // Create widget HTML
     function updateWidget() {
@@ -679,46 +677,22 @@
     // Voice call functionality
     async function startCall() {
       try {
-        connectionAttempts++;
-        
-        // Get API key with better error handling
         const apiKey = window.voicepilotGoogleApiKey;
-        if (!apiKey || apiKey.trim() === '') {
-          throw new Error('Google API key is not configured. Please check your setup.');
-        }
-
-        console.log('[VoicePilot] Starting call with API key:', apiKey.substring(0, 10) + '...');
-
-        // Validate API key format
-        if (!apiKey.startsWith('AIza')) {
-          throw new Error('Invalid Google API key format. API key should start with "AIza".');
+        if (!apiKey) {
+          throw new Error('Google API key not configured');
         }
 
         const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-        console.log('[VoicePilot] Connecting to WebSocket...');
-        
         websocket = new WebSocket(wsUrl);
 
-        // Add connection timeout
-        const connectionTimeout = setTimeout(() => {
-          if (websocket && websocket.readyState === WebSocket.CONNECTING) {
-            console.error('[VoicePilot] WebSocket connection timeout');
-            websocket.close();
-            throw new Error('Connection timeout. Please check your internet connection and API key.');
-          }
-        }, 10000); // 10 second timeout
-
         websocket.onopen = () => {
-          clearTimeout(connectionTimeout);
-          console.log('[VoicePilot] WebSocket connected successfully');
-          connectionAttempts = 0; // Reset on successful connection
+          console.log('[VoicePilot] WebSocket connected');
           
-          // Send setup message immediately upon connection
           const setupMsg = {
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO', 'TEXT'],
+                responseModalities: ['AUDIO'],
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -737,7 +711,6 @@
             }
           };
 
-          console.log('[VoicePilot] Sending setup message...');
           websocket.send(JSON.stringify(setupMsg));
         };
 
@@ -748,42 +721,30 @@
             const text = await event.data.text();
             const parsed = JSON.parse(text);
 
-            console.log('[VoicePilot] Received message:', parsed);
-
             if (parsed.setupComplete) {
-              console.log('[VoicePilot] Setup complete - call is now active');
+              console.log('[VoicePilot] Setup complete');
               isCallActive = true;
               startCallTimer();
               startMicrophone();
               updateWidget();
               
-              // Send greeting after a short delay
-              setTimeout(() => {
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                  const greeting = {
-                    clientContent: {
-                      turns: [{
-                        role: 'user',
-                        parts: [{ text: 'Hello! I\'m ready to chat.' }]
-                      }],
-                      turnComplete: true
-                    }
-                  };
-                  console.log('[VoicePilot] Sending greeting...');
-                  websocket.send(JSON.stringify(greeting));
+              // Send greeting
+              const greeting = {
+                clientContent: {
+                  turns: [{
+                    role: 'user',
+                    parts: [{ text: 'Hello!' }]
+                  }],
+                  turnComplete: true
                 }
-              }, 500);
+              };
+              websocket.send(JSON.stringify(greeting));
             }
 
             if (parsed.serverContent) {
-              // Handle audio transcription (fallback highlighting)
-              if (parsed.serverContent.outputAudioTranscription?.text) {
-                const txt = parsed.serverContent.outputAudioTranscription.text;
-                transcript += txt;
+              if (parsed.serverContent.outputTranscription?.text) {
+                transcript += parsed.serverContent.outputTranscription.text;
                 updateWidget();
-                
-                // Auto-highlight from audio transcription as fallback
-                setTimeout(() => window.voicePilotHighlight(txt), 200);
               }
 
               if (parsed.serverContent.inputTranscription?.text) {
@@ -791,12 +752,10 @@
                 updateWidget();
               }
 
-              // Handle text turns (primary highlighting)
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
                   if (part.text) {
-                    console.log('[VoicePilot] AI response text:', part.text);
                     transcript += part.text;
                     updateWidget();
                     
@@ -834,54 +793,24 @@
         };
 
         websocket.onerror = (error) => {
-          clearTimeout(connectionTimeout);
           console.error('[VoicePilot] WebSocket error:', error);
-          
-          if (connectionAttempts < maxConnectionAttempts) {
-            console.log(`[VoicePilot] Retrying connection (attempt ${connectionAttempts}/${maxConnectionAttempts})...`);
-            setTimeout(() => startCall(), 2000 * connectionAttempts); // Exponential backoff
-          } else {
-            alert('Failed to connect to voice service. Please check your internet connection and try again.');
-            endCall();
-          }
+          endCall();
         };
 
-        websocket.onclose = (event) => {
-          clearTimeout(connectionTimeout);
-          console.log('[VoicePilot] WebSocket closed:', event.code, event.reason);
-          
-          if (event.code === 1006) {
-            console.error('[VoicePilot] WebSocket closed abnormally - possible network or API key issue');
-            if (connectionAttempts < maxConnectionAttempts) {
-              console.log(`[VoicePilot] Retrying connection (attempt ${connectionAttempts}/${maxConnectionAttempts})...`);
-              setTimeout(() => startCall(), 2000 * connectionAttempts);
-              return;
-            }
-          }
-          
-          if (isCallActive) {
-            endCall();
-          }
+        websocket.onclose = () => {
+          console.log('[VoicePilot] WebSocket closed');
+          endCall();
         };
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
         alert('Failed to start voice chat: ' + error.message);
-        endCall();
       }
     }
 
     async function startMicrophone() {
       try {
-        console.log('[VoicePilot] Starting microphone...');
-        microphoneStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            sampleRate: 16000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true
-          }
-        });
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -917,24 +846,17 @@
           }
           const base64Audio = btoa(binary);
           
-          try {
-            websocket.send(JSON.stringify({
-              realtime_input: {
-                audio: {
-                  data: base64Audio,
-                  mime_type: 'audio/pcm;rate=16000'
-                }
+          websocket.send(JSON.stringify({
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000'
               }
-            }));
-          } catch (err) {
-            console.error('[VoicePilot] Error sending audio data:', err);
-          }
+            }
+          }));
         };
-        
-        console.log('[VoicePilot] Microphone started successfully');
       } catch (error) {
         console.error('[VoicePilot] Microphone error:', error);
-        alert('Failed to access microphone. Please check your permissions and try again.');
       }
     }
 
@@ -947,11 +869,9 @@
     }
 
     function endCall() {
-      console.log('[VoicePilot] Ending call...');
       isCallActive = false;
       transcript = '';
       audioQueueTime = 0;
-      connectionAttempts = 0;
       
       if (callTimer) {
         clearInterval(callTimer);
