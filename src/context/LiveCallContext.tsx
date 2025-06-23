@@ -420,36 +420,42 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             if (parsed.serverContent) {
-              // ✅ SMART HIGHLIGHTING FROM AI SPEECH TRANSCRIPTION
+              // ✅ TIGHTENED BUFFERING LOGIC FOR CLEAN TRANSCRIPTS
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
-                
-                // reset debounce timer
+
+                // clear any pending flush
                 if (transcriptTimerRef.current) {
                   clearTimeout(transcriptTimerRef.current);
                 }
 
-                // buffer fragments
-                transcriptBufferRef.current += (transcript.endsWith(' ') ? '' : ' ') + aiText;
+                // accumulate into buffer, with exactly one space between chunks
+                transcriptBufferRef.current = transcriptBufferRef.current
+                  ? transcriptBufferRef.current + ' ' + aiText
+                  : aiText;
 
-                // flush after 300ms of silence, then highlight the full phrase
+                // wait 300ms after last fragment, then flush the whole phrase
                 transcriptTimerRef.current = window.setTimeout(() => {
                   const phrase = transcriptBufferRef.current.trim();
-                  setTranscript(prev => prev + (prev.endsWith(' ') ? '' : ' ') + phrase);
+                  // append to the main transcript with one leading space if needed
+                  setTranscript(prev =>
+                    prev ? prev + ' ' + phrase : phrase
+                  );
                   transcriptBufferRef.current = '';
 
+                  // single highlight for the full phrase
                   if (window.voicePilotHighlight) {
                     window.voicePilotHighlight(phrase);
                   }
                 }, 300);
 
-                console.log('[Live] AI said (transcribed):', aiText);
+                console.log('[Live] buffered AI text:', aiText);
               }
               
               // Handle user speech transcription
               if (parsed.serverContent.inputTranscription?.text) {
                 const userText = parsed.serverContent.inputTranscription.text.trim();
-                setTranscript(prev => prev + (prev.endsWith(' ') ? '' : ' ') + userText);
+                setTranscript(prev => prev ? prev + ' ' + userText : userText);
               }
               
               const modelTurn = parsed.serverContent.modelTurn;
