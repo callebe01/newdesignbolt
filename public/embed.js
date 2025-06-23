@@ -106,9 +106,7 @@
       const commonWords = new Set([
         'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
         'click', 'press', 'tap', 'select', 'choose', 'find', 'locate', 'go', 'navigate', 'see',
-        'can', 'could', 'would', 'should', 'will', 'shall', 'may', 'might', 'must',
-        'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
-        'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did'
+        'button', 'link', 'menu', 'option', 'item', 'element', 'here', 'there', 'this', 'that'
       ]);
 
       // Extract quoted text first (highest priority)
@@ -121,31 +119,6 @@
         });
       }
 
-      // Extract key phrases with specific patterns
-      const keyPhrases = [];
-      
-      // Look for "new [something]" patterns
-      const newPatterns = text.match(/\bnew\s+(\w+(?:\s+\w+)?)/gi);
-      if (newPatterns) {
-        newPatterns.forEach(match => {
-          keyPhrases.push(match.trim());
-          // Also add just the noun part
-          const noun = match.replace(/^new\s+/i, '').trim();
-          if (noun.length > 2) keyPhrases.push(noun);
-        });
-      }
-
-      // Look for action + object patterns
-      const actionPatterns = text.match(/\b(create|add|make|build|start|open|click|press|tap)\s+(\w+(?:\s+\w+)?)/gi);
-      if (actionPatterns) {
-        actionPatterns.forEach(match => {
-          const parts = match.split(/\s+/);
-          if (parts.length >= 2) {
-            keyPhrases.push(parts.slice(1).join(' ')); // Just the object part
-          }
-        });
-      }
-
       // Extract capitalized phrases (medium priority)
       const capitalizedPhrases = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
       
@@ -155,10 +128,10 @@
         .replace(/[^\w\s]/g, ' ')
         .split(/\s+/)
         .filter(word => word.length > 2 && !commonWords.has(word))
-        .slice(0, 6);
+        .slice(0, 8);
 
       // Combine all terms with priority order
-      return [...quotedTerms, ...keyPhrases, ...capitalizedPhrases, ...words];
+      return [...quotedTerms, ...capitalizedPhrases, ...words];
     }
 
     calculateMatchConfidence(element, searchTerms) {
@@ -188,11 +161,11 @@
           if (text.includes(termLower)) {
             // Exact match bonus
             if (text === termLower) {
-              termScore = Math.max(termScore, weight + 0.5);
+              termScore = Math.max(termScore, weight + 0.3);
             }
             // Word boundary match bonus
             else if (new RegExp(`\\b${termLower}\\b`).test(text)) {
-              termScore = Math.max(termScore, weight + 0.3);
+              termScore = Math.max(termScore, weight + 0.2);
             }
             // Partial match
             else {
@@ -201,11 +174,11 @@
           }
         });
 
-        // Priority bonus for earlier terms (quoted text, key phrases, etc.)
-        const priorityBonus = Math.max(0, (searchTerms.length - index) * 0.15);
+        // Priority bonus for earlier terms (quoted text, etc.)
+        const priorityBonus = Math.max(0, (searchTerms.length - index) * 0.1);
         termScore += priorityBonus;
 
-        totalScore += Math.min(1.2, termScore);
+        totalScore += Math.min(1.0, termScore);
       });
 
       return totalScore / maxPossibleScore;
@@ -236,46 +209,38 @@
 
       console.log('[VoicePilot] Searching for terms:', searchTerms);
 
-      // Enhanced selectors with priority for buttons and interactive elements
+      // Enhanced selectors for better UI element detection
       const selectors = [
-        // High priority interactive elements
         'button',
         'a[href]',
         '[role="button"]',
         '[role="link"]',
+        '[role="tab"]',
+        '[role="menuitem"]',
         'input[type="button"]',
         'input[type="submit"]',
-        
-        // Medium priority elements
+        'input[type="reset"]',
         '[data-testid]',
         '[data-agent-id]',
         '[aria-label]',
-        '[onclick]',
-        
-        // UI component selectors
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         '[class*="button"]',
         '[class*="btn"]',
         '[class*="link"]',
         '[class*="nav"]',
         '[class*="menu"]',
         '[class*="tab"]',
-        
-        // Form elements
+        '[class*="card"]',
+        'label',
+        '.card-title',
+        '.title',
+        'nav a',
+        'nav button',
+        '[onclick]',
         'form input',
         'form button',
         'form select',
-        'form textarea',
-        'label',
-        
-        // Content elements (lower priority)
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        '.card-title',
-        '.title',
-        '[class*="card"]',
-        'nav a',
-        'nav button',
-        '[role="tab"]',
-        '[role="menuitem"]'
+        'form textarea'
       ];
 
       const elements = document.querySelectorAll(selectors.join(','));
@@ -285,42 +250,22 @@
         
         const confidence = this.calculateMatchConfidence(element, searchTerms);
         
-        if (confidence > 0.15) {
+        if (confidence > 0.2) {
           matches.push({
             element: element,
             text: this.getElementText(element),
-            confidence: confidence,
-            isInteractive: this.isInteractiveElement(element)
+            confidence: confidence
           });
         }
       });
 
-      // Sort by confidence, but boost interactive elements
-      const sortedMatches = matches.sort((a, b) => {
-        const aScore = a.confidence + (a.isInteractive ? 0.2 : 0);
-        const bScore = b.confidence + (b.isInteractive ? 0.2 : 0);
-        return bScore - aScore;
-      });
-
+      const sortedMatches = matches.sort((a, b) => b.confidence - a.confidence);
       console.log('[VoicePilot] Found matches:', sortedMatches.slice(0, 3).map(m => ({
         text: m.text,
-        confidence: m.confidence.toFixed(2),
-        interactive: m.isInteractive
+        confidence: m.confidence.toFixed(2)
       })));
 
       return sortedMatches;
-    }
-
-    isInteractiveElement(element) {
-      const interactiveTags = ['button', 'a', 'input', 'select', 'textarea'];
-      const interactiveRoles = ['button', 'link', 'tab', 'menuitem'];
-      
-      return (
-        interactiveTags.includes(element.tagName.toLowerCase()) ||
-        interactiveRoles.includes(element.getAttribute('role')) ||
-        element.hasAttribute('onclick') ||
-        element.classList.toString().match(/\b(button|btn|link|clickable)\b/i)
-      );
     }
 
     getElementText(element) {
@@ -349,11 +294,11 @@
       console.log('[VoicePilot] Best match:', bestMatch.text, 'confidence:', bestMatch.confidence.toFixed(2));
       
       // More lenient threshold for highlighting
-      const threshold = Math.max(0.25, bestMatch.confidence - 0.4);
+      const threshold = Math.max(0.3, bestMatch.confidence - 0.3);
       
       const elementsToHighlight = matches
         .filter(match => match.confidence >= threshold)
-        .slice(0, 1) // Only highlight the best match to avoid confusion
+        .slice(0, 2) // Highlight top 2 matches
         .map(match => match.element);
 
       elementsToHighlight.forEach((element, index) => {
@@ -429,25 +374,22 @@
   // Initialize DOM highlighter
   const domHighlighter = new DOMHighlighter();
 
-  // Smart highlighting system with improved transcript processing
+  // Smart highlighting system with buffering
   class SmartHighlighter {
     constructor() {
       this.textBuffer = '';
       this.bufferTimeout = null;
       this.lastHighlightTime = 0;
-      this.highlightCooldown = 3000; // 3 seconds between highlights
-      this.bufferDelay = 2000; // Wait 2 seconds after last text before highlighting
-      this.wordBuffer = []; // Buffer for building complete words
+      this.highlightCooldown = 2000; // 2 seconds between highlights
+      this.bufferDelay = 1500; // Wait 1.5 seconds after last text before highlighting
     }
 
     addText(text) {
       if (!text || text.trim().length === 0) return;
       
-      // Process text to fix spacing issues
-      const processedText = this.processTextSpacing(text);
-      
-      // Add to buffer
-      this.textBuffer += processedText;
+      // Add proper spacing if needed
+      const cleanText = this.addSpacing(text);
+      this.textBuffer += cleanText;
       
       // Clear existing timeout
       if (this.bufferTimeout) {
@@ -460,52 +402,12 @@
       }, this.bufferDelay);
     }
 
-    processTextSpacing(text) {
-      // Clean up the text and fix common spacing issues
-      let processed = text.trim();
-      
-      // If this looks like a broken word (single letters or very short fragments)
-      if (processed.length <= 2 && /^[a-zA-Z!?.,]+$/.test(processed)) {
-        // Add to word buffer
-        this.wordBuffer.push(processed);
-        
-        // If we have accumulated enough fragments, try to form words
-        if (this.wordBuffer.length > 1) {
-          const combined = this.wordBuffer.join('');
-          
-          // If the combined text looks like a word or meaningful fragment
-          if (combined.length >= 3) {
-            this.wordBuffer = [];
-            return this.addSpacing(combined);
-          }
-        }
-        
-        // Don't add single characters immediately
-        return '';
-      } else {
-        // This is a longer text, flush any word buffer first
-        let result = '';
-        if (this.wordBuffer.length > 0) {
-          result = this.addSpacing(this.wordBuffer.join(''));
-          this.wordBuffer = [];
-        }
-        
-        // Add the current text
-        result += this.addSpacing(processed);
-        return result;
-      }
-    }
-
     addSpacing(text) {
-      if (!text) return '';
-      
-      // Add space before text if needed
+      // Add space before text if the buffer doesn't end with space and text doesn't start with space
       if (this.textBuffer.length > 0 && 
           !this.textBuffer.endsWith(' ') && 
-          !this.textBuffer.endsWith('\n') &&
           !text.startsWith(' ') &&
-          /^[a-zA-Z]/.test(text) &&
-          /[a-zA-Z]$/.test(this.textBuffer)) {
+          /^[a-zA-Z]/.test(text)) {
         return ' ' + text;
       }
       return text;
@@ -518,20 +420,13 @@
       if (now - this.lastHighlightTime < this.highlightCooldown) {
         console.log('[VoicePilot] Highlighting on cooldown, skipping');
         this.textBuffer = '';
-        this.wordBuffer = [];
         return;
-      }
-
-      // Flush any remaining word buffer
-      if (this.wordBuffer.length > 0) {
-        this.textBuffer += this.addSpacing(this.wordBuffer.join(''));
-        this.wordBuffer = [];
       }
 
       const textToProcess = this.textBuffer.trim();
       
       // Only highlight if we have substantial text
-      if (textToProcess.length < 5) {
+      if (textToProcess.length < 3) {
         this.textBuffer = '';
         return;
       }
@@ -559,24 +454,22 @@
       
       // Don't highlight common greetings and filler words
       const skipPatterns = [
-        /^(hi|hello|hey|good|thank|thanks|please|sorry|excuse|um|uh|well|so|now|okay|ok)\b/i,
-        /^(how are you|how's it going|nice to meet|good morning|good afternoon|good evening)/i,
-        /^(i am|i'm|you are|you're|we are|we're|they are|they're)/i,
-        /^(yes|no|sure|of course|absolutely|definitely|maybe|perhaps)/i
+        /^(hi|hello|hey|good|thank|thanks|please|sorry|excuse|um|uh|well|so|now|okay|ok)$/i,
+        /^(how are you|how's it going|nice to meet|good morning|good afternoon|good evening)$/i,
+        /^(i am|i'm|you are|you're|we are|we're|they are|they're)$/i
       ];
       
       if (skipPatterns.some(pattern => pattern.test(text.trim()))) {
         return false;
       }
       
-      // Highlight if text contains UI-related keywords or specific actions
+      // Highlight if text contains UI-related keywords
       const uiKeywords = [
         'button', 'click', 'press', 'tap', 'select', 'choose', 'menu', 'link', 'tab',
         'sidebar', 'header', 'footer', 'navigation', 'nav', 'search', 'filter',
         'agent', 'new', 'create', 'add', 'edit', 'delete', 'save', 'cancel',
         'dashboard', 'settings', 'profile', 'help', 'logout', 'login', 'sign',
-        'card', 'form', 'input', 'field', 'dropdown', 'checkbox', 'radio',
-        'start', 'begin', 'open', 'close', 'show', 'hide', 'toggle'
+        'card', 'form', 'input', 'field', 'dropdown', 'checkbox', 'radio'
       ];
       
       const hasUIKeywords = uiKeywords.some(keyword => lowerText.includes(keyword));
@@ -585,15 +478,11 @@
       const hasQuotes = /["']([^"']+)["']/.test(text);
       const hasSpecificReferences = /\b(the|this|that)\s+\w+/.test(lowerText);
       
-      // Highlight if text contains action phrases
-      const hasActionPhrases = /\b(can you|could you|please|let me|show me|find the|locate the|click on|press the|tap the)\b/i.test(text);
-      
-      return hasUIKeywords || hasQuotes || hasSpecificReferences || hasActionPhrases;
+      return hasUIKeywords || hasQuotes || hasSpecificReferences;
     }
 
     clear() {
       this.textBuffer = '';
-      this.wordBuffer = [];
       if (this.bufferTimeout) {
         clearTimeout(this.bufferTimeout);
         this.bufferTimeout = null;
@@ -978,7 +867,7 @@
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
                 
-                // Add to transcript with proper spacing
+                // Add proper spacing to transcript
                 if (transcript.length > 0 && !transcript.endsWith(' ') && !aiText.startsWith(' ')) {
                   transcript += ' ';
                 }
@@ -994,7 +883,7 @@
               if (parsed.serverContent.inputTranscription?.text) {
                 const userText = parsed.serverContent.inputTranscription.text.trim();
                 
-                // Add to transcript with proper spacing
+                // Add proper spacing to transcript
                 if (transcript.length > 0 && !transcript.endsWith(' ') && !userText.startsWith(' ')) {
                   transcript += ' ';
                 }
