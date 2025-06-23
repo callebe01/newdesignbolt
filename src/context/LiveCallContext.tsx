@@ -64,6 +64,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
+  // ✅ AI TRANSCRIPTION BUFFER REFS
+  const aiBufferRef = useRef<string>('');
+  const aiBufferTimerRef = useRef<number | null>(null);
+
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
@@ -80,6 +84,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
+      }
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -131,6 +138,57 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       audioQueueTimeRef.current = startAt + buffer.duration;
     } catch (err) {
       console.error('[Live] playAudioBuffer() error decoding PCM16:', err);
+    }
+  };
+
+  // ✅ BUFFER AND FLUSH AI TRANSCRIPTION LOGIC
+  const bufferAndFlushAI = (text: string) => {
+    // Clear any pending flush
+    if (aiBufferTimerRef.current) {
+      clearTimeout(aiBufferTimerRef.current);
+    }
+
+    // Accumulate into buffer with proper spacing
+    aiBufferRef.current = aiBufferRef.current
+      ? aiBufferRef.current + ' ' + text
+      : text;
+
+    // Wait 300ms after last fragment, then flush the whole phrase
+    aiBufferTimerRef.current = window.setTimeout(() => {
+      const phrase = aiBufferRef.current.trim();
+      if (phrase) {
+        // Append to the main transcript with proper spacing
+        setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+        aiBufferRef.current = '';
+
+        // ✅ SINGLE HIGHLIGHT FOR THE FULL PHRASE
+        if (window.voicePilotHighlight) {
+          window.voicePilotHighlight(phrase);
+        }
+        
+        console.log('[Live] AI said (complete phrase):', phrase);
+      }
+    }, 300);
+
+    console.log('[Live] buffered AI text:', text);
+  };
+
+  // ✅ FORCE FLUSH AI BUFFER
+  const forceFlushAIBuffer = () => {
+    if (aiBufferTimerRef.current) {
+      clearTimeout(aiBufferTimerRef.current);
+    }
+    
+    const phrase = aiBufferRef.current.trim();
+    if (phrase) {
+      setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+      aiBufferRef.current = '';
+
+      if (window.voicePilotHighlight) {
+        window.voicePilotHighlight(phrase);
+      }
+      
+      console.log('[Live] AI said (force flushed):', phrase);
     }
   };
 
@@ -262,6 +320,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = agentId || null;
       conversationIdRef.current = null;
       callEndedRef.current = false;
+      
+      // ✅ CLEAR AI BUFFER
+      aiBufferRef.current = '';
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
+      }
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -412,33 +476,38 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               return;
             }
 
+            // ✅ 1) AI SPEAKING TRANSCRIPTION FRAGMENTS (TOP-LEVEL)
+            if (parsed.outputTranscription?.text) {
+              bufferAndFlushAI(parsed.outputTranscription.text);
+              return;
+            }
+
+            // ✅ 2) USER SPEAKING TRANSCRIPTION (TOP-LEVEL)
+            if (parsed.inputTranscription?.text) {
+              const userFrag = parsed.inputTranscription.text.trim();
+              if (userFrag) {
+                setTranscript(prev => prev ? prev + ' ' + userFrag : userFrag);
+                console.log('[Live] User transcription:', userFrag);
+              }
+              return;
+            }
+
+            // ✅ 3) NORMAL SERVERCONTENT (MODELTURN.PARTS WITH INLINEDATA)
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ PULL IN THE FULL TEXT PAYLOAD FROM THE MODELTURN PARTS ✅
+              // ✅ CHECK FOR TURN COMPLETE TO FORCE FLUSH AI BUFFER
+              if (sc.turnComplete) {
+                console.log('[Live] Turn complete - force flushing AI buffer');
+                forceFlushAIBuffer();
+              }
+
+              // Handle audio data from modelTurn.parts
               const mt = sc.modelTurn;
               if (mt?.parts) {
                 for (const part of mt.parts) {
-                  if (typeof part.text === 'string' && part.text.trim()) {
-                    const txt = part.text.trim();
-                    setTranscript(prev => prev
-                      ? prev + ' ' + txt
-                      : txt
-                    );
-                    
-                    // ✅ HIGHLIGHT THE COMPLETE AI RESPONSE
-                    if (window.voicePilotHighlight) {
-                      window.voicePilotHighlight(txt);
-                    }
-                    
-                    console.log('[Live] AI says (complete text):', txt);
-                  }
-
                   // Handle audio data
-                  if (
-                    part.inlineData &&
-                    typeof part.inlineData.data === 'string'
-                  ) {
+                  if (part.inlineData && typeof part.inlineData.data === 'string') {
                     try {
                       const base64str = part.inlineData.data;
                       const binaryStr = atob(base64str);
@@ -450,26 +519,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                       const pcmBlob = new Blob([rawBuffer.buffer], {
                         type: 'audio/pcm;rate=24000',
                       });
-                      console.log(
-                        '[Live][Debug] Decoded inlineData, scheduling audio playback'
-                      );
+                      console.log('[Live][Debug] Decoded inlineData, scheduling audio playback');
                       playAudioBuffer(pcmBlob);
                     } catch (err) {
-                      console.error(
-                        '[Live] Error decoding inlineData audio:',
-                        err
-                      );
+                      console.error('[Live] Error decoding inlineData audio:', err);
                     }
                   }
                 }
-                return; // ✅ BAIL OUT AFTER HANDLING BOTH TEXT & AUDIO
-              }
-              
-              // Handle user speech transcription (what the user is saying)
-              if (sc.inputTranscription?.text) {
-                const userText = sc.inputTranscription.text.trim();
-                setTranscript(prev => prev ? prev + ' ' + userText : userText);
-                console.log('[Live] User transcription:', userText);
+                return; // ✅ BAIL OUT AFTER HANDLING AUDIO
               }
             }
 
@@ -480,9 +537,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }
 
-        console.log(
-          '[Live][Debug] incoming Blob is not JSON or not recognized → playing raw PCM'
-        );
+        console.log('[Live][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
         playAudioBuffer(ev.data);
       };
 
@@ -493,9 +548,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       ws.onclose = (ev) => {
-        console.log(
-          `[Live][WebSocket] onclose: code=${ev.code}, reason="${ev.reason}"`
-        );
+        console.log(`[Live][WebSocket] onclose: code=${ev.code}, reason="${ev.reason}"`);
         setStatus('ended');
         websocketRef.current = null;
       };
@@ -559,9 +612,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
-          console.log(
-            `[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to Gemini`
-          );
+          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to Gemini`);
         }
       };
 
@@ -774,6 +825,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
 
+      // ✅ FORCE FLUSH ANY REMAINING AI BUFFER
+      forceFlushAIBuffer();
+
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
         window.voicePilotClearHighlights();
@@ -822,6 +876,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         clearTimeout(maxDurationTimerRef.current);
         maxDurationTimerRef.current = null;
       }
+      if (aiBufferTimerRef.current) {
+        clearTimeout(aiBufferTimerRef.current);
+        aiBufferTimerRef.current = null;
+      }
 
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -850,6 +908,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       agentOwnerIdRef.current = null;
       currentAgentIdRef.current = null;
       conversationIdRef.current = null;
+      
+      // ✅ CLEAR AI BUFFER
+      aiBufferRef.current = '';
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
