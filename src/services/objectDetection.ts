@@ -31,7 +31,9 @@ function parseBoundingBoxes(data: any): BoundingBox[] {
 }
 
 export async function detectObjects(base64Image: string): Promise<BoundingBox[]> {
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const apiKey =
+    (window as any).voicepilotGoogleApiKey ||
+    import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
     throw new Error('VITE_GOOGLE_API_KEY not set');
   }

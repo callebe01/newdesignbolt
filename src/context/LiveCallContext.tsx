@@ -315,7 +315,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
-      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+      const apiKey =
+        (window as any).voicepilotGoogleApiKey ||
+        import.meta.env.VITE_GOOGLE_API_KEY;
       if (!apiKey) {
         throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
       }

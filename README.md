@@ -111,3 +111,22 @@ When the agent's response mentions text that matches a visible label on the page
 the corresponding element is briefly outlined. You can optionally tag elements
 with `data-agent-id` attributes to make matching more reliable.
 
+## Embedding the Widget
+
+You can embed the VoicePilot widget on any website. Include the script from the
+`public` directory and configure it with data attributes:
+
+```html
+<script
+  src="/embed.js"
+  data-agent="YOUR_AGENT_ID"
+  data-position="bottom-right"
+  data-google-api-key="YOUR_GOOGLE_API_KEY"
+  async
+></script>
+```
+
+The script automatically mounts the widget and exposes a `window.voicepilot`
+object with `open()`, `close()`, `startCall()`, `endCall()`, and `setPulse()`
+methods so you can control it programmatically.
+
