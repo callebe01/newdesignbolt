@@ -31,12 +31,15 @@
       };
     </script>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      src="/embed.js"
-      data-agent="783bc043-42e4-4f60-afb6-e0d8ee947fa2"
-      data-google-api-key="%VITE_GOOGLE_API_KEY%"
-      data-position="bottom-right"
-      async
-    ></script>
+    <script>
+      // Set the Google API key from environment variable
+      const script = document.createElement('script');
+      script.src = '/embed.js';
+      script.setAttribute('data-agent', '783bc043-42e4-4f60-afb6-e0d8ee947fa2');
+      script.setAttribute('data-google-api-key', import.meta.env.VITE_GOOGLE_API_KEY || '');
+      script.setAttribute('data-position', 'bottom-right');
+      script.async = true;
+      document.body.appendChild(script);
+    </script>
   </body>
 </html>
