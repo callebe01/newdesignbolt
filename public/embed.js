@@ -660,9 +660,40 @@
                     updateWidget();
                   }
 
+                  // Handle function calls - CRITICAL FIX
                   if (part.functionCall?.name === 'highlight_element' && part.functionCall.args?.text) {
                     console.log('[VoicePilot] Highlighting element:', part.functionCall.args.text);
-                    window.voicePilotHighlight(part.functionCall.args.text);
+                    const highlighted = window.voicePilotHighlight(part.functionCall.args.text);
+                    
+                    // Send function response back to the model - ASYNC to prevent blocking
+                    setTimeout(() => {
+                      if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        const functionResponse = {
+                          clientContent: {
+                            turns: [{
+                              role: 'model',
+                              parts: [{
+                                functionResponse: {
+                                  name: 'highlight_element',
+                                  response: {
+                                    success: highlighted,
+                                    message: highlighted ? 'Element highlighted successfully' : 'No matching element found'
+                                  }
+                                }
+                              }]
+                            }],
+                            turnComplete: true
+                          }
+                        };
+                        
+                        try {
+                          websocket.send(JSON.stringify(functionResponse));
+                          console.log('[VoicePilot] Sent function response:', highlighted);
+                        } catch (sendError) {
+                          console.error('[VoicePilot] Error sending function response:', sendError);
+                        }
+                      }
+                    }, 100); // Small delay to prevent race conditions
                   }
 
                   if (part.inlineData?.data) {
