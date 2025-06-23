@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { ObjectDetectionOverlay } from '../components/overlay/ObjectDetectionOverlay';
 import { detectObjects, BoundingBox } from '../services/objectDetection';
+import { domHighlighter } from '../services/domHighlighting';
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
 import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
@@ -55,7 +56,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     'CORE BEHAVIOR: Think aloud in the moment. React as you notice things — not after deep analysis. It\'s okay to feel stuck or ramble a bit—don\'t tidy your sentences. Use natural phrases: "Hmm…", "Let me read this…", "Not sure what that means…" Focus on what your eyes land on first. Don\'t describe everything at once. Don\'t try to define the whole product. Say what you *think* it might be, even if unsure. If something confuses you, just say so. Don\'t explain unless it feels obvious. Keep answers short. You don\'t need to keep the conversation going unless you have a reaction.' +
     'First-Time Reaction Behavior. When seeing a screen (or a new part of it) for the first time: Glance — Start with what draws your eye. "Okay… first thing I see is…" Pause to read or scan — You should react like someone figuring it out in real time. "Let me read this real quick…" " "Wait — what\'s this down here…" Guess or think aloud — Share your thoughts as they form. Don\'t rush to a final answer. ' +
     'DECISION RULE: When asked what you would do (next / first), commit: 1. State the ONE action you\'d take. 2. Say why you chose it (brief). Only list other ideas if the designer asks "anything else?"' +
-    'Important: You are not supposed to summarize or label the tool right away. You\'re reacting moment by moment, like someone thinking out loud in a real usability session.';
+    'Important: You are not supposed to summarize or label the tool right away. You\'re reacting moment by moment, like someone thinking out loud in a real usability session.' +
+    'HIGHLIGHTING TOOL: You have access to a highlight_element tool. Use it when you mention specific UI elements, buttons, or parts of the interface. For example, if you say "click the New Post button", call highlight_element with "New Post button" as the text parameter. This helps users see exactly what you\'re referring to.';
 
   const websocketRef = useRef<WebSocket | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
@@ -106,6 +108,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         audioContextRef.current = null;
       }
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      domHighlighter.clearHighlights();
     };
   }, []);
 
@@ -336,11 +339,33 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         setStatus('connecting');
 
         // Create URL context tools if documentation URLs are provided
-        const tools = documentationUrls?.length ? [{
-          url_context: {
-            urls: documentationUrls
-          }
-        }] : undefined;
+        const tools = [];
+        
+        if (documentationUrls?.length) {
+          tools.push({
+            url_context: {
+              urls: documentationUrls
+            }
+          });
+        }
+
+        // Add DOM highlighting tool
+        tools.push({
+          function_declarations: [{
+            name: 'highlight_element',
+            description: 'Highlight a UI element on the page when mentioning it in conversation. Use this when referring to specific buttons, links, or interface elements.',
+            parameters: {
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description: 'The text or description of the element to highlight (e.g., "New Post button", "Settings menu", "Login form")'
+                }
+              },
+              required: ['text']
+            }
+          }]
+        });
 
         // Setup message with tools and Kore voice
         const setupMsg = {
@@ -426,18 +451,26 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   (prev) => prev + parsed.serverContent.inputTranscription.text
                 );
               }
+              
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn && Array.isArray(modelTurn.parts)) {
                 for (const part of modelTurn.parts) {
                   if (typeof part.text === 'string') {
                     console.log('[Live] AI says (text):', part.text);
                     setTranscript((prev) => prev + part.text);
-                    try {
-                      window.highlightTextMatch?.(part.text);
-                    } catch {
-                      /* ignore */
+                  }
+                  
+                  // Handle function calls (tool usage)
+                  if (part.functionCall) {
+                    const { name, args } = part.functionCall;
+                    console.log('[Live] Function call:', name, args);
+                    
+                    if (name === 'highlight_element' && args?.text) {
+                      const highlighted = domHighlighter.highlightElement(args.text);
+                      console.log(`[Live] Highlighted element for "${args.text}":`, highlighted);
                     }
                   }
+                  
                   if (
                     part.inlineData &&
                     typeof part.inlineData.data === 'string'
@@ -768,6 +801,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const finalTranscript = transcript.trim();
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
+
+      // Clear any DOM highlights
+      domHighlighter.clearHighlights();
 
       // Save transcript and conversation data
       if (agentId && finalTranscript) {
