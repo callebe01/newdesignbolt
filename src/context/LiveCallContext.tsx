@@ -64,9 +64,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
-  // ✅ AI TRANSCRIPTION BUFFER REFS
+  // ✅ AI TRANSCRIPTION BUFFER REFS - USING FINISHED FLAG
   const aiBufferRef = useRef<string>('');
-  const aiBufferTimerRef = useRef<number | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -84,9 +83,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
-      }
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -138,57 +134,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       audioQueueTimeRef.current = startAt + buffer.duration;
     } catch (err) {
       console.error('[Live] playAudioBuffer() error decoding PCM16:', err);
-    }
-  };
-
-  // ✅ BUFFER AND FLUSH AI TRANSCRIPTION LOGIC
-  const bufferAndFlushAI = (text: string) => {
-    // Clear any pending flush
-    if (aiBufferTimerRef.current) {
-      clearTimeout(aiBufferTimerRef.current);
-    }
-
-    // Accumulate into buffer with proper spacing
-    aiBufferRef.current = aiBufferRef.current
-      ? aiBufferRef.current + ' ' + text
-      : text;
-
-    // Wait 300ms after last fragment, then flush the whole phrase
-    aiBufferTimerRef.current = window.setTimeout(() => {
-      const phrase = aiBufferRef.current.trim();
-      if (phrase) {
-        // Append to the main transcript with proper spacing
-        setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
-        aiBufferRef.current = '';
-
-        // ✅ SINGLE HIGHLIGHT FOR THE FULL PHRASE
-        if (window.voicePilotHighlight) {
-          window.voicePilotHighlight(phrase);
-        }
-        
-        console.log('[Live] AI said (complete phrase):', phrase);
-      }
-    }, 300);
-
-    console.log('[Live] buffered AI text:', text);
-  };
-
-  // ✅ FORCE FLUSH AI BUFFER
-  const forceFlushAIBuffer = () => {
-    if (aiBufferTimerRef.current) {
-      clearTimeout(aiBufferTimerRef.current);
-    }
-    
-    const phrase = aiBufferRef.current.trim();
-    if (phrase) {
-      setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
-      aiBufferRef.current = '';
-
-      if (window.voicePilotHighlight) {
-        window.voicePilotHighlight(phrase);
-      }
-      
-      console.log('[Live] AI said (force flushed):', phrase);
     }
   };
 
@@ -323,9 +268,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       
       // ✅ CLEAR AI BUFFER
       aiBufferRef.current = '';
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
-      }
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -476,30 +418,43 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               return;
             }
 
-            // ✅ 1) AI SPEAKING TRANSCRIPTION FRAGMENTS (TOP-LEVEL)
-            if (parsed.outputTranscription?.text) {
-              bufferAndFlushAI(parsed.outputTranscription.text);
-              return;
-            }
-
-            // ✅ 2) USER SPEAKING TRANSCRIPTION (TOP-LEVEL)
-            if (parsed.inputTranscription?.text) {
-              const userFrag = parsed.inputTranscription.text.trim();
-              if (userFrag) {
-                setTranscript(prev => prev ? prev + ' ' + userFrag : userFrag);
-                console.log('[Live] User transcription:', userFrag);
-              }
-              return;
-            }
-
-            // ✅ 3) NORMAL SERVERCONTENT (MODELTURN.PARTS WITH INLINEDATA)
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ CHECK FOR TURN COMPLETE TO FORCE FLUSH AI BUFFER
-              if (sc.turnComplete) {
-                console.log('[Live] Turn complete - force flushing AI buffer');
-                forceFlushAIBuffer();
+              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH FINISHED FLAG
+              if (sc.outputAudioTranscription) {
+                const { text, finished } = sc.outputAudioTranscription;
+                
+                if (text) {
+                  // 1) Accumulate every piece
+                  aiBufferRef.current += text;
+                  console.log('[Live] AI transcription fragment:', text);
+                }
+
+                // 2) When Vertex signals end of this transcription chunk, flush the whole phrase
+                if (finished) {
+                  const phrase = aiBufferRef.current.trim();
+                  if (phrase) {
+                    setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+                    
+                    // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                    if (window.voicePilotHighlight) {
+                      window.voicePilotHighlight(phrase);
+                    }
+                    
+                    console.log('[Live] AI said (complete phrase):', phrase);
+                  }
+                  aiBufferRef.current = '';
+                }
+              }
+
+              // ✅ HANDLE USER SPEECH TRANSCRIPTION
+              if (sc.inputAudioTranscription?.text) {
+                const userText = sc.inputAudioTranscription.text.trim();
+                if (userText) {
+                  setTranscript(prev => prev ? prev + ' ' + userText : userText);
+                  console.log('[Live] User transcription:', userText);
+                }
               }
 
               // Handle audio data from modelTurn.parts
@@ -527,6 +482,22 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   }
                 }
                 return; // ✅ BAIL OUT AFTER HANDLING AUDIO
+              }
+
+              // ✅ CHECK FOR TURN COMPLETE TO FORCE FLUSH AI BUFFER
+              if (sc.turnComplete) {
+                console.log('[Live] Turn complete - force flushing AI buffer if needed');
+                const phrase = aiBufferRef.current.trim();
+                if (phrase) {
+                  setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+                  
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(phrase);
+                  }
+                  
+                  console.log('[Live] AI said (turn complete flush):', phrase);
+                  aiBufferRef.current = '';
+                }
               }
             }
 
@@ -826,7 +797,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       const conversationId = conversationIdRef.current;
 
       // ✅ FORCE FLUSH ANY REMAINING AI BUFFER
-      forceFlushAIBuffer();
+      const phrase = aiBufferRef.current.trim();
+      if (phrase) {
+        setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+        aiBufferRef.current = '';
+        console.log('[Live] Final AI buffer flush:', phrase);
+      }
 
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
@@ -875,10 +851,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
         maxDurationTimerRef.current = null;
-      }
-      if (aiBufferTimerRef.current) {
-        clearTimeout(aiBufferTimerRef.current);
-        aiBufferTimerRef.current = null;
       }
 
       if (websocketRef.current) {
