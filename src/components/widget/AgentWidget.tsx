@@ -7,10 +7,21 @@ import { formatTime } from '../../utils/format';
 
 interface AgentWidgetProps {
   agentId: string;
+  initialOpen?: boolean;
+  exposeApi?: (api: {
+    open: () => void;
+    close: () => void;
+    startCall: () => Promise<void>;
+    endCall: () => void;
+  }) => void;
 }
 
-export const AgentWidget: React.FC<AgentWidgetProps> = ({ agentId }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const AgentWidget: React.FC<AgentWidgetProps> = ({
+  agentId,
+  initialOpen = false,
+  exposeApi
+}) => {
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const { 
     startCall, 
     endCall, 
@@ -49,6 +60,16 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({ agentId }) => {
     endCall();
     setIsOpen(false);
   };
+
+  useEffect(() => {
+    if (!exposeApi) return;
+    exposeApi({
+      open: () => setIsOpen(true),
+      close: () => setIsOpen(false),
+      startCall: handleStartCall,
+      endCall: handleEndCall,
+    });
+  }, [exposeApi, handleStartCall]);
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
