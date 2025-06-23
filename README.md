@@ -114,17 +114,20 @@ with `data-agent-id` attributes to make matching more reliable.
 ## Embedding the Widget
 
 You can embed the VoicePilot widget on any website. Include the script from the
-`public` directory and configure it with data attributes:
+`public` directory and configure it with data attributes. The
+`data-google-api-key` attribute is optional:
 
 ```html
 <script
   src="/embed.js"
   data-agent="YOUR_AGENT_ID"
   data-position="bottom-right"
-  data-google-api-key="YOUR_GOOGLE_API_KEY"
   async
 ></script>
 ```
+
+If you omit `data-google-api-key`, the script uses the built-in key from the
+bundle.
 
 The script automatically mounts the widget and exposes a `window.voicepilot`
 object with `open()`, `close()`, `startCall()`, `endCall()`, and `setPulse()`
