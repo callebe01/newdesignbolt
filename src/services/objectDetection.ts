@@ -6,6 +6,9 @@ export interface BoundingBox {
   label?: string;
 }
 
+const env: any =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+
 function parseBoundingBoxes(data: any): BoundingBox[] {
   const boxes: BoundingBox[] = [];
   const candidates = data?.candidates ?? [];
@@ -33,7 +36,7 @@ function parseBoundingBoxes(data: any): BoundingBox[] {
 export async function detectObjects(base64Image: string): Promise<BoundingBox[]> {
   const apiKey =
     (window as any).voicepilotGoogleApiKey ||
-    import.meta.env.VITE_GOOGLE_API_KEY;
+    env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
     throw new Error('VITE_GOOGLE_API_KEY not set');
   }

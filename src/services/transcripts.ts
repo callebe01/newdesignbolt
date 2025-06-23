@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { AnalysisResult } from '../types';
 
+const env: any =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+
 export interface Transcript {
   id: string;
   agent_id: string;
@@ -85,7 +88,7 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
 
   // Call OpenAI API through our Edge Function
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
+    `${env.VITE_SUPABASE_URL}/functions/v1/analyze-transcripts`,
     {
       method: 'POST',
       headers: {
