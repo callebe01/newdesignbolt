@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+const env: any =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+
 export async function createCheckoutSession(priceId: string, mode: 'subscription' | 'payment') {
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -8,7 +11,7 @@ export async function createCheckoutSession(priceId: string, mode: 'subscription
   }
 
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
+    `${env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
     {
       method: 'POST',
       headers: {

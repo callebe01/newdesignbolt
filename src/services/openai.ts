@@ -17,13 +17,16 @@ export interface AgentReport {
   recommendedActions: string[];
 }
 
+const env: any =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+
 export async function analyzeTranscript(text: string): Promise<AnalysisResult> {
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-transcript`,
+    `${env.VITE_SUPABASE_URL}/functions/v1/analyze-transcript`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ text })
@@ -39,11 +42,11 @@ export async function analyzeTranscript(text: string): Promise<AnalysisResult> {
 
 export async function generateAgentReport(text: string): Promise<AgentReport> {
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-report`,
+    `${env.VITE_SUPABASE_URL}/functions/v1/generate-report`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ text })

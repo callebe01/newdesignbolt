@@ -12,6 +12,9 @@ import { useAuth } from './AuthContext';
 import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
 import { supabase } from '../services/supabase';
 
+const env: any =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+
 interface LiveCallContextType {
   status: LiveCallStatus;
   isScreenSharing: boolean;
@@ -142,12 +145,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const checkAgentOwnerUsage = async (agentId: string): Promise<boolean> => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-agent-usage`,
+        `${env.VITE_SUPABASE_URL}/functions/v1/check-agent-usage`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ 
             agentId,
@@ -173,12 +176,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const recordAgentUsage = async (agentId: string, minutes: number): Promise<void> => {
     try {
       await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-agent-usage`,
+        `${env.VITE_SUPABASE_URL}/functions/v1/record-agent-usage`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ 
             agentId,
@@ -317,7 +320,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const apiKey =
         (window as any).voicepilotGoogleApiKey ||
-        import.meta.env.VITE_GOOGLE_API_KEY;
+        env.VITE_GOOGLE_API_KEY;
       if (!apiKey) {
         throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
       }
