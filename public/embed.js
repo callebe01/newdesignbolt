@@ -374,15 +374,136 @@
   // Initialize DOM highlighter
   const domHighlighter = new DOMHighlighter();
 
+  // Smart highlighting system with buffering
+  class SmartHighlighter {
+    constructor() {
+      this.textBuffer = '';
+      this.bufferTimeout = null;
+      this.lastHighlightTime = 0;
+      this.highlightCooldown = 2000; // 2 seconds between highlights
+      this.bufferDelay = 1500; // Wait 1.5 seconds after last text before highlighting
+    }
+
+    addText(text) {
+      if (!text || text.trim().length === 0) return;
+      
+      // Add proper spacing if needed
+      const cleanText = this.addSpacing(text);
+      this.textBuffer += cleanText;
+      
+      // Clear existing timeout
+      if (this.bufferTimeout) {
+        clearTimeout(this.bufferTimeout);
+      }
+      
+      // Set new timeout to process buffer
+      this.bufferTimeout = setTimeout(() => {
+        this.processBuffer();
+      }, this.bufferDelay);
+    }
+
+    addSpacing(text) {
+      // Add space before text if the buffer doesn't end with space and text doesn't start with space
+      if (this.textBuffer.length > 0 && 
+          !this.textBuffer.endsWith(' ') && 
+          !text.startsWith(' ') &&
+          /^[a-zA-Z]/.test(text)) {
+        return ' ' + text;
+      }
+      return text;
+    }
+
+    processBuffer() {
+      const now = Date.now();
+      
+      // Check cooldown
+      if (now - this.lastHighlightTime < this.highlightCooldown) {
+        console.log('[VoicePilot] Highlighting on cooldown, skipping');
+        this.textBuffer = '';
+        return;
+      }
+
+      const textToProcess = this.textBuffer.trim();
+      
+      // Only highlight if we have substantial text
+      if (textToProcess.length < 3) {
+        this.textBuffer = '';
+        return;
+      }
+
+      // Check if text contains actionable content
+      if (this.shouldHighlight(textToProcess)) {
+        console.log('[VoicePilot] Processing for highlight:', textToProcess);
+        
+        if (domHighlighter.highlightElement(textToProcess)) {
+          this.lastHighlightTime = now;
+        }
+      } else {
+        console.log('[VoicePilot] Text not suitable for highlighting:', textToProcess);
+      }
+      
+      // Clear buffer
+      this.textBuffer = '';
+    }
+
+    shouldHighlight(text) {
+      const lowerText = text.toLowerCase();
+      
+      // Don't highlight if text is too short or just greetings
+      if (text.length < 5) return false;
+      
+      // Don't highlight common greetings and filler words
+      const skipPatterns = [
+        /^(hi|hello|hey|good|thank|thanks|please|sorry|excuse|um|uh|well|so|now|okay|ok)$/i,
+        /^(how are you|how's it going|nice to meet|good morning|good afternoon|good evening)$/i,
+        /^(i am|i'm|you are|you're|we are|we're|they are|they're)$/i
+      ];
+      
+      if (skipPatterns.some(pattern => pattern.test(text.trim()))) {
+        return false;
+      }
+      
+      // Highlight if text contains UI-related keywords
+      const uiKeywords = [
+        'button', 'click', 'press', 'tap', 'select', 'choose', 'menu', 'link', 'tab',
+        'sidebar', 'header', 'footer', 'navigation', 'nav', 'search', 'filter',
+        'agent', 'new', 'create', 'add', 'edit', 'delete', 'save', 'cancel',
+        'dashboard', 'settings', 'profile', 'help', 'logout', 'login', 'sign',
+        'card', 'form', 'input', 'field', 'dropdown', 'checkbox', 'radio'
+      ];
+      
+      const hasUIKeywords = uiKeywords.some(keyword => lowerText.includes(keyword));
+      
+      // Highlight if text contains quoted content or specific references
+      const hasQuotes = /["']([^"']+)["']/.test(text);
+      const hasSpecificReferences = /\b(the|this|that)\s+\w+/.test(lowerText);
+      
+      return hasUIKeywords || hasQuotes || hasSpecificReferences;
+    }
+
+    clear() {
+      this.textBuffer = '';
+      if (this.bufferTimeout) {
+        clearTimeout(this.bufferTimeout);
+        this.bufferTimeout = null;
+      }
+    }
+  }
+
+  // Initialize smart highlighter
+  const smartHighlighter = new SmartHighlighter();
+
   // Expose global functions
   window.voicePilotHighlight = (text) => {
-    console.log('[VoicePilot] Highlighting request for:', text);
-    return domHighlighter.highlightElement(text);
+    console.log('[VoicePilot] Adding text to buffer:', text);
+    smartHighlighter.addText(text);
+    return true;
   };
   
   window.voicePilotClearHighlights = () => {
-    console.log('[VoicePilot] Clearing highlights');
+    console.log('[VoicePilot] Clearing highlights and buffer');
     domHighlighter.clearHighlights();
+    smartHighlighter.clear();
   };
 
   // Legacy function for backward compatibility
@@ -745,19 +866,27 @@
               // Handle AI speech transcription (what the AI is saying)
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
+                
+                // Add proper spacing to transcript
+                if (transcript.length > 0 && !transcript.endsWith(' ') && !aiText.startsWith(' ')) {
+                  transcript += ' ';
+                }
                 transcript += aiText;
                 updateWidget();
                 
-                // ✅ HIGHLIGHT BASED ON AI SPEECH TRANSCRIPTION
+                // ✅ SMART HIGHLIGHTING BASED ON AI SPEECH TRANSCRIPTION
                 console.log('[VoicePilot] AI said:', aiText);
-                setTimeout(() => {
-                  window.voicePilotHighlight(aiText);
-                }, 200);
+                window.voicePilotHighlight(aiText);
               }
 
               // Handle user speech transcription (what the user is saying)
               if (parsed.serverContent.inputTranscription?.text) {
                 const userText = parsed.serverContent.inputTranscription.text.trim();
+                
+                // Add proper spacing to transcript
+                if (transcript.length > 0 && !transcript.endsWith(' ') && !userText.startsWith(' ')) {
+                  transcript += ' ';
+                }
                 transcript += userText;
                 updateWidget();
               }
@@ -894,7 +1023,8 @@
         audioContext = null;
       }
       
-      domHighlighter.clearHighlights();
+      // Clear highlights and smart highlighter buffer
+      window.voicePilotClearHighlights();
       updateWidget();
     }
 
