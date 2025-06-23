@@ -69,9 +69,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const screenIntervalRef = useRef<number | null>(null);
   const detectionInProgressRef = useRef(false);
 
-  // Smart transcript buffering for better highlighting
+  // ✅ Smart transcript buffering for better highlighting
   const transcriptBufferRef = useRef<string>('');
-  const transcriptTimeoutRef = useRef<number | null>(null);
+  const transcriptTimerRef = useRef<number | null>(null);
 
   const handleBeforeUnload = () => {
     endCall(true);
@@ -85,8 +85,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
       }
-      if (transcriptTimeoutRef.current) {
-        clearTimeout(transcriptTimeoutRef.current);
+      if (transcriptTimerRef.current) {
+        clearTimeout(transcriptTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -261,53 +261,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Smart transcript processing with proper spacing and highlighting
-  const processTranscriptText = (newText: string, isAI: boolean = false) => {
-    if (!newText || newText.trim().length === 0) return;
-
-    // Add proper spacing
-    let processedText = newText.trim();
-    
-    // Add space before text if needed
-    if (transcriptBufferRef.current.length > 0 && 
-        !transcriptBufferRef.current.endsWith(' ') && 
-        !processedText.startsWith(' ') &&
-        /^[a-zA-Z]/.test(processedText)) {
-      processedText = ' ' + processedText;
-    }
-
-    // Update transcript buffer
-    transcriptBufferRef.current += processedText;
-    
-    // Update displayed transcript
-    setTranscript(prev => {
-      if (prev.length > 0 && !prev.endsWith(' ') && !processedText.startsWith(' ') && /^[a-zA-Z]/.test(processedText)) {
-        return prev + ' ' + processedText;
-      }
-      return prev + processedText;
-    });
-
-    // Handle highlighting for AI speech
-    if (isAI) {
-      // Clear existing timeout
-      if (transcriptTimeoutRef.current) {
-        clearTimeout(transcriptTimeoutRef.current);
-      }
-
-      // Set timeout to process highlighting after speech pause
-      transcriptTimeoutRef.current = window.setTimeout(() => {
-        const textToHighlight = transcriptBufferRef.current.trim();
-        if (textToHighlight.length > 3) {
-          console.log('[Live] Processing AI speech for highlighting:', textToHighlight);
-          if (window.voicePilotHighlight) {
-            window.voicePilotHighlight(textToHighlight);
-          }
-        }
-        transcriptBufferRef.current = '';
-      }, 1500); // Wait 1.5 seconds after last AI speech
-    }
-  };
-
   const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
       setErrorMessage(null);
@@ -470,14 +423,33 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               // ✅ SMART HIGHLIGHTING FROM AI SPEECH TRANSCRIPTION
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
-                processTranscriptText(aiText, true); // true = isAI
+                
+                // Clear any pending update
+                if (transcriptTimerRef.current) {
+                  clearTimeout(transcriptTimerRef.current);
+                }
+                
+                // Buffer with proper spacing
+                transcriptBufferRef.current += (transcript.endsWith(' ') ? '' : ' ') + aiText;
+                
+                // Wait 300ms after the last fragment, then flush to UI
+                transcriptTimerRef.current = window.setTimeout(() => {
+                  setTranscript(prev => prev + transcriptBufferRef.current);
+                  transcriptBufferRef.current = '';
+                }, 300);
+
+                // Still highlight immediately for responsiveness
+                if (window.voicePilotHighlight) {
+                  window.voicePilotHighlight(aiText);
+                }
+                
                 console.log('[Live] AI said (transcribed):', aiText);
               }
               
               // Handle user speech transcription
               if (parsed.serverContent.inputTranscription?.text) {
                 const userText = parsed.serverContent.inputTranscription.text.trim();
-                processTranscriptText(userText, false); // false = isUser
+                setTranscript(prev => prev + (prev.endsWith(' ') ? '' : ' ') + userText);
               }
               
               const modelTurn = parsed.serverContent.modelTurn;
@@ -822,9 +794,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // Clear transcript timeout
-      if (transcriptTimeoutRef.current) {
-        clearTimeout(transcriptTimeoutRef.current);
-        transcriptTimeoutRef.current = null;
+      if (transcriptTimerRef.current) {
+        clearTimeout(transcriptTimerRef.current);
+        transcriptTimerRef.current = null;
       }
       transcriptBufferRef.current = '';
 
