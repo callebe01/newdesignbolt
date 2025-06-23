@@ -282,16 +282,43 @@
     }
 
     highlightElement(searchText) {
-      const matches = this.searchElements(searchText);
-      
+      const phrase = searchText.trim();
+      const normalized = phrase.replace(/[?!.]+$/, '').toLowerCase();
+
+      // 1) Get all of our fuzzy matches
+      let matches = this.searchElements(searchText);
       if (matches.length === 0) {
-        console.log('[VoicePilot] No matches found for:', searchText);
+        console.log('[VoicePilot] No matches at all for:', phrase);
         return false;
       }
 
-      this.clearHighlights();
+      // 2) Look for an exact text-content match (ignoring trailing punctuation)
+      const exact = matches.filter(m =>
+        m.text.trim().toLowerCase() === normalized
+      );
+      if (exact.length) {
+        console.log('[VoicePilot] Exact match override:', exact[0].text);
+        matches = exact;
+      }
 
+      // 3) Prefer actual interactive controls (buttons/links/ARIA buttons)
+      const interactive = matches.filter(m => {
+        const el = m.element;
+        return (
+          el.tagName === 'BUTTON' ||
+          (el.tagName === 'A' && el.hasAttribute('href')) ||
+          el.getAttribute('role') === 'button'
+        );
+      });
+      if (interactive.length) {
+        console.log('[VoicePilot] Elevating interactive elements:', interactive.map(m => m.text));
+        matches = interactive;
+      }
+
+      // Now fall through to existing "bestMatch = matches[0]" logic
+      this.clearHighlights();
       const bestMatch = matches[0];
+      
       console.log('[VoicePilot] Best match:', bestMatch.text, 'confidence:', bestMatch.confidence.toFixed(2));
       
       // More lenient threshold for highlighting
