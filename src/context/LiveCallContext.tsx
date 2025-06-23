@@ -265,23 +265,28 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const processTranscriptText = (newText: string, isAI: boolean = false) => {
     if (!newText || newText.trim().length === 0) return;
 
-    // Add proper spacing
+    // Clean and process the text
     let processedText = newText.trim();
     
-    // Add space before text if needed
+    // Add space before text if needed for proper word separation
     if (transcriptBufferRef.current.length > 0 && 
         !transcriptBufferRef.current.endsWith(' ') && 
         !processedText.startsWith(' ') &&
-        /^[a-zA-Z]/.test(processedText)) {
+        /^[a-zA-Z]/.test(processedText) &&
+        /[a-zA-Z]$/.test(transcriptBufferRef.current)) {
       processedText = ' ' + processedText;
     }
 
-    // Update transcript buffer
+    // Update transcript buffer for highlighting processing
     transcriptBufferRef.current += processedText;
     
-    // Update displayed transcript
+    // Update displayed transcript with proper spacing
     setTranscript(prev => {
-      if (prev.length > 0 && !prev.endsWith(' ') && !processedText.startsWith(' ') && /^[a-zA-Z]/.test(processedText)) {
+      if (prev.length > 0 && 
+          !prev.endsWith(' ') && 
+          !processedText.startsWith(' ') && 
+          /^[a-zA-Z]/.test(processedText) &&
+          /[a-zA-Z]$/.test(prev)) {
         return prev + ' ' + processedText;
       }
       return prev + processedText;
@@ -297,7 +302,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       // Set timeout to process highlighting after speech pause
       transcriptTimeoutRef.current = window.setTimeout(() => {
         const textToHighlight = transcriptBufferRef.current.trim();
-        if (textToHighlight.length > 3) {
+        if (textToHighlight.length > 5) {
           console.log('[Live] Processing AI speech for highlighting:', textToHighlight);
           if (window.voicePilotHighlight) {
             window.voicePilotHighlight(textToHighlight);
