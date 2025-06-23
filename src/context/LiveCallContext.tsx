@@ -69,10 +69,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const screenIntervalRef = useRef<number | null>(null);
   const detectionInProgressRef = useRef(false);
 
-  // ✅ Smart transcript buffering for better highlighting
-  const transcriptBufferRef = useRef<string>('');
-  const transcriptTimerRef = useRef<number | null>(null);
-
   const handleBeforeUnload = () => {
     endCall(true);
   };
@@ -84,9 +80,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
-      }
-      if (transcriptTimerRef.current) {
-        clearTimeout(transcriptTimerRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -269,7 +262,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = agentId || null;
       conversationIdRef.current = null;
       callEndedRef.current = false;
-      transcriptBufferRef.current = '';
       window.addEventListener('beforeunload', handleBeforeUnload);
 
       // Check agent owner's usage limits if agentId is provided
@@ -420,48 +412,39 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             if (parsed.serverContent) {
-              // ✅ TIGHTENED BUFFERING LOGIC FOR CLEAN TRANSCRIPTS
+              // Handle AI speech transcription (what the AI is saying)
               if (parsed.serverContent.outputTranscription?.text) {
                 const aiText = parsed.serverContent.outputTranscription.text.trim();
-
-                // clear any pending flush
-                if (transcriptTimerRef.current) {
-                  clearTimeout(transcriptTimerRef.current);
-                }
-
-                // accumulate into buffer, with exactly one space between chunks
-                transcriptBufferRef.current = transcriptBufferRef.current
-                  ? transcriptBufferRef.current + ' ' + aiText
-                  : aiText;
-
-                // wait 300ms after last fragment, then flush the whole phrase
-                transcriptTimerRef.current = window.setTimeout(() => {
-                  const phrase = transcriptBufferRef.current.trim();
-                  // append to the main transcript with one leading space if needed
-                  setTranscript(prev =>
-                    prev ? prev + ' ' + phrase : phrase
-                  );
-                  transcriptBufferRef.current = '';
-
-                  // single highlight for the full phrase
-                  if (window.voicePilotHighlight) {
-                    window.voicePilotHighlight(phrase);
-                  }
-                }, 300);
-
-                console.log('[Live] buffered AI text:', aiText);
+                setTranscript(prev => prev ? prev + ' ' + aiText : aiText);
+                console.log('[Live] AI transcription:', aiText);
               }
               
-              // Handle user speech transcription
+              // Handle user speech transcription (what the user is saying)
               if (parsed.serverContent.inputTranscription?.text) {
                 const userText = parsed.serverContent.inputTranscription.text.trim();
                 setTranscript(prev => prev ? prev + ' ' + userText : userText);
+                console.log('[Live] User transcription:', userText);
               }
               
+              // ✅ BATCH ON modelTurn.parts FOR COMPLETE SENTENCES
               const modelTurn = parsed.serverContent.modelTurn;
-              if (modelTurn && Array.isArray(modelTurn.parts)) {
+              if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
-                  // Handle audio data (no text parts expected with AUDIO-only mode)
+                  if (part.text) {
+                    // ✅ Complete sentence from Gemini - add to transcript and highlight
+                    setTranscript(prev =>
+                      prev ? prev + ' ' + part.text : part.text
+                    );
+                    
+                    // ✅ Highlight the complete sentence
+                    if (window.voicePilotHighlight) {
+                      window.voicePilotHighlight(part.text);
+                    }
+                    
+                    console.log('[Live] AI complete sentence:', part.text);
+                  }
+                  
+                  // Handle audio data
                   if (
                     part.inlineData &&
                     typeof part.inlineData.data === 'string'
@@ -798,13 +781,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       if (window.voicePilotClearHighlights) {
         window.voicePilotClearHighlights();
       }
-
-      // Clear transcript timeout
-      if (transcriptTimerRef.current) {
-        clearTimeout(transcriptTimerRef.current);
-        transcriptTimerRef.current = null;
-      }
-      transcriptBufferRef.current = '';
 
       // Save transcript and conversation data
       if (agentId && finalTranscript) {
