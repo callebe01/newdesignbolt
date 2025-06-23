@@ -692,7 +692,7 @@
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
-                responseModalities: ['AUDIO'],
+                responseModalities: ['AUDIO'], // AUDIO only - no TEXT
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
@@ -701,8 +701,8 @@
                   }
                 }
               },
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
+              outputAudioTranscription: {}, // Enable transcription of AI speech
+              inputAudioTranscription: {},  // Enable transcription of user speech
               systemInstruction: {
                 parts: [{
                   text: 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.'
@@ -742,29 +742,30 @@
             }
 
             if (parsed.serverContent) {
+              // Handle AI speech transcription (what the AI is saying)
               if (parsed.serverContent.outputTranscription?.text) {
-                transcript += parsed.serverContent.outputTranscription.text;
+                const aiText = parsed.serverContent.outputTranscription.text.trim();
+                transcript += aiText;
                 updateWidget();
+                
+                // ✅ HIGHLIGHT BASED ON AI SPEECH TRANSCRIPTION
+                console.log('[VoicePilot] AI said:', aiText);
+                setTimeout(() => {
+                  window.voicePilotHighlight(aiText);
+                }, 200);
               }
 
+              // Handle user speech transcription (what the user is saying)
               if (parsed.serverContent.inputTranscription?.text) {
-                transcript += parsed.serverContent.inputTranscription.text;
+                const userText = parsed.serverContent.inputTranscription.text.trim();
+                transcript += userText;
                 updateWidget();
               }
 
+              // Handle audio data from AI responses
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn?.parts) {
                 for (const part of modelTurn.parts) {
-                  if (part.text) {
-                    transcript += part.text;
-                    updateWidget();
-                    
-                    // Auto-highlight UI elements mentioned in AI response
-                    setTimeout(() => {
-                      window.voicePilotHighlight(part.text);
-                    }, 200);
-                  }
-
                   if (part.inlineData?.data) {
                     try {
                       const base64str = part.inlineData.data;

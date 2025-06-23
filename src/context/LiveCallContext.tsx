@@ -109,72 +109,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  // Auto-highlighting function that analyzes AI text and highlights matching elements
-  const autoHighlightFromText = (text: string) => {
-    if (!text || typeof window.voicePilotHighlight !== 'function') return;
-
-    // Extract potential UI element references from the AI's text
-    const uiPatterns = [
-      // Button patterns
-      /(?:click|press|tap|hit)\s+(?:the\s+)?([^.!?]+?)\s*(?:button|btn)/gi,
-      /(?:the\s+)?([^.!?]+?)\s*(?:button|btn)/gi,
-      
-      // Link patterns
-      /(?:click|follow|go to)\s+(?:the\s+)?([^.!?]+?)\s*(?:link|url)/gi,
-      /(?:the\s+)?([^.!?]+?)\s*(?:link|url)/gi,
-      
-      // Menu/navigation patterns
-      /(?:open|click|go to)\s+(?:the\s+)?([^.!?]+?)\s*(?:menu|nav|navigation)/gi,
-      /(?:the\s+)?([^.!?]+?)\s*(?:menu|nav|navigation)/gi,
-      
-      // Form patterns
-      /(?:fill|enter|type in)\s+(?:the\s+)?([^.!?]+?)\s*(?:field|input|form)/gi,
-      /(?:the\s+)?([^.!?]+?)\s*(?:field|input|form)/gi,
-      
-      // General element patterns
-      /(?:see|find|look at|notice)\s+(?:the\s+)?([^.!?]+?)(?:\s+(?:here|there|above|below))?/gi,
-      /(?:the\s+)?([A-Z][^.!?]*?)(?:\s+(?:section|area|part))/gi,
-      
-      // Quoted elements
-      /"([^"]+)"/g,
-      /'([^']+)'/g,
-    ];
-
-    const extractedTerms = new Set<string>();
-
-    // Extract terms using patterns
-    uiPatterns.forEach(pattern => {
-      let match;
-      while ((match = pattern.exec(text)) !== null) {
-        const term = match[1]?.trim();
-        if (term && term.length > 2 && term.length < 50) {
-          extractedTerms.add(term);
-        }
-      }
-    });
-
-    // Also look for capitalized words that might be UI elements
-    const capitalizedWords = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g);
-    if (capitalizedWords) {
-      capitalizedWords.forEach(word => {
-        if (word.length > 2 && word.length < 30) {
-          extractedTerms.add(word);
-        }
-      });
-    }
-
-    // Try to highlight each extracted term
-    extractedTerms.forEach(term => {
-      setTimeout(() => {
-        try {
-          window.voicePilotHighlight(term);
-        } catch (error) {
-          console.log('[AutoHighlight] Failed to highlight:', term, error);
-        }
-      }, 100);
-    });
-  };
-
   const playAudioBuffer = async (pcmBlob: Blob) => {
     try {
       const arrayBuffer = await pcmBlob.arrayBuffer();
@@ -412,12 +346,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // Setup message with tools and Kore voice
+        // Setup message with tools and Kore voice - AUDIO ONLY
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
             generationConfig: {
-              responseModalities: ['AUDIO'],
+              responseModalities: ['AUDIO'], // ✅ AUDIO ONLY - no TEXT
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
@@ -427,8 +361,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               }
             },
             tools: tools.length > 0 ? tools : undefined,
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
+            outputAudioTranscription: {}, // ✅ Enable transcription of AI speech
+            inputAudioTranscription: {},  // ✅ Enable transcription of user speech
             systemInstruction: {
               parts: [
                 {
@@ -486,28 +420,30 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             if (parsed.serverContent) {
+              // ✅ HIGHLIGHT FROM AI SPEECH TRANSCRIPTION
               if (parsed.serverContent.outputTranscription?.text) {
-                setTranscript(
-                  (prev) => prev + parsed.serverContent.outputTranscription.text
-                );
+                const aiText = parsed.serverContent.outputTranscription.text.trim();
+                setTranscript((prev) => prev + aiText);
+                
+                // Auto-highlight UI elements mentioned in AI speech
+                console.log('[Live] AI said (transcribed):', aiText);
+                setTimeout(() => {
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(aiText);
+                  }
+                }, 200);
               }
+              
+              // Handle user speech transcription
               if (parsed.serverContent.inputTranscription?.text) {
-                setTranscript(
-                  (prev) => prev + parsed.serverContent.inputTranscription.text
-                );
+                const userText = parsed.serverContent.inputTranscription.text.trim();
+                setTranscript((prev) => prev + userText);
               }
               
               const modelTurn = parsed.serverContent.modelTurn;
               if (modelTurn && Array.isArray(modelTurn.parts)) {
                 for (const part of modelTurn.parts) {
-                  if (typeof part.text === 'string') {
-                    console.log('[Live] AI says (text):', part.text);
-                    setTranscript((prev) => prev + part.text);
-                    
-                    // Auto-highlight UI elements mentioned in the AI's response
-                    autoHighlightFromText(part.text);
-                  }
-                  
+                  // Handle audio data (no text parts expected with AUDIO-only mode)
                   if (
                     part.inlineData &&
                     typeof part.inlineData.data === 'string'
