@@ -35,40 +35,60 @@
       this.highlightStyle.textContent = `
         .${this.highlightClass} {
           position: relative !important;
-          outline: 3px solid #3b82f6 !important;
-          outline-offset: 2px !important;
-          box-shadow: 0 0 0 2px rgba(59,130,246,0.3),0 0 20px rgba(59,130,246,0.2) !important;
-          border-radius: 8px !important;
-          background-color: rgba(59,130,246,0.08) !important;
-          transition: all 0.3s ease !important;
+          outline: 3px solid #f59e0b !important;
+          outline-offset: 3px !important;
+          box-shadow:
+            0 0 0 4px rgba(251, 191, 36, 0.4),
+            0 0 16px rgba(251, 191, 36, 0.8),
+            0 0 32px rgba(251, 191, 36, 0.5) !important;
+          border-radius: 12px !important;
+          background-color: rgba(251, 191, 36, 0.15) !important;
+          transition: all 0.25s ease-in-out !important;
           z-index: 9999 !important;
+          animation: pulse-ring 1.6s infinite ease-in-out;
         }
-        .${this.highlightClass}::before {
-          content: '';
+        
+        .${this.highlightClass}::after {
+          content: "🟡";
           position: absolute;
-          top: -6px; left: -6px; right: -6px; bottom: -6px;
-          background: linear-gradient(45deg, rgba(59,130,246,0.15), rgba(147,51,234,0.15));
-          border-radius: 12px;
-          z-index: -1;
-          animation: voicepilot-pulse 2s infinite;
+          top: -18px;
+          left: -18px;
+          font-size: 20px;
+          animation: wiggle 0.4s ease-in-out infinite alternate;
           pointer-events: none;
+          z-index: 10000;
         }
-        @keyframes voicepilot-pulse {
-          0%,100%{opacity:0.4;transform:scale(1);}
-          50%{opacity:0.8;transform:scale(1.02);}
+        
+        @keyframes pulse-ring {
+          0% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.05); opacity: 0.5; }
+          100% { transform: scale(1); opacity: 0.8; }
         }
+        
+        @keyframes wiggle {
+          0% { transform: rotate(-8deg); }
+          100% { transform: rotate(8deg); }
+        }
+        
         .${this.highlightClass}-badge {
           position: absolute;
-          top: -12px; left: -8px;
-          background: #3b82f6; color: white;
-          font-size: 10px; font-weight:600;
-          padding: 2px 6px; border-radius:4px;
-          z-index:10000; pointer-events:none;
-          animation: voicepilot-badge-appear 0.3s ease;
+          bottom: -20px;
+          right: -8px;
+          background: #f59e0b;
+          color: white;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 4px 8px;
+          border-radius: 6px;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.15);
+          z-index: 10000;
+          animation: badge-pop 0.4s ease-out;
+          pointer-events: none;
         }
-        @keyframes voicepilot-badge-appear {
-          0%{opacity:0;transform:translateY(-5px) scale(0.8);}
-          100%{opacity:1;transform:translateY(0) scale(1);}
+        
+        @keyframes badge-pop {
+          0% { opacity: 0; transform: translateY(5px) scale(0.8); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `;
       document.head.appendChild(this.highlightStyle);
