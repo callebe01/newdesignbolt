@@ -35,77 +35,65 @@
       this.highlightStyle.textContent = `
         .${this.highlightClass} {
           position: relative !important;
-          outline: 4px solid #000000 !important;
-          outline-offset: 4px !important;
-          box-shadow:
-            0 0 0 2px #ffffff,
-            0 0 0 8px #000000,
-            0 0 20px rgba(0, 0, 0, 0.8),
-            0 0 40px rgba(255, 255, 255, 0.6) !important;
-          border-radius: 12px !important;
-          background-color: rgba(255, 255, 255, 0.95) !important;
-          transition: all 0.25s ease-in-out !important;
+          outline: 2px solid #f59e0b !important;
+          outline-offset: 2px !important;
+          box-shadow: 
+            0 0 0 4px rgba(245, 158, 11, 0.2),
+            0 0 12px rgba(245, 158, 11, 0.4) !important;
+          border-radius: 8px !important;
+          transition: all 0.3s ease !important;
           z-index: 9999 !important;
-          animation: pulse-ring 1.6s infinite ease-in-out;
+          animation: gentle-pulse 2s infinite ease-in-out;
         }
         
         .${this.highlightClass}::before {
           content: '';
           position: absolute;
-          top: -8px;
-          left: -8px;
-          right: -8px;
-          bottom: -8px;
-          border: 3px solid #ff0000;
-          border-radius: 16px;
-          background: linear-gradient(45deg, 
-            rgba(255, 0, 0, 0.1), 
-            rgba(255, 255, 0, 0.1),
-            rgba(255, 0, 0, 0.1));
+          top: -6px;
+          left: -6px;
+          right: -6px;
+          bottom: -6px;
+          border: 2px solid #f59e0b;
+          border-radius: 12px;
           z-index: -1;
-          animation: border-flash 0.8s infinite alternate;
+          animation: gentle-glow 1.5s infinite alternate;
           pointer-events: none;
         }
         
-        @keyframes pulse-ring {
-          0% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.03); opacity: 0.8; }
-          100% { transform: scale(1); opacity: 1; }
+        @keyframes gentle-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
         }
         
-        @keyframes border-flash {
+        @keyframes gentle-glow {
           0% { 
-            border-color: #ff0000;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.8);
+            opacity: 0.6;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
           }
           100% { 
-            border-color: #ffff00;
-            box-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
+            opacity: 1;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
           }
         }
         
         .${this.highlightClass}-badge {
           position: absolute;
-          bottom: -25px;
-          right: -10px;
-          background: linear-gradient(135deg, #000000, #333333);
+          top: -12px;
+          right: -8px;
+          background: #f59e0b;
           color: #ffffff;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 6px 10px;
-          border-radius: 8px;
-          border: 2px solid #ffffff;
-          box-shadow: 
-            0 2px 8px rgba(0,0,0,0.5),
-            0 0 0 1px #000000;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 3px 6px;
+          border-radius: 4px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           z-index: 10000;
-          animation: badge-pop 0.4s ease-out;
+          animation: badge-appear 0.3s ease-out;
           pointer-events: none;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
         
-        @keyframes badge-pop {
-          0% { opacity: 0; transform: translateY(8px) scale(0.7); }
+        @keyframes badge-appear {
+          0% { opacity: 0; transform: translateY(-4px) scale(0.8); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `;
@@ -187,7 +175,7 @@ highlightElement(searchText) {
       if (isPrimary) {
         const badge = document.createElement('div');
         badge.className = `${this.highlightClass}-badge`;
-        badge.textContent = 'Product Coach';
+        badge.textContent = 'AI';
         badge.style.position = 'absolute';
         el.style.position = 'relative';
         el.appendChild(badge);
