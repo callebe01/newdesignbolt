@@ -46,34 +46,9 @@
           animation: gentle-pulse 2s infinite ease-in-out;
         }
         
-        .${this.highlightClass}::before {
-          content: '';
-          position: absolute;
-          top: -6px;
-          left: -6px;
-          right: -6px;
-          bottom: -6px;
-          border: 2px solid #f59e0b;
-          border-radius: 12px;
-          z-index: -1;
-          animation: gentle-glow 1.5s infinite alternate;
-          pointer-events: none;
-        }
-        
         @keyframes gentle-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.02); }
-        }
-        
-        @keyframes gentle-glow {
-          0% { 
-            opacity: 0.6;
-            box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
-          }
-          100% { 
-            opacity: 1;
-            box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
-          }
         }
         
         .${this.highlightClass}-badge {
