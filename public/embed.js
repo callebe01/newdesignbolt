@@ -149,7 +149,7 @@ highlightElement(searchText) {
       if (isPrimary) {
         const badge = document.createElement('div');
         badge.className = `${this.highlightClass}-badge`;
-        badge.textContent = 'AI';
+        badge.textContent = 'Product Coach';
         badge.style.position = 'absolute';
         el.style.position = 'relative';
         el.appendChild(badge);
