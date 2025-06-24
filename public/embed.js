@@ -35,59 +35,77 @@
       this.highlightStyle.textContent = `
         .${this.highlightClass} {
           position: relative !important;
-          outline: 3px solid #f59e0b !important;
-          outline-offset: 3px !important;
+          outline: 4px solid #000000 !important;
+          outline-offset: 4px !important;
           box-shadow:
-            0 0 0 4px rgba(251, 191, 36, 0.4),
-            0 0 16px rgba(251, 191, 36, 0.8),
-            0 0 32px rgba(251, 191, 36, 0.5) !important;
+            0 0 0 2px #ffffff,
+            0 0 0 8px #000000,
+            0 0 20px rgba(0, 0, 0, 0.8),
+            0 0 40px rgba(255, 255, 255, 0.6) !important;
           border-radius: 12px !important;
-          background-color: rgba(251, 191, 36, 0.15) !important;
+          background-color: rgba(255, 255, 255, 0.95) !important;
           transition: all 0.25s ease-in-out !important;
           z-index: 9999 !important;
           animation: pulse-ring 1.6s infinite ease-in-out;
         }
         
-        .${this.highlightClass}::after {
-          content: "🟡";
+        .${this.highlightClass}::before {
+          content: '';
           position: absolute;
-          top: -18px;
-          left: -18px;
-          font-size: 20px;
-          animation: wiggle 0.4s ease-in-out infinite alternate;
+          top: -8px;
+          left: -8px;
+          right: -8px;
+          bottom: -8px;
+          border: 3px solid #ff0000;
+          border-radius: 16px;
+          background: linear-gradient(45deg, 
+            rgba(255, 0, 0, 0.1), 
+            rgba(255, 255, 0, 0.1),
+            rgba(255, 0, 0, 0.1));
+          z-index: -1;
+          animation: border-flash 0.8s infinite alternate;
           pointer-events: none;
-          z-index: 10000;
         }
         
         @keyframes pulse-ring {
-          0% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.05); opacity: 0.5; }
-          100% { transform: scale(1); opacity: 0.8; }
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.03); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
         }
         
-        @keyframes wiggle {
-          0% { transform: rotate(-8deg); }
-          100% { transform: rotate(8deg); }
+        @keyframes border-flash {
+          0% { 
+            border-color: #ff0000;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.8);
+          }
+          100% { 
+            border-color: #ffff00;
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
+          }
         }
         
         .${this.highlightClass}-badge {
           position: absolute;
-          bottom: -20px;
-          right: -8px;
-          background: #f59e0b;
-          color: white;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 6px;
-          box-shadow: 0 1px 5px rgba(0,0,0,0.15);
+          bottom: -25px;
+          right: -10px;
+          background: linear-gradient(135deg, #000000, #333333);
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 2px solid #ffffff;
+          box-shadow: 
+            0 2px 8px rgba(0,0,0,0.5),
+            0 0 0 1px #000000;
           z-index: 10000;
           animation: badge-pop 0.4s ease-out;
           pointer-events: none;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
         
         @keyframes badge-pop {
-          0% { opacity: 0; transform: translateY(5px) scale(0.8); }
+          0% { opacity: 0; transform: translateY(8px) scale(0.7); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `;
