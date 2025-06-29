@@ -377,22 +377,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         conversationIdRef.current = conversationId;
       }
 
-      // Optionally validate provided documentation URLs
-      if (documentationUrls && documentationUrls.length) {
-        for (const url of documentationUrls) {
-          try {
-            const resp = await fetch(url, { method: 'HEAD' });
-            if (!resp.ok) {
-              throw new Error(`HEAD request failed with status ${resp.status}`);
-            }
-          } catch (err) {
-            console.error('[Live] URL validation failed:', err);
-            setErrorMessage(`Unable to access ${url}. Please check the link and try again.`);
-            setStatus('error');
-            return;
-          }
-        }
-      }
+      // ✅ REMOVED: Client-side URL validation that was causing CORS errors
+      // The Gemini API will handle URL access from its own servers
 
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
