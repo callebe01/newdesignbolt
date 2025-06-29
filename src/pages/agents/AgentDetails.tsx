@@ -817,7 +817,7 @@ export const AgentDetails: React.FC = () => {
           <div className="mt-4 p-3 bg-muted rounded-lg flex items-center gap-2">
             <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <code className="text-sm flex-1 break-all">
-              https://voicepilot.live/agent/${agent?.id}
+              https://voicepilot.live/agent/{agent?.id}
             </code>
           </div>
         </CardContent>
@@ -880,7 +880,7 @@ export const AgentDetails: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-3xl font-bold">
-                    {Math.round(overviewMetrics.resolutionRate * 100)}%
+                    {Math.round(overviewMetrics.resolutionRate)}%
                   </h3>
                   <p className="text-sm text-muted-foreground">Resolution Rate</p>
                   {overviewMetrics.changes?.resolution && (
@@ -1050,7 +1050,7 @@ export const AgentDetails: React.FC = () => {
                           <td className="px-4 py-3 text-sm">
                             {analysis.sentimentScores?.positive && (
                               <span className="text-success">
-                                {Math.round(analysis.sentimentScores.positive * 100)}% Positive
+                                {Math.round(analysis.sentimentScores.positive)}% Positive
                               </span>
                             )}
                           </td>
