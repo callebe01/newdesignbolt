@@ -275,6 +275,20 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // ✅ NEW: Get page context for AI system instruction
+  const getPageContext = (): string => {
+    try {
+      if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+        return window.voicePilotGetPageContext();
+      }
+    } catch (error) {
+      console.warn('[Live] Error getting page context:', error);
+    }
+    
+    // Fallback context
+    return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+  };
+
   const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
       setErrorMessage(null);
@@ -354,6 +368,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
+        // ✅ Get current page context
+        const pageContext = getPageContext();
+        console.log('[Live] Page context:', pageContext);
+
         // Create URL context tools if documentation URLs are provided
         const tools = [];
         
@@ -364,6 +382,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             }
           });
         }
+
+        // ✅ Enhanced system instruction with page context
+        const enhancedSystemInstruction = `${systemInstruction || 'You are a helpful AI assistant.'} 
+
+CURRENT PAGE CONTEXT: ${pageContext}
+
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
         // Setup message with tools and Kore voice - AUDIO ONLY
         const setupMsg = {
@@ -385,7 +410,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             systemInstruction: {
               parts: [
                 {
-                  text: systemInstruction || 'You are a helpful AI assistant. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.',
+                  text: enhancedSystemInstruction,
                 },
               ],
             },
@@ -971,3 +996,12 @@ export const useLiveCall = (): LiveCallContextType => {
   }
   return context;
 };
+
+// Extend window interface for TypeScript
+declare global {
+  interface Window {
+    voicePilotHighlight?: (text: string) => boolean;
+    voicePilotClearHighlights?: () => void;
+    voicePilotGetPageContext?: () => string;
+  }
+}
