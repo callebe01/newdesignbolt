@@ -68,6 +68,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const committedTextRef = useRef<string>(''); // All finalized text
   const partialTextRef = useRef<string>('');   // Current in-flight fragment
 
+  // ✅ PAGE CONTEXT MONITORING REFS
+  const currentPageContextRef = useRef<string>('');
+  const lastSentPageContextRef = useRef<string>('');
+  const pageContextIntervalRef = useRef<number | null>(null);
+
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
@@ -84,6 +89,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (maxDurationTimerRef.current) {
         clearTimeout(maxDurationTimerRef.current);
+      }
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
       }
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -167,6 +175,58 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     
     // Fallback context
     return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+  };
+
+  // ✅ NEW: Monitor page context changes during active call
+  const startPageContextMonitoring = () => {
+    if (pageContextIntervalRef.current) {
+      clearInterval(pageContextIntervalRef.current);
+    }
+
+    pageContextIntervalRef.current = window.setInterval(() => {
+      if (status !== 'active' || !websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      try {
+        const newContext = getPageContext();
+        currentPageContextRef.current = newContext;
+
+        // Check if context has changed significantly
+        if (newContext !== lastSentPageContextRef.current) {
+          console.log('[Live] Page context changed, updating AI:', newContext);
+          
+          // Send page context update to AI
+          const contextUpdateMessage = {
+            clientContent: {
+              turns: [
+                {
+                  role: 'user',
+                  parts: [{ 
+                    text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                  }],
+                },
+              ],
+              turnComplete: true,
+            },
+          };
+
+          websocketRef.current.send(JSON.stringify(contextUpdateMessage));
+          lastSentPageContextRef.current = newContext;
+          
+          console.log('[Live] Sent page context update to AI');
+        }
+      } catch (error) {
+        console.warn('[Live] Error monitoring page context:', error);
+      }
+    }, 2000); // Check every 2 seconds
+  };
+
+  const stopPageContextMonitoring = () => {
+    if (pageContextIntervalRef.current) {
+      clearInterval(pageContextIntervalRef.current);
+      pageContextIntervalRef.current = null;
+    }
   };
 
   const checkAgentOwnerUsage = async (agentId: string): Promise<boolean> => {
@@ -368,9 +428,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
-        // ✅ Get current page context
+        // ✅ Get current page context and initialize monitoring
         const pageContext = getPageContext();
-        console.log('[Live] Page context:', pageContext);
+        currentPageContextRef.current = pageContext;
+        lastSentPageContextRef.current = pageContext;
+        console.log('[Live] Initial page context:', pageContext);
 
         // Create URL context tools if documentation URLs are provided
         const tools = [];
@@ -441,6 +503,9 @@ When responding, consider the user's current location and what they can see on t
             if (parsed.setupComplete) {
               console.log('[Live][WebSocket] Received setupComplete ✅');
               setStatus('active');
+
+              // ✅ Start page context monitoring when call becomes active
+              startPageContextMonitoring();
 
               if (ws.readyState === WebSocket.OPEN && !greetingSentRef.current) {
                 const greeting = {
@@ -598,6 +663,8 @@ When responding, consider the user's current location and what they can see on t
         console.log(`[Live][WebSocket] onclose: code=${ev.code}, reason="${ev.reason}"`);
         setStatus('ended');
         websocketRef.current = null;
+        // ✅ Stop page context monitoring when call ends
+        stopPageContextMonitoring();
       };
     } catch (err: any) {
       console.error('[Live] Failed to start call:', err);
@@ -921,6 +988,9 @@ When responding, consider the user's current location and what they can see on t
         clearTimeout(maxDurationTimerRef.current);
         maxDurationTimerRef.current = null;
       }
+
+      // ✅ Stop page context monitoring
+      stopPageContextMonitoring();
 
       if (websocketRef.current) {
         websocketRef.current.close();
