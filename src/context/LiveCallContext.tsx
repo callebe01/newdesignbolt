@@ -107,7 +107,18 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
   const updateTranscriptDisplay = () => {
-    const fullText = committedTextRef.current + partialTextRef.current;
+    const committed = committedTextRef.current;
+    const partial = partialTextRef.current;
+    
+    // Smart spacing: add space between committed and partial if needed
+    let fullText = committed;
+    if (committed && partial) {
+      const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
+      fullText = committed + (needsSpace ? ' ' : '') + partial;
+    } else if (partial) {
+      fullText = partial;
+    }
+    
     setTranscript(fullText);
   };
 
@@ -273,7 +284,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       conversationIdRef.current = null;
       callEndedRef.current = false;
       
-      // ✅ CLEAR BOTH BUFFERS
+      // ✅ CLEAR BOTH BUFFERS AND TRANSCRIPT
       committedTextRef.current = '';
       partialTextRef.current = '';
       setTranscript('');
@@ -435,33 +446,39 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) Replace the partial buffer with the new text (don't append!)
-                  const needsSpace = committedTextRef.current && 
-                                   !committedTextRef.current.endsWith(' ') && 
-                                   !text.startsWith(' ');
-                  partialTextRef.current = needsSpace ? ' ' + text : text;
+                  // 1) REPLACE the partial buffer with the new text (don't append!)
+                  partialTextRef.current = text;
                   
-                  // 2) Update the display immediately
+                  // 2) Update the display immediately with committed + partial
                   updateTranscriptDisplay();
                   
                   console.log('[Live] AI transcription fragment (partial):', text);
                 }
 
-                // 3) When finished, move partial to committed and clear partial
+                // 3) When finished, MOVE partial to committed and clear partial
                 if (finished && partialTextRef.current) {
-                  const partialText = partialTextRef.current;
-                  committedTextRef.current += partialText;
+                  const partialText = partialTextRef.current.trim();
+                  
+                  // Add to committed with smart spacing
+                  if (committedTextRef.current && partialText) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    committedTextRef.current = partialText;
+                  }
+                  
+                  // Clear partial buffer
                   partialTextRef.current = '';
                   
-                  // Update display with committed text
+                  // Update display with committed text only
                   updateTranscriptDisplay();
                   
                   // ✅ HIGHLIGHT THE COMPLETE PHRASE
-                  if (window.voicePilotHighlight) {
-                    window.voicePilotHighlight(partialText.trim());
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
                   }
                   
-                  console.log('[Live] AI said (complete phrase):', partialText.trim());
+                  console.log('[Live] AI said (complete phrase):', partialText);
                 }
               }
 
@@ -469,14 +486,15 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               if (sc.inputTranscription?.text) {
                 const userText = sc.inputTranscription.text.trim();
                 if (userText) {
-                  const needsSpace = committedTextRef.current && 
-                                   !committedTextRef.current.endsWith(' ') && 
-                                   !userText.startsWith(' ');
-                  const textToAdd = needsSpace ? ' ' + userText : userText;
+                  // Add to committed text with smart spacing
+                  if (committedTextRef.current) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + userText;
+                  } else {
+                    committedTextRef.current = userText;
+                  }
                   
-                  committedTextRef.current += textToAdd;
                   updateTranscriptDisplay();
-                  
                   console.log('[Live] User transcription:', userText);
                 }
               }
@@ -511,17 +529,26 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
               // ✅ CHECK FOR TURN COMPLETE TO FORCE COMMIT PARTIAL BUFFER
               if (sc.turnComplete && partialTextRef.current) {
                 console.log('[Live] Turn complete - committing partial buffer');
-                const partialText = partialTextRef.current;
-                committedTextRef.current += partialText;
+                const partialText = partialTextRef.current.trim();
+                
+                // Move partial to committed
+                if (committedTextRef.current && partialText) {
+                  const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                  committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                } else if (partialText) {
+                  committedTextRef.current = partialText;
+                }
+                
+                // Clear partial buffer
                 partialTextRef.current = '';
                 
                 updateTranscriptDisplay();
                 
-                if (window.voicePilotHighlight) {
-                  window.voicePilotHighlight(partialText.trim());
+                if (window.voicePilotHighlight && partialText) {
+                  window.voicePilotHighlight(partialText);
                 }
                 
-                console.log('[Live] AI said (turn complete commit):', partialText.trim());
+                console.log('[Live] AI said (turn complete commit):', partialText);
               }
             }
 
