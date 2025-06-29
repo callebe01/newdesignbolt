@@ -31,7 +31,6 @@ export const AgentCall: React.FC = () => {
     endCall,
     status,
     transcript,
-    livePartialTranscript,
     toggleMicrophone,
     toggleScreenShare,
     toggleHighlightObjects,
@@ -117,18 +116,9 @@ export const AgentCall: React.FC = () => {
 
       {/* TRANSCRIPT */}
       <main className="flex-1 flex flex-col items-center justify-center p-6">
-        {transcript || livePartialTranscript ? (
+        {transcript ? (
           <div className="w-full max-w-2xl bg-white border rounded-lg p-4 mb-6 shadow">
-            {/* Finalized transcript */}
-            {transcript && (
-              <p className="whitespace-pre-wrap">{transcript}</p>
-            )}
-            {/* Live partial transcript in a different style */}
-            {livePartialTranscript && (
-              <p className="whitespace-pre-wrap text-gray-500 italic">
-                {transcript && ' '}{livePartialTranscript}
-              </p>
-            )}
+            <p className="whitespace-pre-wrap">{transcript}</p>
           </div>
         ) : (
           <p className="text-gray-400 mb-6">Start speaking to begin the conversation</p>

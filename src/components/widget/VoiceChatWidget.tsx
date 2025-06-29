@@ -17,7 +17,6 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
     endCall, 
     status, 
     transcript,
-    livePartialTranscript,
     toggleMicrophone,
     isMicrophoneActive,
     duration,
@@ -117,20 +116,11 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
                   </div>
 
                   {/* Transcript */}
-                  {(transcript || livePartialTranscript) && (
+                  {transcript && (
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 max-h-32 overflow-y-auto">
-                      <div className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                        {/* Finalized transcript */}
-                        {transcript && (
-                          <span>{transcript}</span>
-                        )}
-                        {/* Live partial transcript in a different style */}
-                        {livePartialTranscript && (
-                          <span className="text-gray-400 italic">
-                            {transcript && ' '}{livePartialTranscript}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                        {transcript}
+                      </p>
                     </div>
                   )}
 
