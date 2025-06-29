@@ -18,7 +18,7 @@
   }
 
   // ═══════════════════════════════════════════════
-  // Page Context Capture System
+  // Enhanced Page Context Capture System
   // ═══════════════════════════════════════════════
   class PageContextCapture {
     constructor() {
@@ -42,7 +42,8 @@
             mainHeading: this.getMainHeading(),
             breadcrumbs: this.getBreadcrumbs(),
             navigationItems: this.getNavigationItems(),
-            pageType: this.inferPageType()
+            pageType: this.inferPageType(),
+            currentScreen: this.getCurrentScreen()
           },
           ui: {
             visibleButtons: this.getVisibleButtons(),
@@ -58,7 +59,7 @@
         console.warn('[VoicePilot] Error capturing page context:', error);
         return {
           url: { pathname: window.location.pathname },
-          page: { title: document.title || 'Unknown Page' },
+          page: { title: document.title || 'Unknown Page', currentScreen: 'Unknown' },
           ui: {},
           timestamp: new Date().toISOString()
         };
@@ -77,6 +78,40 @@
       // Fallback to other headings
       const h2 = document.querySelector('h2');
       return h2 ? h2.textContent?.trim() || '' : '';
+    }
+
+    getCurrentScreen() {
+      const pathname = window.location.pathname.toLowerCase();
+      const mainHeading = this.getMainHeading();
+      
+      // Specific page type detection based on URL patterns and headings
+      if (pathname.includes('/agents/new') || mainHeading.toLowerCase().includes('create') && mainHeading.toLowerCase().includes('agent')) {
+        return 'agent_creation_form';
+      }
+      if (pathname.includes('/agents/') && pathname.includes('/edit')) {
+        return 'agent_edit_form';
+      }
+      if (pathname.match(/\/agents\/[^\/]+$/) && !pathname.includes('/new') && !pathname.includes('/edit')) {
+        return 'agent_details_page';
+      }
+      if (pathname === '/agents' || pathname.endsWith('/agents')) {
+        return 'agents_list_page';
+      }
+      if (pathname === '/' || pathname === '/dashboard') {
+        return 'dashboard_page';
+      }
+      if (pathname.includes('/settings')) {
+        return 'settings_page';
+      }
+      if (pathname.includes('/login')) {
+        return 'login_page';
+      }
+      if (pathname.includes('/signup')) {
+        return 'signup_page';
+      }
+      
+      // Fallback to generic content type
+      return 'content_page';
     }
 
     getBreadcrumbs() {
@@ -287,43 +322,53 @@
     getContextSummary() {
       const context = this.lastContext || this.capturePageContext();
       
-      // Create a concise summary for the AI
+      // Create a concise summary for the AI with prioritized current screen info
       const summary = [];
       
-      // Page identification
-      if (context.page.title) {
-        summary.push(`Page: "${context.page.title}"`);
-      }
-      
-      if (context.url.pathname !== '/') {
-        summary.push(`URL: ${context.url.pathname}`);
+      // ✅ PRIORITIZE CURRENT SCREEN - Most important context first
+      if (context.page.currentScreen) {
+        const screenDescriptions = {
+          'agent_creation_form': 'Agent Creation Form - User is creating a new AI agent',
+          'agent_edit_form': 'Agent Edit Form - User is editing an existing AI agent',
+          'agent_details_page': 'Agent Details Page - User is viewing agent information and analytics',
+          'agents_list_page': 'Agents List - User is browsing their AI agents',
+          'dashboard_page': 'Dashboard - User is on the main dashboard overview',
+          'settings_page': 'Settings Page - User is managing account settings',
+          'login_page': 'Login Page - User is signing in',
+          'signup_page': 'Signup Page - User is creating an account',
+          'content_page': 'Content Page - User is viewing general content'
+        };
+        
+        const screenDescription = screenDescriptions[context.page.currentScreen] || context.page.currentScreen;
+        summary.push(`Current Screen: ${screenDescription}`);
       }
 
-      if (context.page.pageType && context.page.pageType !== 'content') {
-        summary.push(`Type: ${context.page.pageType}`);
-      }
-
-      // Main content
-      if (context.page.mainHeading && context.page.mainHeading !== context.page.title) {
+      // Main heading for additional context (if different from screen description)
+      if (context.page.mainHeading && !summary[0]?.includes(context.page.mainHeading)) {
         summary.push(`Main heading: "${context.page.mainHeading}"`);
       }
 
-      if (context.page.activeSection) {
-        summary.push(`Active section: "${context.page.activeSection}"`);
+      // Page identification
+      if (context.page.title && !summary.join(' ').includes(context.page.title)) {
+        summary.push(`Page title: "${context.page.title}"`);
+      }
+      
+      if (context.url.pathname !== '/' && !summary.join(' ').includes(context.url.pathname)) {
+        summary.push(`URL: ${context.url.pathname}`);
       }
 
       // Navigation context
       if (context.page.breadcrumbs && context.page.breadcrumbs.length > 0) {
-        summary.push(`Navigation: ${context.page.breadcrumbs.join(' > ')}`);
+        summary.push(`Navigation path: ${context.page.breadcrumbs.join(' > ')}`);
       }
 
-      // Available actions
+      // Available actions (most relevant buttons)
       if (context.ui.visibleButtons && context.ui.visibleButtons.length > 0) {
         const buttons = context.ui.visibleButtons.slice(0, 5).join(', ');
         summary.push(`Available actions: ${buttons}`);
       }
 
-      // Form context
+      // Form context (if user is on a form)
       if (context.ui.formElements && context.ui.formElements.length > 0) {
         const formFields = context.ui.formElements[0].fields.slice(0, 3).join(', ');
         summary.push(`Form fields: ${formFields}`);

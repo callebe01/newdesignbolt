@@ -155,6 +155,20 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // ✅ NEW: Get page context for AI system instruction
+  const getPageContext = (): string => {
+    try {
+      if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+        return window.voicePilotGetPageContext();
+      }
+    } catch (error) {
+      console.warn('[Live] Error getting page context:', error);
+    }
+    
+    // Fallback context
+    return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+  };
+
   const checkAgentOwnerUsage = async (agentId: string): Promise<boolean> => {
     try {
       const response = await fetch(
@@ -273,20 +287,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error('Error saving conversation messages:', err);
     }
-  };
-
-  // ✅ NEW: Get page context for AI system instruction
-  const getPageContext = (): string => {
-    try {
-      if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
-        return window.voicePilotGetPageContext();
-      }
-    } catch (error) {
-      console.warn('[Live] Error getting page context:', error);
-    }
-    
-    // Fallback context
-    return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
   };
 
   const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
