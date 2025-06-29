@@ -22,6 +22,7 @@ interface LiveCallContextType {
   isVideoActive: boolean;
   errorMessage: string | null;
   transcript: string;
+  livePartialTranscript: string;
   duration: number;
   highlightObjects: boolean;
   toggleHighlightObjects: () => void;
@@ -44,6 +45,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isVideoActive, setIsVideoActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
+  const [livePartialTranscript, setLivePartialTranscript] = useState<string>('');
   const [duration, setDuration] = useState(0);
   const [highlightObjects, setHighlightObjects] = useState(false);
   const [objectBoxes, setObjectBoxes] = useState<BoundingBox[]>([]);
@@ -266,8 +268,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       conversationIdRef.current = null;
       callEndedRef.current = false;
       
-      // ✅ CLEAR AI BUFFER
+      // ✅ CLEAR AI BUFFER AND PARTIAL TRANSCRIPT
       aiBufferRef.current = '';
+      setLivePartialTranscript('');
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -426,29 +429,30 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) Accumulate every piece in the buffer for complete phrase tracking
-                  aiBufferRef.current += text;
-                  console.log('[Live] AI transcription fragment:', text);
+                  // 1) Replace the current partial transcript with the latest text
+                  // This assumes text contains the complete current segment being spoken
+                  aiBufferRef.current = text;
+                  setLivePartialTranscript(text);
+                  console.log('[Live] AI transcription (live):', text);
                   
-                  // 2) ✅ REAL-TIME: Immediately update transcript with this fragment
-                  setTranscript(prev => {
-                    // Add space if needed between previous text and new fragment
-                    if (prev && !prev.endsWith(' ') && !text.startsWith(' ')) {
-                      return prev + ' ' + text;
-                    }
-                    return prev + text;
-                  });
-                  
-                  // 3) ✅ REAL-TIME: Immediately trigger highlighting for this fragment
+                  // 2) ✅ REAL-TIME: Immediately trigger highlighting for this text
                   if (window.voicePilotHighlight) {
                     window.voicePilotHighlight(text);
                   }
                 }
 
-                // 4) When Vertex signals end of this transcription chunk, process complete phrase
+                // 3) When Vertex signals end of this transcription chunk, finalize it
                 if (finished) {
                   const phrase = aiBufferRef.current.trim();
                   if (phrase) {
+                    // Add the complete phrase to the main transcript
+                    setTranscript(prev => {
+                      if (prev && !prev.endsWith(' ') && !phrase.startsWith(' ')) {
+                        return prev + ' ' + phrase;
+                      }
+                      return prev + phrase;
+                    });
+                    
                     // Trigger highlighting for the complete phrase (more accurate)
                     if (window.voicePilotHighlight) {
                       window.voicePilotHighlight(phrase);
@@ -456,7 +460,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     
                     console.log('[Live] AI said (complete phrase):', phrase);
                   }
+                  // Clear the partial transcript and buffer
                   aiBufferRef.current = '';
+                  setLivePartialTranscript('');
                 }
               }
 
@@ -471,6 +477,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                     return prev + userText;
                   });
                   console.log('[Live] User transcription:', userText);
+                  
+                  // Clear AI partial transcript when user speaks
+                  aiBufferRef.current = '';
+                  setLivePartialTranscript('');
                 }
               }
 
@@ -519,6 +529,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                   
                   console.log('[Live] AI said (turn complete flush):', phrase);
                   aiBufferRef.current = '';
+                  setLivePartialTranscript('');
                 }
               }
             }
@@ -828,6 +839,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           return prev + phrase;
         });
         aiBufferRef.current = '';
+        setLivePartialTranscript('');
         console.log('[Live] Final AI buffer flush:', phrase);
       }
 
@@ -908,8 +920,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = null;
       conversationIdRef.current = null;
       
-      // ✅ CLEAR AI BUFFER
+      // ✅ CLEAR AI BUFFER AND PARTIAL TRANSCRIPT
       aiBufferRef.current = '';
+      setLivePartialTranscript('');
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
@@ -926,6 +939,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         isVideoActive,
         errorMessage,
         transcript,
+        livePartialTranscript,
         duration,
         highlightObjects,
         toggleHighlightObjects,
