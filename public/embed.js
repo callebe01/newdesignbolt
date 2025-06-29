@@ -18,7 +18,7 @@
   }
 
   // ═══════════════════════════════════════════════
-  // Enhanced Page Context Capture System
+  // Enhanced Page Context Capture System - GENERIC APPROACH
   // ═══════════════════════════════════════════════
   class PageContextCapture {
     constructor() {
@@ -42,7 +42,6 @@
             mainHeading: this.getMainHeading(),
             breadcrumbs: this.getBreadcrumbs(),
             navigationItems: this.getNavigationItems(),
-            pageType: this.inferPageType(),
             currentScreen: this.getCurrentScreen()
           },
           ui: {
@@ -72,45 +71,89 @@
     }
 
     getMainHeading() {
+      // Look for the most prominent heading in order of importance
       const h1 = document.querySelector('h1');
-      if (h1) return h1.textContent?.trim() || '';
+      if (h1 && h1.textContent?.trim()) {
+        return h1.textContent.trim();
+      }
       
-      // Fallback to other headings
+      // Fallback to h2 if no h1
       const h2 = document.querySelector('h2');
-      return h2 ? h2.textContent?.trim() || '' : '';
+      if (h2 && h2.textContent?.trim()) {
+        return h2.textContent.trim();
+      }
+
+      // Fallback to h3 if no h2
+      const h3 = document.querySelector('h3');
+      if (h3 && h3.textContent?.trim()) {
+        return h3.textContent.trim();
+      }
+
+      return '';
     }
 
     getCurrentScreen() {
+      // ✅ GENERIC APPROACH - Focus on content, not specific URLs
+      const mainHeading = this.getMainHeading().toLowerCase();
+      const title = document.title.toLowerCase();
       const pathname = window.location.pathname.toLowerCase();
-      const mainHeading = this.getMainHeading();
       
-      // Specific page type detection based on URL patterns and headings
-      if (pathname.includes('/agents/new') || mainHeading.toLowerCase().includes('create') && mainHeading.toLowerCase().includes('agent')) {
-        return 'agent_creation_form';
-      }
-      if (pathname.includes('/agents/') && pathname.includes('/edit')) {
-        return 'agent_edit_form';
-      }
-      if (pathname.match(/\/agents\/[^\/]+$/) && !pathname.includes('/new') && !pathname.includes('/edit')) {
-        return 'agent_details_page';
-      }
-      if (pathname === '/agents' || pathname.endsWith('/agents')) {
-        return 'agents_list_page';
-      }
-      if (pathname === '/' || pathname === '/dashboard') {
-        return 'dashboard_page';
-      }
-      if (pathname.includes('/settings')) {
-        return 'settings_page';
-      }
-      if (pathname.includes('/login')) {
-        return 'login_page';
-      }
-      if (pathname.includes('/signup')) {
-        return 'signup_page';
-      }
+      // Look for common UI patterns and content indicators
+      const indicators = [];
       
-      // Fallback to generic content type
+      // Check for form-related content
+      if (mainHeading.includes('create') || mainHeading.includes('new') || mainHeading.includes('add')) {
+        indicators.push('creation_form');
+      }
+      if (mainHeading.includes('edit') || mainHeading.includes('update') || mainHeading.includes('modify')) {
+        indicators.push('edit_form');
+      }
+      if (mainHeading.includes('settings') || mainHeading.includes('preferences') || mainHeading.includes('configuration')) {
+        indicators.push('settings_page');
+      }
+      if (mainHeading.includes('dashboard') || mainHeading.includes('overview') || mainHeading.includes('home')) {
+        indicators.push('dashboard_page');
+      }
+      if (mainHeading.includes('list') || mainHeading.includes('browse') || document.querySelectorAll('table, .list, .grid').length > 0) {
+        indicators.push('list_page');
+      }
+      if (mainHeading.includes('details') || mainHeading.includes('view') || mainHeading.includes('information')) {
+        indicators.push('details_page');
+      }
+      if (mainHeading.includes('login') || mainHeading.includes('sign in') || title.includes('login')) {
+        indicators.push('login_page');
+      }
+      if (mainHeading.includes('signup') || mainHeading.includes('register') || mainHeading.includes('sign up')) {
+        indicators.push('signup_page');
+      }
+
+      // Check for specific form elements to determine page type
+      const forms = document.querySelectorAll('form');
+      if (forms.length > 0) {
+        const hasPasswordField = document.querySelector('input[type="password"]');
+        const hasEmailField = document.querySelector('input[type="email"]');
+        
+        if (hasPasswordField && hasEmailField) {
+          if (mainHeading.includes('sign up') || mainHeading.includes('register')) {
+            indicators.push('signup_form');
+          } else {
+            indicators.push('login_form');
+          }
+        } else if (forms.length === 1 && forms[0].querySelectorAll('input, textarea, select').length > 3) {
+          indicators.push('data_entry_form');
+        }
+      }
+
+      // Return the most specific indicator, or a generic description
+      if (indicators.length > 0) {
+        return indicators[0];
+      }
+
+      // Fallback to generic content description
+      if (mainHeading) {
+        return `content_page_${mainHeading.replace(/[^a-z0-9]/g, '_').substring(0, 20)}`;
+      }
+
       return 'content_page';
     }
 
@@ -122,15 +165,16 @@
         '[aria-label*="breadcrumb"] a',
         '.breadcrumb a',
         '.breadcrumbs a',
-        'nav[role="navigation"] a'
+        'nav[role="navigation"] a',
+        '.nav-breadcrumb a'
       ];
 
       for (const selector of selectors) {
         const elements = document.querySelectorAll(selector);
-        if (elements.length > 0) {
+        if (elements.length > 0 && elements.length < 10) { // Reasonable breadcrumb size
           elements.forEach(el => {
             const text = el.textContent?.trim();
-            if (text && text.length > 0) {
+            if (text && text.length > 0 && text.length < 100) {
               breadcrumbs.push(text);
             }
           });
@@ -144,13 +188,14 @@
     getNavigationItems() {
       const navItems = [];
       
-      // Look for main navigation
+      // Look for main navigation - prioritize semantic navigation
       const navSelectors = [
+        'nav[role="navigation"] a',
         'nav a',
         '[role="navigation"] a',
-        '.nav a',
+        'header nav a',
         '.navigation a',
-        'header a'
+        '.nav a'
       ];
 
       for (const selector of navSelectors) {
@@ -164,7 +209,7 @@
               }
             }
           });
-          break;
+          if (navItems.length > 0) break; // Use first successful selector
         }
       }
 
@@ -173,11 +218,14 @@
 
     getVisibleButtons() {
       const buttons = [];
-      const buttonElements = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+      const buttonElements = document.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]');
       
       buttonElements.forEach(el => {
         if (this.isElementVisible(el)) {
-          const text = el.textContent?.trim() || el.value?.trim() || el.getAttribute('aria-label')?.trim();
+          const text = el.textContent?.trim() || 
+                      el.value?.trim() || 
+                      el.getAttribute('aria-label')?.trim() ||
+                      el.getAttribute('title')?.trim();
           if (text && text.length > 0 && text.length < 50) {
             buttons.push(text);
           }
@@ -193,7 +241,7 @@
       
       formElements.forEach(form => {
         if (this.isElementVisible(form)) {
-          const inputs = form.querySelectorAll('input[type="text"], input[type="email"], textarea, select');
+          const inputs = form.querySelectorAll('input:not([type="hidden"]), textarea, select');
           const labels = [];
           
           inputs.forEach(input => {
@@ -220,65 +268,43 @@
       const id = input.id;
       if (id) {
         const label = document.querySelector(`label[for="${id}"]`);
-        if (label) return label.textContent?.trim();
+        if (label && label.textContent?.trim()) {
+          return label.textContent.trim();
+        }
       }
 
-      const placeholder = input.placeholder;
-      if (placeholder) return placeholder.trim();
+      // Check for parent label
+      const parentLabel = input.closest('label');
+      if (parentLabel && parentLabel.textContent?.trim()) {
+        return parentLabel.textContent.trim();
+      }
 
-      const ariaLabel = input.getAttribute('aria-label');
-      if (ariaLabel) return ariaLabel.trim();
+      const placeholder = input.placeholder?.trim();
+      if (placeholder) return placeholder;
+
+      const ariaLabel = input.getAttribute('aria-label')?.trim();
+      if (ariaLabel) return ariaLabel;
+
+      const title = input.getAttribute('title')?.trim();
+      if (title) return title;
 
       return '';
     }
 
     getActiveSection() {
       // Try to determine what section of the page is most prominent
-      const sections = document.querySelectorAll('main, section, article, .content, .main-content');
+      const sections = document.querySelectorAll('main, section, article, .content, .main-content, [role="main"]');
       
       for (const section of sections) {
         if (this.isElementVisible(section)) {
           const heading = section.querySelector('h1, h2, h3');
-          if (heading) {
-            return heading.textContent?.trim() || '';
+          if (heading && heading.textContent?.trim()) {
+            return heading.textContent.trim();
           }
         }
       }
 
       return '';
-    }
-
-    inferPageType() {
-      const pathname = window.location.pathname.toLowerCase();
-      const title = document.title.toLowerCase();
-      
-      // Common page type patterns
-      if (pathname.includes('/login') || title.includes('login') || title.includes('sign in')) {
-        return 'login';
-      }
-      if (pathname.includes('/signup') || pathname.includes('/register') || title.includes('sign up')) {
-        return 'signup';
-      }
-      if (pathname.includes('/dashboard') || title.includes('dashboard')) {
-        return 'dashboard';
-      }
-      if (pathname.includes('/settings') || title.includes('settings')) {
-        return 'settings';
-      }
-      if (pathname.includes('/profile') || title.includes('profile')) {
-        return 'profile';
-      }
-      if (pathname.includes('/checkout') || title.includes('checkout')) {
-        return 'checkout';
-      }
-      if (pathname.includes('/cart') || title.includes('cart')) {
-        return 'cart';
-      }
-      if (pathname === '/' || pathname === '/home') {
-        return 'home';
-      }
-      
-      return 'content';
     }
 
     isElementVisible(el) {
@@ -325,41 +351,35 @@
       // Create a concise summary for the AI with prioritized current screen info
       const summary = [];
       
-      // ✅ PRIORITIZE CURRENT SCREEN - Most important context first
-      if (context.page.currentScreen) {
-        const screenDescriptions = {
-          'agent_creation_form': 'Agent Creation Form - User is creating a new AI agent',
-          'agent_edit_form': 'Agent Edit Form - User is editing an existing AI agent',
-          'agent_details_page': 'Agent Details Page - User is viewing agent information and analytics',
-          'agents_list_page': 'Agents List - User is browsing their AI agents',
-          'dashboard_page': 'Dashboard - User is on the main dashboard overview',
-          'settings_page': 'Settings Page - User is managing account settings',
-          'login_page': 'Login Page - User is signing in',
-          'signup_page': 'Signup Page - User is creating an account',
-          'content_page': 'Content Page - User is viewing general content'
-        };
-        
-        const screenDescription = screenDescriptions[context.page.currentScreen] || context.page.currentScreen;
-        summary.push(`Current Screen: ${screenDescription}`);
+      // ✅ PRIORITIZE MAIN HEADING - Most descriptive context
+      if (context.page.mainHeading) {
+        summary.push(`Current page: "${context.page.mainHeading}"`);
       }
 
-      // Main heading for additional context (if different from screen description)
-      if (context.page.mainHeading && !summary[0]?.includes(context.page.mainHeading)) {
-        summary.push(`Main heading: "${context.page.mainHeading}"`);
+      // Page type context (if different from heading)
+      if (context.page.currentScreen && !summary.join(' ').toLowerCase().includes(context.page.currentScreen.replace(/_/g, ' '))) {
+        const screenType = context.page.currentScreen.replace(/_/g, ' ').replace(/page|form/, '').trim();
+        if (screenType) {
+          summary.push(`Page type: ${screenType}`);
+        }
       }
 
-      // Page identification
+      // Page title for additional context (if different from heading)
       if (context.page.title && !summary.join(' ').includes(context.page.title)) {
         summary.push(`Page title: "${context.page.title}"`);
       }
       
-      if (context.url.pathname !== '/' && !summary.join(' ').includes(context.url.pathname)) {
-        summary.push(`URL: ${context.url.pathname}`);
+      // URL context (only if meaningful)
+      if (context.url.pathname !== '/' && context.url.pathname.length > 1) {
+        const pathParts = context.url.pathname.split('/').filter(p => p && p.length > 0);
+        if (pathParts.length > 0) {
+          summary.push(`URL path: /${pathParts.join('/')}`);
+        }
       }
 
       // Navigation context
       if (context.page.breadcrumbs && context.page.breadcrumbs.length > 0) {
-        summary.push(`Navigation path: ${context.page.breadcrumbs.join(' > ')}`);
+        summary.push(`Navigation: ${context.page.breadcrumbs.join(' > ')}`);
       }
 
       // Available actions (most relevant buttons)
