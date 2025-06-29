@@ -26,7 +26,7 @@ interface LiveCallContextType {
   highlightObjects: boolean;
   toggleHighlightObjects: () => void;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
-  startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string, canSeePageContext?: boolean) => Promise<void>;
+  startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string) => Promise<void>;
   endCall: (fromUnload?: boolean) => void;
   toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
@@ -72,7 +72,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentPageContextRef = useRef<string>('');
   const lastSentPageContextRef = useRef<string>('');
   const pageContextIntervalRef = useRef<number | null>(null);
-  const pageContextEnabledRef = useRef<boolean>(false); // Track if page context is enabled for this agent
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -164,12 +163,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ✅ NEW: Get page context for AI system instruction (only if enabled)
+  // ✅ NEW: Get page context for AI system instruction
   const getPageContext = (): string => {
-    if (!pageContextEnabledRef.current) {
-      return '';
-    }
-
     try {
       if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
         return window.voicePilotGetPageContext();
@@ -182,13 +177,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
   };
 
-  // ✅ NEW: Monitor page context changes during active call (only if enabled)
+  // ✅ NEW: Monitor page context changes during active call
   const startPageContextMonitoring = () => {
-    if (!pageContextEnabledRef.current) {
-      console.log('[Live] Page context monitoring disabled for this agent');
-      return;
-    }
-
     if (pageContextIntervalRef.current) {
       clearInterval(pageContextIntervalRef.current);
     }
@@ -359,7 +349,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string, canSeePageContext?: boolean): Promise<void> => {
+  const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
       setErrorMessage(null);
       setDuration(0);
@@ -367,10 +357,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = agentId || null;
       conversationIdRef.current = null;
       callEndedRef.current = false;
-      
-      // ✅ SET PAGE CONTEXT CAPABILITY FOR THIS CALL
-      pageContextEnabledRef.current = canSeePageContext || false;
-      console.log('[Live] Page context enabled for this call:', pageContextEnabledRef.current);
       
       // ✅ CLEAR BOTH BUFFERS AND TRANSCRIPT
       committedTextRef.current = '';
@@ -442,16 +428,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
-        // ✅ Get current page context and initialize monitoring (only if enabled)
-        let pageContext = '';
-        if (pageContextEnabledRef.current) {
-          pageContext = getPageContext();
-          currentPageContextRef.current = pageContext;
-          lastSentPageContextRef.current = pageContext;
-          console.log('[Live] Initial page context:', pageContext);
-        } else {
-          console.log('[Live] Page context disabled for this agent');
-        }
+        // ✅ Get current page context and initialize monitoring
+        const pageContext = getPageContext();
+        currentPageContextRef.current = pageContext;
+        lastSentPageContextRef.current = pageContext;
+        console.log('[Live] Initial page context:', pageContext);
 
         // Create URL context tools if documentation URLs are provided
         const tools = [];
@@ -464,20 +445,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // ✅ Enhanced system instruction with optional page context
-        let enhancedSystemInstruction = systemInstruction || 'You are a helpful AI assistant.';
-        
-        if (pageContextEnabledRef.current && pageContext) {
-          enhancedSystemInstruction += `
+        // ✅ Enhanced system instruction with page context
+        const enhancedSystemInstruction = `${systemInstruction || 'You are a helpful AI assistant.'} 
 
 CURRENT PAGE CONTEXT: ${pageContext}
 
-When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification.`;
-        }
-
-        enhancedSystemInstruction += `
-
-When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
         // Setup message with tools and Kore voice - AUDIO ONLY
         const setupMsg = {
@@ -531,10 +504,8 @@ When you mention specific UI elements, buttons, or parts of the interface in you
               console.log('[Live][WebSocket] Received setupComplete ✅');
               setStatus('active');
 
-              // ✅ Start page context monitoring when call becomes active (only if enabled)
-              if (pageContextEnabledRef.current) {
-                startPageContextMonitoring();
-              }
+              // ✅ Start page context monitoring when call becomes active
+              startPageContextMonitoring();
 
               if (ws.readyState === WebSocket.OPEN && !greetingSentRef.current) {
                 const greeting = {
@@ -592,8 +563,8 @@ When you mention specific UI elements, buttons, or parts of the interface in you
                   // Update display with committed text only
                   updateTranscriptDisplay();
                   
-                  // ✅ HIGHLIGHT THE COMPLETE PHRASE (only if page context is enabled)
-                  if (pageContextEnabledRef.current && window.voicePilotHighlight && partialText) {
+                  // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                  if (window.voicePilotHighlight && partialText) {
                     window.voicePilotHighlight(partialText);
                   }
                   
@@ -663,7 +634,7 @@ When you mention specific UI elements, buttons, or parts of the interface in you
                 
                 updateTranscriptDisplay();
                 
-                if (pageContextEnabledRef.current && window.voicePilotHighlight && partialText) {
+                if (window.voicePilotHighlight && partialText) {
                   window.voicePilotHighlight(partialText);
                 }
                 
@@ -969,8 +940,8 @@ When you mention specific UI elements, buttons, or parts of the interface in you
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
 
-      // Clear any DOM highlights (only if page context is enabled)
-      if (pageContextEnabledRef.current && window.voicePilotClearHighlights) {
+      // Clear any DOM highlights
+      if (window.voicePilotClearHighlights) {
         window.voicePilotClearHighlights();
       }
 
@@ -1049,10 +1020,9 @@ When you mention specific UI elements, buttons, or parts of the interface in you
       currentAgentIdRef.current = null;
       conversationIdRef.current = null;
       
-      // ✅ CLEAR BOTH BUFFERS AND RESET PAGE CONTEXT
+      // ✅ CLEAR BOTH BUFFERS
       committedTextRef.current = '';
       partialTextRef.current = '';
-      pageContextEnabledRef.current = false;
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');

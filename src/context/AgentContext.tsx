@@ -16,8 +16,7 @@ interface AgentContextType {
     instructions: string,
     canSeeScreenshare: boolean,
     duration: number,
-    documentationUrls?: string[],
-    canSeePageContext?: boolean
+    documentationUrls?: string[]
   ) => Promise<Agent>;
   setCurrentAgent: (agent: Agent | null) => void;
 }
@@ -40,7 +39,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updated_at: string;
     user_id: string;
     can_see_screenshare: boolean;
-    can_see_page_context: boolean;
     call_duration: number;
     documentation_urls: string[] | null;
   }
@@ -54,7 +52,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     updatedAt: new Date(data.updated_at),
     userId: data.user_id,
     canSeeScreenshare: data.can_see_screenshare,
-    canSeePageContext: data.can_see_page_context || false,
     callDuration: data.call_duration,
     documentationUrls: data.documentation_urls || [],
   });
@@ -108,8 +105,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     instructions: string,
     canSeeScreenshare: boolean,
     duration: number,
-    documentationUrls: string[] = [],
-    canSeePageContext: boolean = false
+    documentationUrls: string[] = []
   ): Promise<Agent> => {
     try {
       if (!user) {
@@ -130,7 +126,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           status: 'active',
           user_id: user.id,
           can_see_screenshare: canSeeScreenshare,
-          can_see_page_context: canSeePageContext,
           call_duration: duration,
           documentation_urls: documentationUrls,
         })

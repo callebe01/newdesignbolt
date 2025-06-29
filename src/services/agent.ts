@@ -6,8 +6,7 @@ export async function createAgent(
   instructions: string,
   canSeeScreenshare: boolean,
   duration: number,
-  documentationUrls?: string[],
-  canSeePageContext?: boolean
+  documentationUrls?: string[]
 ): Promise<Agent> {
   const { data, error } = await supabase
     .from('agents')
@@ -16,7 +15,6 @@ export async function createAgent(
       instructions,
       status: 'active',
       can_see_screenshare: canSeeScreenshare,
-      can_see_page_context: canSeePageContext || false,
       call_duration: duration,
       documentation_urls: documentationUrls,
     })
@@ -42,7 +40,6 @@ export async function updateAgent(id: string, updates: Partial<Agent>): Promise<
   const {
     callDuration,
     canSeeScreenshare,
-    canSeePageContext,
     documentationUrls,
     ...rest
   } = updates as any;
@@ -58,10 +55,6 @@ export async function updateAgent(id: string, updates: Partial<Agent>): Promise<
 
   if (canSeeScreenshare !== undefined) {
     updateData.can_see_screenshare = canSeeScreenshare;
-  }
-
-  if (canSeePageContext !== undefined) {
-    updateData.can_see_page_context = canSeePageContext;
   }
 
   if (documentationUrls !== undefined) {
@@ -204,7 +197,6 @@ function mapAgent(row: Record<string, any>): Agent {
     updatedAt: new Date(row.updated_at),
     userId: row.user_id,
     canSeeScreenshare: row.can_see_screenshare,
-    canSeePageContext: row.can_see_page_context || false,
     callDuration: row.call_duration,
     documentationUrls: row.documentation_urls || [],
   };
