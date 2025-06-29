@@ -23,7 +23,9 @@ import {
   Inbox,
   Calendar as CalendarIcon,
   Copy,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Users,
+  TrendingDown
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -479,51 +481,104 @@ export const AgentDetails: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Resolution and Engagement */}
+      {/* Conversation Outcomes and Exit Points */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              Resolution
+              <Users className="h-5 w-5 mr-2" />
+              Conversation Outcomes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-24">
-              {analysis.resolutionRate?.resolved > 50 ? (
-                <div className="flex items-center text-success">
-                  <CheckCircle className="h-8 w-8 mr-3" />
-                  <span className="text-2xl font-bold">Yes</span>
+            {analysis.conversationOutcomes ? (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-success">
+                    {analysis.conversationOutcomes.satisfiedUsers}
+                  </div>
+                  <div className="text-sm text-muted-foreground">users left satisfied</div>
                 </div>
-              ) : (
-                <div className="flex items-center text-destructive">
-                  <XCircle className="h-8 w-8 mr-3" />
-                  <span className="text-2xl font-bold">No</span>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-warning">
+                    {analysis.conversationOutcomes.usersWithQuestions}
+                  </div>
+                  <div className="text-sm text-muted-foreground">still had questions</div>
                 </div>
-              )}
-            </div>
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    {analysis.conversationOutcomes.outcomeDescription}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No outcome data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <BarChart2 className="h-5 w-5 mr-2" />
-              Engagement Score
+              <TrendingDown className="h-5 w-5 mr-2" />
+              Common Exit Points
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center">
-              <div className="text-4xl font-bold">{analysis.engagementScore}</div>
-              <div className="text-sm text-muted-foreground mt-2">
-                {analysis.engagementScore >= 80 ? 'High Engagement' :
-                 analysis.engagementScore >= 50 ? 'Moderate Engagement' :
-                 'Low Engagement'}
+            {analysis.commonExitPoints ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-sm mb-2">Primary Exit Point</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {analysis.commonExitPoints.primaryExitPoint}
+                  </p>
+                </div>
+                {analysis.commonExitPoints.dropOffReasons?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Drop-off Reasons</h4>
+                    <ul className="space-y-1">
+                      {analysis.commonExitPoints.dropOffReasons.slice(0, 3).map((reason, index) => (
+                        <li key={index} className="text-sm text-muted-foreground flex items-start">
+                          <span className="w-1 h-1 bg-muted-foreground rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8">
+                <TrendingDown className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No exit point data available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Engagement Score */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BarChart2 className="h-5 w-5 mr-2" />
+            Engagement Score
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <div className="text-4xl font-bold">{analysis.engagementScore}</div>
+            <div className="text-sm text-muted-foreground mt-2">
+              {analysis.engagementScore >= 80 ? 'High Engagement' :
+               analysis.engagementScore >= 50 ? 'Moderate Engagement' :
+               'Low Engagement'}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* User Intent */}
       <Card>

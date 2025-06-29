@@ -34,18 +34,27 @@ serve(async (req) => {
           role: "system",
           content: `You are a conversation analyst. Analyze the provided transcripts and return a JSON object with:
             - summary (brief overview)
-            - sentimentScores (object with positive/negative/neutral percentages)
+            - sentimentScores (object with positive/negative/neutral as percentages 0-100)
             - keyPoints (array of main takeaways)
             - recommendations (array of actionable insights)
             - userIntent (object categorizing user intents like onboarding, troubleshooting, feature discovery)
             - workflowPatterns (array of identified workflow patterns and bottlenecks)
             - uxIssues (array of UX issues mentioned)
             - featureRequests (array of feature requests or suggestions)
-            - resolutionRate (object with resolved and unresolved percentages)
+            - conversationOutcomes (object with detailed outcome analysis):
+              - satisfiedUsers (number of users who seemed satisfied)
+              - usersWithQuestions (number of users who still had questions)
+              - totalUsers (total number of users analyzed)
+              - outcomeDescription (string describing overall outcomes)
+            - commonExitPoints (object with exit point analysis):
+              - primaryExitPoint (string describing the most common exit point)
+              - exitPatterns (array of common exit patterns)
+              - dropOffReasons (array of reasons users typically drop off)
+            - resolutionRate (object with resolved and unresolved percentages 0-100)
             - engagementScore (number from 0-100 indicating user engagement level)
             - repetitiveQuestions (array of questions that came up multiple times)
             
-            Focus on extracting actionable insights and patterns.`
+            Focus on extracting actionable insights and patterns. For conversation outcomes, analyze the tone and completion of each conversation to determine satisfaction levels.`
         }, {
           role: "user",
           content: text
@@ -71,7 +80,9 @@ serve(async (req) => {
       !Array.isArray(analysis.workflowPatterns) ||
       !Array.isArray(analysis.featureRequests) ||
       typeof analysis.resolutionRate !== 'object' ||
-      typeof analysis.engagementScore !== 'number'
+      typeof analysis.engagementScore !== 'number' ||
+      typeof analysis.conversationOutcomes !== 'object' ||
+      typeof analysis.commonExitPoints !== 'object'
     ) {
       throw new Error("Invalid analysis format");
     }
@@ -96,7 +107,9 @@ serve(async (req) => {
         feature_requests: analysis.featureRequests,
         resolution_rate: analysis.resolutionRate,
         engagement_score: analysis.engagementScore,
-        repetitive_questions: analysis.repetitiveQuestions || []
+        repetitive_questions: analysis.repetitiveQuestions || [],
+        conversation_outcomes: analysis.conversationOutcomes,
+        common_exit_points: analysis.commonExitPoints
       })
       .select()
       .single();

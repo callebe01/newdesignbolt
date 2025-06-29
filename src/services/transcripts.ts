@@ -123,6 +123,8 @@ export async function analyzeTranscripts(transcripts: any[]): Promise<AnalysisRe
     resolutionRate: result.resolution_rate || { resolved: 0, unresolved: 0 },
     engagementScore: result.engagement_score || 0,
     repetitiveQuestions: result.repetitive_questions || [],
+    conversationOutcomes: result.conversation_outcomes,
+    commonExitPoints: result.common_exit_points,
     createdAt: result.created_at
   };
 }
@@ -157,6 +159,8 @@ export async function getAnalysisResults(transcriptionIds: string[]): Promise<An
       resolutionRate: row.resolution_rate || { resolved: 0, unresolved: 0 },
       engagementScore: row.engagement_score || 0,
       repetitiveQuestions: row.repetitive_questions || [],
+      conversationOutcomes: row.conversation_outcomes,
+      commonExitPoints: row.common_exit_points,
       createdAt: row.created_at
     }));
   } catch (err) {

@@ -62,6 +62,19 @@ export interface UserDecision {
   timestamp: Date;
 }
 
+export interface ConversationOutcomes {
+  satisfiedUsers: number;
+  usersWithQuestions: number;
+  totalUsers: number;
+  outcomeDescription: string;
+}
+
+export interface CommonExitPoints {
+  primaryExitPoint: string;
+  exitPatterns: string[];
+  dropOffReasons: string[];
+}
+
 export interface AnalysisResult {
   id: string;
   transcriptionIds: string[];
@@ -78,6 +91,8 @@ export interface AnalysisResult {
   };
   engagementScore: number;
   repetitiveQuestions: string[];
+  conversationOutcomes?: ConversationOutcomes;
+  commonExitPoints?: CommonExitPoints;
   createdAt: string;
 }
 
