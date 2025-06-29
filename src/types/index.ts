@@ -108,4 +108,5 @@ export interface Agent {
   canSeeScreenshare: boolean;
   callDuration: number;
   documentationUrls?: string[];
+  canSeePageContext?: boolean; // New field for page context awareness
 }

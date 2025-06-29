@@ -66,7 +66,8 @@ export const AgentCall: React.FC = () => {
         agent.instructions,
         agent.callDuration,
         agent.documentationUrls,
-        agentId
+        agentId,
+        agent.canSeePageContext // ✅ Pass page context capability
       ).catch(console.error);
     }
   }, [agent, agentId, startCall, setTranscript]);
@@ -99,6 +100,25 @@ export const AgentCall: React.FC = () => {
           <h2 className="text-xl font-semibold mb-2 text-gray-900">Call Completed</h2>
           <p className="text-gray-600 mb-4">Thank you for using {agent?.name || 'our AI agent'}!</p>
           <p className="text-sm text-gray-500">Duration: {formatTime(duration)}</p>
+          
+          {/* Show agent capabilities that were used */}
+          {agent && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Agent capabilities used:</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {agent.canSeePageContext && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                    Page Context Awareness
+                  </span>
+                )}
+                {agent.canSeeScreenshare && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                    Screen Sharing
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -108,7 +128,23 @@ export const AgentCall: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* HEADER */}
       <header className="flex items-center justify-between p-4 bg-white border-b shadow">
-        <h1 className="text-lg font-semibold">{agent?.name || 'AI Agent'}</h1>
+        <div>
+          <h1 className="text-lg font-semibold">{agent?.name || 'AI Agent'}</h1>
+          {agent && (
+            <div className="flex items-center gap-2 mt-1">
+              {agent.canSeePageContext && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  Context Aware
+                </span>
+              )}
+              {agent.canSeeScreenshare && (
+                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                  Screen Share Ready
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         <span className="text-sm text-gray-500">
           {status === 'active' ? `${formatTime(duration)} elapsed` : status}
         </span>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Bot, Clock, Plus, X, MessageCircle, Sparkles } from 'lucide-react';
+import { ChevronLeft, Bot, Clock, Plus, X, MessageCircle, Sparkles, Eye, Monitor } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -22,6 +22,7 @@ export const NewAgent: React.FC = () => {
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
   const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
+  const [canSeePageContext, setCanSeePageContext] = useState(false);
   const [duration, setDuration] = useState<number>(300); // Default to 5 minutes
   const [documentationUrls, setDocumentationUrls] = useState<string[]>([]);
   const [newUrl, setNewUrl] = useState('');
@@ -68,7 +69,8 @@ export const NewAgent: React.FC = () => {
         instructions,
         canSeeScreenshare,
         duration,
-        documentationUrls
+        documentationUrls,
+        canSeePageContext
       );
       navigate(`/agents/${agent.id}`);
     } catch (err) {
@@ -243,19 +245,65 @@ export const NewAgent: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Capabilities</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start space-x-3 p-3 bg-muted rounded-lg">
                   <input
                     type="checkbox"
                     id="canSeeScreenshare"
                     checked={canSeeScreenshare}
                     onChange={(e) => setCanSeeScreenshare(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-0.5"
                   />
-                  <label htmlFor="canSeeScreenshare" className="text-sm font-medium flex-1">
-                    Allow this agent to see screen shares
-                  </label>
+                  <div className="flex-1">
+                    <label htmlFor="canSeeScreenshare" className="text-sm font-medium flex items-center">
+                      <Monitor className="h-4 w-4 mr-2" />
+                      Screen Sharing
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Allow this agent to see and analyze screen shares during calls
+                    </p>
+                  </div>
                 </div>
+
+                <div className="flex items-start space-x-3 p-3 bg-muted rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="canSeePageContext"
+                    checked={canSeePageContext}
+                    onChange={(e) => setCanSeePageContext(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="canSeePageContext" className="text-sm font-medium flex items-center">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Page Context Awareness
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Allow this agent to see page contents, buttons, and navigation elements to provide contextual guidance
+                    </p>
+                  </div>
+                </div>
+
+                {canSeePageContext && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                    <div className="flex items-start space-x-2">
+                      <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-primary">Enhanced Guidance</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This agent will be able to see what page users are on, highlight relevant buttons, and provide step-by-step navigation assistance.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
