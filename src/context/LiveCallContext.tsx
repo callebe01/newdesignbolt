@@ -446,8 +446,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) REPLACE the partial buffer with the new text (don't append!)
-                  partialTextRef.current = text;
+                  // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
+                  partialTextRef.current += text;
                   
                   // 2) Update the display immediately with committed + partial
                   updateTranscriptDisplay();
