@@ -90,58 +90,57 @@
       );
     }
 
-highlightElement(searchText) {
-  // 1) pull out anything in single or double quotes (highest priority)
-  let phrase = searchText.trim();
-  const qm = phrase.match(/['"]([^'"]+)['"]/);
-  if (qm) {
-    phrase = qm[1];      // e.g. "New Agent"
-  }
+    highlightElement(searchText) {
+      // 1) pull out anything in single or double quotes (highest priority)
+      let phrase = searchText.trim();
+      const qm = phrase.match(/['"]([^'"]+)['"]/);
+      if (qm) {
+        phrase = qm[1];      // e.g. "New Agent"
+      }
 
-  phrase = phrase.toLowerCase();
-  if (!phrase) return false;
+      phrase = phrase.toLowerCase();
+      if (!phrase) return false;
 
-  // 2) grab _only_ buttons + clickable inputs
-  const controls = Array.from(
-    document.querySelectorAll(
-      'button,' +
-      'input[type="button"],' +
-      'input[type="submit"],' +
-      'input[type="reset"]'
-    )
-  ).filter(el => this.isElementVisible(el));
+      // 2) grab _only_ buttons + clickable inputs
+      const controls = Array.from(
+        document.querySelectorAll(
+          'button,' +
+          'input[type="button"],' +
+          'input[type="submit"],' +
+          'input[type="reset"]'
+        )
+      ).filter(el => this.isElementVisible(el));
 
-  // 3) score each by exact (2) → substring (1)
-  const matches = controls
-    .map(el => {
-      const label = (el.getAttribute('aria-label')
-                   || el.value
-                   || el.textContent
-                   || ''
-                  ).trim();
-      const lower = label.toLowerCase();
-      let score = 0;
-      if (lower === phrase)      score = 2;
-      else if (lower.includes(phrase)) score = 1;
-      return { el, label, score };
-    })
-    .filter(x => x.score > 0)
-    .sort((a,b) => b.score - a.score);
+      // 3) score each by exact (2) → substring (1)
+      const matches = controls
+        .map(el => {
+          const label = (el.getAttribute('aria-label')
+                       || el.value
+                       || el.textContent
+                       || ''
+                      ).trim();
+          const lower = label.toLowerCase();
+          let score = 0;
+          if (lower === phrase)      score = 2;
+          else if (lower.includes(phrase)) score = 1;
+          return { el, label, score };
+        })
+        .filter(x => x.score > 0)
+        .sort((a,b) => b.score - a.score);
 
-  if (!matches.length) {
-    console.log('[VoicePilot] No buttons/inputs matching:', phrase);
-    return false;
-  }
+      if (!matches.length) {
+        console.log('[VoicePilot] No buttons/inputs matching:', phrase);
+        return false;
+      }
 
-  // 4) highlight the top one
-  this.clearHighlights();
-  const best = matches[0].el;
-  this.addHighlight(best, true);
-  best.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  console.log('[VoicePilot] Highlighting control:', matches[0].label);
-  return true;
-}
-
+      // 4) highlight the top one
+      this.clearHighlights();
+      const best = matches[0].el;
+      this.addHighlight(best, true);
+      best.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[VoicePilot] Highlighting control:', matches[0].label);
+      return true;
+    }
 
     addHighlight(el, isPrimary=false) {
       el.classList.add(this.highlightClass);
@@ -175,52 +174,16 @@ highlightElement(searchText) {
 
   const domHighlighter = new DOMHighlighter();
 
-  // ═══════════════════════════════════════════════
-  // SmartHighlighter (buffers AI‐speech → DOMHighlighter)
-  // ═══════════════════════════════════════════════
-  class SmartHighlighter {
-    constructor() {
-      this.textBuffer = '';
-      this.bufferTimeout = null;
-      this.lastHighlightTime = 0;
-      this.cooldown = 2000;   // ms
-      this.delay    = 1500;   // ms
+  // Expose global highlight functions for real-time highlighting
+  window.voicePilotHighlight = text => { 
+    if (text && text.trim()) {
+      domHighlighter.highlightElement(text); 
     }
-    addText(txt) {
-      if (!txt || !txt.trim()) return;
-      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-      this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
-      this.bufferTimeout = setTimeout(() => this.process(), this.delay);
-    }
-    process() {
-      const now = Date.now();
-      if (now - this.lastHighlightTime < this.cooldown) {
-        this.textBuffer = '';
-        return;
-      }
-      const phrase = this.textBuffer.trim();
-      this.textBuffer = '';
-      if (!phrase || phrase.length < 3) return;
-      // simple filter to skip greetings
-      if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
-      console.log('[VoicePilot] Trying to highlight:', phrase);
-      if (domHighlighter.highlightElement(phrase)) {
-        this.lastHighlightTime = now;
-      }
-    }
-    clear() {
-      this.textBuffer = '';
-      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-    }
-  }
-
-  const smartHighlighter = new SmartHighlighter();
-
-  // Expose global highlight functions
-  window.voicePilotHighlight = text => { smartHighlighter.addText(text); return true; };
+    return true; 
+  };
+  
   window.voicePilotClearHighlights = () => {
     domHighlighter.clearHighlights();
-    smartHighlighter.clear();
   };
 
   // ────────────────────────────────────────────────────

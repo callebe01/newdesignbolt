@@ -64,7 +64,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
-  // ✅ AI TRANSCRIPTION BUFFER REFS - USING FINISHED FLAG
+  // ✅ AI TRANSCRIPTION BUFFER REFS - FOR COMPLETE PHRASE TRACKING
   const aiBufferRef = useRef<string>('');
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -421,23 +421,35 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH FINISHED FLAG - CORRECT FIELD NAME
+              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH REAL-TIME UPDATES
               if (sc.outputTranscription) {
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) Accumulate every piece
+                  // 1) Accumulate every piece in the buffer for complete phrase tracking
                   aiBufferRef.current += text;
                   console.log('[Live] AI transcription fragment:', text);
+                  
+                  // 2) ✅ REAL-TIME: Immediately update transcript with this fragment
+                  setTranscript(prev => {
+                    // Add space if needed between previous text and new fragment
+                    if (prev && !prev.endsWith(' ') && !text.startsWith(' ')) {
+                      return prev + ' ' + text;
+                    }
+                    return prev + text;
+                  });
+                  
+                  // 3) ✅ REAL-TIME: Immediately trigger highlighting for this fragment
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(text);
+                  }
                 }
 
-                // 2) When Vertex signals end of this transcription chunk, flush the whole phrase
+                // 4) When Vertex signals end of this transcription chunk, process complete phrase
                 if (finished) {
                   const phrase = aiBufferRef.current.trim();
                   if (phrase) {
-                    setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
-                    
-                    // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                    // Trigger highlighting for the complete phrase (more accurate)
                     if (window.voicePilotHighlight) {
                       window.voicePilotHighlight(phrase);
                     }
@@ -448,11 +460,16 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
               }
 
-              // ✅ HANDLE USER SPEECH TRANSCRIPTION - CORRECT FIELD NAME
+              // ✅ HANDLE USER SPEECH TRANSCRIPTION - REAL-TIME
               if (sc.inputTranscription?.text) {
                 const userText = sc.inputTranscription.text.trim();
                 if (userText) {
-                  setTranscript(prev => prev ? prev + ' ' + userText : userText);
+                  setTranscript(prev => {
+                    if (prev && !prev.endsWith(' ') && !userText.startsWith(' ')) {
+                      return prev + ' ' + userText;
+                    }
+                    return prev + userText;
+                  });
                   console.log('[Live] User transcription:', userText);
                 }
               }
@@ -489,7 +506,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 console.log('[Live] Turn complete - force flushing AI buffer if needed');
                 const phrase = aiBufferRef.current.trim();
                 if (phrase) {
-                  setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+                  setTranscript(prev => {
+                    if (prev && !prev.endsWith(' ') && !phrase.startsWith(' ')) {
+                      return prev + ' ' + phrase;
+                    }
+                    return prev + phrase;
+                  });
                   
                   if (window.voicePilotHighlight) {
                     window.voicePilotHighlight(phrase);
@@ -799,7 +821,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       // ✅ FORCE FLUSH ANY REMAINING AI BUFFER
       const phrase = aiBufferRef.current.trim();
       if (phrase) {
-        setTranscript(prev => prev ? prev + ' ' + phrase : phrase);
+        setTranscript(prev => {
+          if (prev && !prev.endsWith(' ') && !phrase.startsWith(' ')) {
+            return prev + ' ' + phrase;
+          }
+          return prev + phrase;
+        });
         aiBufferRef.current = '';
         console.log('[Live] Final AI buffer flush:', phrase);
       }
