@@ -431,14 +431,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // ✅ Enhanced system instruction with explicit documentation guidance
+        // ✅ Enhanced system instruction with page context
         const enhancedSystemInstruction = `${systemInstruction || 'You are a helpful AI assistant.'} 
 
 CURRENT PAGE CONTEXT: ${pageContext}
 
-${documentationUrls?.length ? `DOCUMENTATION KNOWLEDGE BASE: You have access to external documentation at the following URLs: ${documentationUrls.join(', ')}. Use this documentation to answer questions about features, processes, and information that may not be visible on the current page. When users ask about topics covered in the documentation, reference and explain the relevant information from these sources.` : ''}
-
-When responding, consider both the user's current page location and the available documentation. If they ask about something that doesn't match their current context but is covered in the documentation, provide helpful information from the docs and guide them appropriately. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
         // Setup message with tools and Kore voice - AUDIO ONLY
         const setupMsg = {
