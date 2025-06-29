@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, Bot, Clock, Plus, X, MessageCircle, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ChevronLeft, Clock, Plus, X, Save, MessageCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { useAgents } from '../../context/AgentContext';
+import { Agent } from '../../types';
+import { updateAgent } from '../../services/agent';
 
 interface DurationOption {
   value: number;
@@ -18,18 +20,48 @@ const DURATION_OPTIONS: DurationOption[] = [
   { value: 600, label: '10 minutes' },
 ];
 
-export const NewAgent: React.FC = () => {
+export const EditAgent: React.FC = () => {
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+  const { getAgent } = useAgents();
+  
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
   const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
-  const [duration, setDuration] = useState<number>(300); // Default to 5 minutes
+  const [duration, setDuration] = useState(300);
   const [documentationUrls, setDocumentationUrls] = useState<string[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { createAgent } = useAgents();
-  const navigate = useNavigate();
+  useEffect(() => {
+    const loadAgent = async () => {
+      if (!agentId) return;
+      
+      try {
+        const fetchedAgent = await getAgent(agentId);
+        if (fetchedAgent) {
+          setAgent(fetchedAgent);
+          setName(fetchedAgent.name);
+          setInstructions(fetchedAgent.instructions);
+          setCanSeeScreenshare(fetchedAgent.canSeeScreenshare);
+          setDuration(fetchedAgent.callDuration);
+          setDocumentationUrls(fetchedAgent.documentationUrls || []);
+        } else {
+          setError('Agent not found');
+        }
+      } catch (err) {
+        console.error('Failed to load agent:', err);
+        setError('Failed to load agent');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAgent();
+  }, [agentId, getAgent]);
 
   const addUrl = () => {
     if (!newUrl.trim()) return;
@@ -37,6 +69,7 @@ export const NewAgent: React.FC = () => {
       new URL(newUrl); // Validate URL format
       setDocumentationUrls([...documentationUrls, newUrl.trim()]);
       setNewUrl('');
+      setError(null);
     } catch (err) {
       setError('Please enter a valid URL');
     }
@@ -63,17 +96,18 @@ export const NewAgent: React.FC = () => {
     setError(null);
 
     try {
-      const agent = await createAgent(
+      await updateAgent(agentId!, {
         name,
         instructions,
         canSeeScreenshare,
-        duration,
+        callDuration: duration,
         documentationUrls
-      );
-      navigate(`/agents/${agent.id}`);
+      });
+      
+      navigate(`/agents/${agentId}`);
     } catch (err) {
-      console.error('Failed to create agent:', err);
-      setError('Failed to create agent. Please try again.');
+      console.error('Failed to update agent:', err);
+      setError('Failed to update agent. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -85,42 +119,48 @@ export const NewAgent: React.FC = () => {
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-pulse-subtle text-lg">Loading agent...</div>
+      </div>
+    );
+  }
+
+  if (error && !agent) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-6">
+          <Link to="/agents" className="flex items-center text-muted-foreground hover:text-foreground">
             <ChevronLeft className="mr-1 h-4 w-4" />
             Back to Agents
           </Link>
-          <h1 className="text-3xl font-bold flex items-center">
-            <Bot className="mr-3 h-8 w-8 text-primary" />
-            Create New Agent
-          </h1>
+        </div>
+        <div className="bg-destructive/10 text-destructive p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-2">Error</h2>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Link to={`/agents/${agentId}`} className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            Back to Agent Details
+          </Link>
+          <h1 className="text-3xl font-bold">Edit Agent</h1>
           <p className="text-muted-foreground mt-1">
-            Set up your AI agent with custom instructions and behavior
+            Update your agent's configuration and behavior
           </p>
         </div>
         <Button variant="outline" onClick={handleGetHelp}>
           <MessageCircle className="mr-2 h-4 w-4" />
           Need Help?
         </Button>
-      </div>
-
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 rounded-lg p-6 border border-primary/20">
-        <div className="flex items-center space-x-4">
-          <div className="p-3 bg-primary/10 rounded-full">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold">Create Your First AI Agent</h2>
-            <p className="text-muted-foreground mt-1">
-              Define how your agent should behave, what it knows, and how long conversations should last.
-            </p>
-          </div>
-        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -247,12 +287,12 @@ export const NewAgent: React.FC = () => {
                 <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
                   <input
                     type="checkbox"
-                    id="canSeeScreenshare"
+                    id="editCanSeeScreenshare"
                     checked={canSeeScreenshare}
                     onChange={(e) => setCanSeeScreenshare(e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   />
-                  <label htmlFor="canSeeScreenshare" className="text-sm font-medium flex-1">
+                  <label htmlFor="editCanSeeScreenshare" className="text-sm font-medium flex-1">
                     Allow this agent to see screen shares
                   </label>
                 </div>
@@ -269,13 +309,14 @@ export const NewAgent: React.FC = () => {
                   disabled={isLoading}
                   fullWidth
                 >
-                  {isLoading ? 'Creating...' : 'Create Agent'}
+                  <Save className="mr-2 h-4 w-4" />
+                  {isLoading ? 'Updating...' : 'Update Agent'}
                 </Button>
                 
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/agents')}
+                  onClick={() => navigate(`/agents/${agentId}`)}
                   disabled={isLoading}
                   fullWidth
                 >

@@ -9,6 +9,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { AgentsList } from './pages/agents/AgentsList';
 import { NewAgent } from './pages/agents/NewAgent';
+import { EditAgent } from './pages/agents/EditAgent';
 import { AgentDetails } from './pages/agents/AgentDetails';
 import { AgentCall } from './pages/agents/AgentCall';
 import { Login } from './pages/auth/Login';
@@ -38,6 +39,7 @@ function App() {
                       {/* Agent routes */}
                       <Route path="/agents" element={<AgentsList />} />
                       <Route path="/agents/new" element={<NewAgent />} />
+                      <Route path="/agents/:agentId/edit" element={<EditAgent />} />
                       <Route path="/agents/:agentId" element={<AgentDetails />} />
                       
                       {/* Settings route */}

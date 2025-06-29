@@ -32,7 +32,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
 import { Dialog } from '../../components/ui/Dialog';
-import { EditAgentModal } from '../../components/agents/EditAgentModal';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
@@ -96,7 +95,6 @@ export const AgentDetails: React.FC = () => {
   const [modal, setModal] = useState<ModalState>({ type: null, data: null });
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
   const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTranscripts, setSelectedTranscripts] = useState<string[]>([]);
   const [timeframe, setTimeframe] = useState<'today' | '7days'>('today');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('last7days');
@@ -111,10 +109,6 @@ export const AgentDetails: React.FC = () => {
     if (!agent) return;
     const shareableUrl = `https://voicepilot.live/agent/${agent.id}`;
     navigator.clipboard.writeText(shareableUrl);
-  };
-
-  const handleAgentUpdated = (updatedAgent: Agent) => {
-    setAgent(updatedAgent);
   };
 
   const refreshData = async () => {
@@ -855,7 +849,7 @@ export const AgentDetails: React.FC = () => {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowEditModal(true)}>
+          <Button variant="outline" onClick={() => navigate(`/agents/${agent.id}/edit`)}>
             <Edit2 className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -1169,13 +1163,6 @@ export const AgentDetails: React.FC = () => {
       >
         {modal.type === 'conversation' && renderConversationModal(modal.data)}
       </Modal>
-
-      <EditAgentModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        agent={agent}
-        onAgentUpdated={handleAgentUpdated}
-      />
 
       <Dialog
         isOpen={showAnalyzeDialog}
