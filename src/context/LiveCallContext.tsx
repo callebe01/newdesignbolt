@@ -64,8 +64,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentAgentIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
-  // ✅ AI TRANSCRIPTION BUFFER REFS - FOR COMPLETE PHRASE TRACKING
-  const aiBufferRef = useRef<string>('');
+  // ✅ TWO-BUFFER SYSTEM FOR REAL-TIME TRANSCRIPTION
+  const committedTextRef = useRef<string>(''); // All finalized text
+  const partialTextRef = useRef<string>('');   // Current in-flight fragment
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -103,6 +104,12 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
+  const updateTranscriptDisplay = () => {
+    const fullText = committedTextRef.current + partialTextRef.current;
+    setTranscript(fullText);
+  };
 
   const playAudioBuffer = async (pcmBlob: Blob) => {
     try {
@@ -266,8 +273,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       conversationIdRef.current = null;
       callEndedRef.current = false;
       
-      // ✅ CLEAR AI BUFFER
-      aiBufferRef.current = '';
+      // ✅ CLEAR BOTH BUFFERS
+      committedTextRef.current = '';
+      partialTextRef.current = '';
+      setTranscript('');
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -421,55 +430,53 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
             if (parsed.serverContent) {
               const sc = parsed.serverContent;
 
-              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH REAL-TIME UPDATES
+              // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH TWO-BUFFER SYSTEM
               if (sc.outputTranscription) {
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) Accumulate every piece in the buffer for complete phrase tracking
-                  aiBufferRef.current += text;
-                  console.log('[Live] AI transcription fragment:', text);
+                  // 1) Replace the partial buffer with the new text (don't append!)
+                  const needsSpace = committedTextRef.current && 
+                                   !committedTextRef.current.endsWith(' ') && 
+                                   !text.startsWith(' ');
+                  partialTextRef.current = needsSpace ? ' ' + text : text;
                   
-                  // 2) ✅ REAL-TIME: Immediately update transcript with this fragment
-                  setTranscript(prev => {
-                    // Add space if needed between previous text and new fragment
-                    if (prev && !prev.endsWith(' ') && !text.startsWith(' ')) {
-                      return prev + ' ' + text;
-                    }
-                    return prev + text;
-                  });
+                  // 2) Update the display immediately
+                  updateTranscriptDisplay();
                   
-                  // 3) ✅ REAL-TIME: Immediately trigger highlighting for this fragment
-                  if (window.voicePilotHighlight) {
-                    window.voicePilotHighlight(text);
-                  }
+                  console.log('[Live] AI transcription fragment (partial):', text);
                 }
 
-                // 4) When Vertex signals end of this transcription chunk, process complete phrase
-                if (finished) {
-                  const phrase = aiBufferRef.current.trim();
-                  if (phrase) {
-                    // Trigger highlighting for the complete phrase (more accurate)
-                    if (window.voicePilotHighlight) {
-                      window.voicePilotHighlight(phrase);
-                    }
-                    
-                    console.log('[Live] AI said (complete phrase):', phrase);
+                // 3) When finished, move partial to committed and clear partial
+                if (finished && partialTextRef.current) {
+                  const partialText = partialTextRef.current;
+                  committedTextRef.current += partialText;
+                  partialTextRef.current = '';
+                  
+                  // Update display with committed text
+                  updateTranscriptDisplay();
+                  
+                  // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                  if (window.voicePilotHighlight) {
+                    window.voicePilotHighlight(partialText.trim());
                   }
-                  aiBufferRef.current = '';
+                  
+                  console.log('[Live] AI said (complete phrase):', partialText.trim());
                 }
               }
 
-              // ✅ HANDLE USER SPEECH TRANSCRIPTION - REAL-TIME
+              // ✅ HANDLE USER SPEECH TRANSCRIPTION
               if (sc.inputTranscription?.text) {
                 const userText = sc.inputTranscription.text.trim();
                 if (userText) {
-                  setTranscript(prev => {
-                    if (prev && !prev.endsWith(' ') && !userText.startsWith(' ')) {
-                      return prev + ' ' + userText;
-                    }
-                    return prev + userText;
-                  });
+                  const needsSpace = committedTextRef.current && 
+                                   !committedTextRef.current.endsWith(' ') && 
+                                   !userText.startsWith(' ');
+                  const textToAdd = needsSpace ? ' ' + userText : userText;
+                  
+                  committedTextRef.current += textToAdd;
+                  updateTranscriptDisplay();
+                  
                   console.log('[Live] User transcription:', userText);
                 }
               }
@@ -501,25 +508,20 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
                 return; // ✅ BAIL OUT AFTER HANDLING AUDIO
               }
 
-              // ✅ CHECK FOR TURN COMPLETE TO FORCE FLUSH AI BUFFER
-              if (sc.turnComplete) {
-                console.log('[Live] Turn complete - force flushing AI buffer if needed');
-                const phrase = aiBufferRef.current.trim();
-                if (phrase) {
-                  setTranscript(prev => {
-                    if (prev && !prev.endsWith(' ') && !phrase.startsWith(' ')) {
-                      return prev + ' ' + phrase;
-                    }
-                    return prev + phrase;
-                  });
-                  
-                  if (window.voicePilotHighlight) {
-                    window.voicePilotHighlight(phrase);
-                  }
-                  
-                  console.log('[Live] AI said (turn complete flush):', phrase);
-                  aiBufferRef.current = '';
+              // ✅ CHECK FOR TURN COMPLETE TO FORCE COMMIT PARTIAL BUFFER
+              if (sc.turnComplete && partialTextRef.current) {
+                console.log('[Live] Turn complete - committing partial buffer');
+                const partialText = partialTextRef.current;
+                committedTextRef.current += partialText;
+                partialTextRef.current = '';
+                
+                updateTranscriptDisplay();
+                
+                if (window.voicePilotHighlight) {
+                  window.voicePilotHighlight(partialText.trim());
                 }
+                
+                console.log('[Live] AI said (turn complete commit):', partialText.trim());
               }
             }
 
@@ -814,22 +816,10 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     
     try {
       const finalDuration = duration;
-      const finalTranscript = transcript.trim();
+      // ✅ GET FINAL TRANSCRIPT FROM BOTH BUFFERS
+      const finalTranscript = (committedTextRef.current + partialTextRef.current).trim();
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
-
-      // ✅ FORCE FLUSH ANY REMAINING AI BUFFER
-      const phrase = aiBufferRef.current.trim();
-      if (phrase) {
-        setTranscript(prev => {
-          if (prev && !prev.endsWith(' ') && !phrase.startsWith(' ')) {
-            return prev + ' ' + phrase;
-          }
-          return prev + phrase;
-        });
-        aiBufferRef.current = '';
-        console.log('[Live] Final AI buffer flush:', phrase);
-      }
 
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
@@ -908,8 +898,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAgentIdRef.current = null;
       conversationIdRef.current = null;
       
-      // ✅ CLEAR AI BUFFER
-      aiBufferRef.current = '';
+      // ✅ CLEAR BOTH BUFFERS
+      committedTextRef.current = '';
+      partialTextRef.current = '';
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
