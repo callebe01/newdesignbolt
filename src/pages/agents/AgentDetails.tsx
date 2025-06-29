@@ -327,6 +327,25 @@ export const AgentDetails: React.FC = () => {
       console.log('Conversations data:', conversations);
       
       const now = new Date();
+      
+      // Filter conversations based on time filter
+      const filteredConversations = conversations.filter(conversation => {
+        const date = new Date(conversation.start_time);
+        switch (timeFilter) {
+          case 'today':
+            return date.toDateString() === now.toDateString();
+          case 'last7days':
+            return (now.getTime() - date.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+          case 'last30days':
+            return (now.getTime() - date.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+          case 'last90days':
+            return (now.getTime() - date.getTime()) <= 90 * 24 * 60 * 60 * 1000;
+          default:
+            return true;
+        }
+      });
+
+      // Filter analysis results based on time filter
       const filteredResults = analysisResults.filter(result => {
         const date = new Date(result.createdAt);
         switch (timeFilter) {
@@ -343,28 +362,25 @@ export const AgentDetails: React.FC = () => {
         }
       });
 
-      if (filteredResults.length === 0) {
-        const metrics = {
-          totalConversations: conversations.length,
-          resolutionRate: 0,
-          engagementScore: 0,
-          avgDuration: 0
-        };
-        console.log('Setting metrics (no analysis results):', metrics);
-        setOverviewMetrics(metrics);
-        return;
-      }
+      // Calculate metrics using filtered data
+      const avgDurationFromConversations = filteredConversations.length > 0 
+        ? filteredConversations.reduce((acc, conv) => acc + (conv.duration || 0), 0) / filteredConversations.length
+        : 0;
 
-      const avgDurationFromConversations = conversations.length > 0 
-        ? conversations.reduce((acc, conv) => acc + (conv.duration || 0), 0) / conversations.length
+      const avgResolutionRate = filteredResults.length > 0
+        ? filteredResults.reduce((acc, curr) => 
+            acc + (curr.resolutionRate?.resolved || 0), 0) / filteredResults.length
+        : 0;
+
+      const avgEngagementScore = filteredResults.length > 0
+        ? filteredResults.reduce((acc, curr) => 
+            acc + (curr.engagementScore || 0), 0) / filteredResults.length
         : 0;
 
       const metrics = {
-        totalConversations: conversations.length,
-        resolutionRate: filteredResults.reduce((acc, curr) => 
-          acc + (curr.resolutionRate?.resolved || 0), 0) / filteredResults.length,
-        engagementScore: filteredResults.reduce((acc, curr) => 
-          acc + (curr.engagementScore || 0), 0) / filteredResults.length,
+        totalConversations: filteredConversations.length,
+        resolutionRate: avgResolutionRate,
+        engagementScore: avgEngagementScore,
         avgDuration: avgDurationFromConversations,
         changes: {
           conversations: '+12 this week',
@@ -374,7 +390,7 @@ export const AgentDetails: React.FC = () => {
         }
       };
 
-      console.log('Setting metrics (with analysis results):', metrics);
+      console.log('Setting metrics (filtered):', metrics);
       setOverviewMetrics(metrics);
     };
 
