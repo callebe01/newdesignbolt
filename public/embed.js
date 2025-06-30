@@ -779,22 +779,90 @@
   const domHighlighter = new DOMHighlighter();
 
   // ═══════════════════════════════════════════════
-  // SmartHighlighter (buffers AI‐speech → DOMHighlighter)
+  // SmartHighlighter (real-time highlighting as AI speaks)
   // ═══════════════════════════════════════════════
   class SmartHighlighter {
     constructor() {
       this.textBuffer = '';
       this.bufferTimeout = null;
       this.lastHighlightTime = 0;
-      this.cooldown = 2000;   // ms
-      this.delay    = 1500;   // ms
+      this.cooldown = 1500;   // Reduced from 2000ms
+      this.delay    = 300;    // Reduced from 1500ms for faster response
+      this.streamBuffer = ''; // New: for real-time streaming
+      this.streamTimeout = null;
+      this.lastStreamHighlight = 0;
     }
+
+    // 🆕 NEW: Real-time highlighting for streaming text
+    addStreamingText(txt) {
+      if (!txt || !txt.trim()) return;
+      
+      // Clear existing timeout
+      if (this.streamTimeout) clearTimeout(this.streamTimeout);
+      
+      // Add to stream buffer
+      this.streamBuffer += (this.streamBuffer && !this.streamBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+      
+      // Process immediately if we detect quoted text (highest priority)
+      const quotedMatch = this.streamBuffer.match(/['"]([^'"]+)['"]/);
+      if (quotedMatch && quotedMatch[1].length > 2) {
+        this.processStream(quotedMatch[1]);
+        return;
+      }
+      
+      // Look for common UI element patterns in real-time
+      const patterns = [
+        /\b(click|tap|press)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:button|link|tab|field|input|dropdown|menu))/i,
+        /\b(go\s+to|open|select)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:tab|section|page|menu))/i,
+        /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = this.streamBuffer.match(pattern);
+        if (match && match[2] && match[2].length > 2) {
+          this.processStream(match[2]);
+          return;
+        }
+      }
+      
+      // Fallback: process with short delay for any other potential matches
+      this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
+    }
+
+    processStream(elementText) {
+      const now = Date.now();
+      if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
+      
+      console.log('[VoicePilot] Real-time highlight attempt:', elementText);
+      if (domHighlighter.highlightElement(elementText)) {
+        this.lastStreamHighlight = now;
+        this.streamBuffer = ''; // Clear buffer on successful highlight
+      }
+    }
+
+    processStreamBuffer() {
+      // Extract the most recent potential element name
+      const words = this.streamBuffer.trim().split(/\s+/);
+      if (words.length >= 2) {
+        // Try last 2-4 words as potential element names
+        for (let i = Math.min(4, words.length); i >= 2; i--) {
+          const phrase = words.slice(-i).join(' ');
+          if (phrase.length > 3 && phrase.length < 30) {
+            this.processStream(phrase);
+            break;
+          }
+        }
+      }
+    }
+
+    // Original method for backward compatibility
     addText(txt) {
       if (!txt || !txt.trim()) return;
       if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
       this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
       this.bufferTimeout = setTimeout(() => this.process(), this.delay);
     }
+
     process() {
       const now = Date.now();
       if (now - this.lastHighlightTime < this.cooldown) {
@@ -811,9 +879,12 @@
         this.lastHighlightTime = now;
       }
     }
+
     clear() {
       this.textBuffer = '';
+      this.streamBuffer = '';
       if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+      if (this.streamTimeout) clearTimeout(this.streamTimeout);
     }
   }
 
@@ -825,6 +896,14 @@
       smartHighlighter.addText(text); 
     }
     return true; 
+  };
+
+  // 🆕 NEW: Expose real-time streaming highlight function
+  window.voicePilotHighlightStream = text => {
+    if (text && text.trim()) {
+      smartHighlighter.addStreamingText(text);
+    }
+    return true;
   };
   
   window.voicePilotClearHighlights = () => {
