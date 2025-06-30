@@ -579,12 +579,46 @@
       
       // For form inputs, prioritize labels and placeholders
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
-        // Try to find associated label
+        // Try to find associated label by ID
         const id = el.id;
         if (id) {
           const label = document.querySelector(`label[for="${id}"]`);
           if (label && label.textContent?.trim()) {
             text = label.textContent.trim();
+          }
+        }
+        
+        // 🆕 Try to find nearby labels (common pattern where label appears before input)
+        if (!text) {
+          // Look for label immediately before this element
+          let previousElement = el.previousElementSibling;
+          while (previousElement && !text) {
+            if (previousElement.tagName === 'LABEL' && previousElement.textContent?.trim()) {
+              text = previousElement.textContent.trim();
+              break;
+            }
+            // Also check if the previous element contains a label
+            const labelInPrev = previousElement.querySelector('label');
+            if (labelInPrev && labelInPrev.textContent?.trim()) {
+              text = labelInPrev.textContent.trim();
+              break;
+            }
+            previousElement = previousElement.previousElementSibling;
+          }
+        }
+
+        // 🆕 Try to find parent container with label
+        if (!text) {
+          let parent = el.parentElement;
+          let depth = 0;
+          while (parent && depth < 3) { // Don't go too far up
+            const labelInParent = parent.querySelector('label');
+            if (labelInParent && labelInParent.textContent?.trim()) {
+              text = labelInParent.textContent.trim();
+              break;
+            }
+            parent = parent.parentElement;
+            depth++;
           }
         }
         
