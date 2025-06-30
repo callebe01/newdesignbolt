@@ -407,7 +407,7 @@
   const pageContextCapture = new PageContextCapture();
 
   // ═══════════════════════════════════════════════
-  // Enhanced DOM Highlighting System – STRICT BUTTONS/INPUTS ONLY
+  // Enhanced DOM Highlighting System – EXPANDED ELEMENT SUPPORT
   // ═══════════════════════════════════════════════
   class DOMHighlighter {
     constructor() {
@@ -479,59 +479,240 @@
       );
     }
 
-    highlightElement(searchText) {
-      // 1) pull out anything in single or double quotes (highest priority)
-      let phrase = searchText.trim();
-      const qm = phrase.match(/['"]([^'"]+)['"]/);
-      if (qm) {
-        phrase = qm[1];      // e.g. "New Agent"
-      }
+    // 🆕 EXPANDED: More comprehensive element selector
+    getInteractiveElements() {
+      const selectors = [
+        // Original button/input selectors
+        'button',
+        'input[type="button"]',
+        'input[type="submit"]',
+        'input[type="reset"]',
+        
+        // 🆕 Form elements
+        'input[type="text"]',
+        'input[type="email"]',
+        'input[type="password"]',
+        'input[type="search"]',
+        'input[type="tel"]',
+        'input[type="url"]',
+        'input[type="number"]',
+        'input[type="date"]',
+        'input[type="datetime-local"]',
+        'input[type="time"]',
+        'input[type="checkbox"]',
+        'input[type="radio"]',
+        'input[type="file"]',
+        'textarea',
+        'select',
+        
+        // 🆕 Navigation elements
+        'a[href]',
+        '[role="tab"]',
+        '[role="tabpanel"]',
+        '[data-tab]',
+        '.tab',
+        '.nav-item',
+        '.navigation-item',
+        
+        // 🆕 Interactive UI elements
+        '[role="button"]',
+        '[role="menuitem"]',
+        '[role="option"]',
+        '[role="switch"]',
+        '[role="slider"]',
+        '[aria-expanded]',
+        '[data-toggle]',
+        '[data-action]',
+        
+        // 🆕 Common clickable elements
+        '.dropdown-toggle',
+        '.menu-item',
+        '.clickable',
+        '[onclick]',
+        
+        // 🆕 Cards and panels (if they're clickable)
+        '.card[role="button"]',
+        '.panel[role="button"]',
+        '[data-clickable="true"]'
+      ];
 
-      phrase = phrase.toLowerCase();
-      if (!phrase) return false;
+      return Array.from(
+        document.querySelectorAll(selectors.join(','))
+      ).filter(el => this.isElementVisible(el) && this.isElementInteractive(el));
+    }
 
-      // 2) grab _only_ buttons + clickable inputs
-      const controls = Array.from(
-        document.querySelectorAll(
-          'button,' +
-          'input[type="button"],' +
-          'input[type="submit"],' +
-          'input[type="reset"]'
-        )
-      ).filter(el => this.isElementVisible(el));
-
-      // 3) score each by exact (2) → substring (1)
-      const matches = controls
-        .map(el => {
-          const label = (el.getAttribute('aria-label')
-                       || el.value
-                       || el.textContent
-                       || ''
-                      ).trim();
-          const lower = label.toLowerCase();
-          let score = 0;
-          if (lower === phrase)      score = 2;
-          else if (lower.includes(phrase)) score = 1;
-          return { el, label, score };
-        })
-        .filter(x => x.score > 0)
-        .sort((a,b) => b.score - a.score);
-
-      if (!matches.length) {
-        console.log('[VoicePilot] No buttons/inputs matching:', phrase);
+    // 🆕 Helper to determine if element is truly interactive
+    isElementInteractive(el) {
+      // Skip if disabled
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
         return false;
       }
 
-      // 4) highlight the top one
+      // Skip if it's a label without for attribute (not directly interactive)
+      if (el.tagName === 'LABEL' && !el.getAttribute('for')) {
+        return false;
+      }
+
+      // For links, ensure they have href
+      if (el.tagName === 'A' && !el.getAttribute('href')) {
+        return false;
+      }
+
+      // Check if element has click handlers or interactive roles
+      const hasClickHandler = el.onclick || 
+                             el.getAttribute('onclick') || 
+                             el.getAttribute('data-action') ||
+                             el.getAttribute('data-toggle');
+                             
+      const isFormElement = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName);
+      
+      const hasInteractiveRole = [
+        'button', 'tab', 'menuitem', 'option', 'switch', 'slider'
+      ].includes(el.getAttribute('role'));
+
+      return isFormElement || hasClickHandler || hasInteractiveRole || el.tagName === 'A';
+    }
+
+    // 🆕 ENHANCED: Better text extraction for different element types
+    getElementText(el) {
+      let text = '';
+      
+      // For form inputs, prioritize labels and placeholders
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
+        // Try to find associated label
+        const id = el.id;
+        if (id) {
+          const label = document.querySelector(`label[for="${id}"]`);
+          if (label && label.textContent?.trim()) {
+            text = label.textContent.trim();
+          }
+        }
+        
+        // Fallback to placeholder or aria-label
+        if (!text) {
+          text = el.placeholder?.trim() || 
+                 el.getAttribute('aria-label')?.trim() || 
+                 el.getAttribute('title')?.trim() || 
+                 el.value?.trim() || '';
+        }
+      }
+      // For other elements, use text content or aria-label
+      else {
+        text = el.getAttribute('aria-label')?.trim() ||
+               el.getAttribute('title')?.trim() ||
+               el.textContent?.trim() ||
+               el.value?.trim() || '';
+      }
+
+      return text;
+    }
+
+    // 🆕 ENHANCED: Smarter scoring system for different element types
+    scoreMatch(element, searchPhrase) {
+      const elementText = this.getElementText(element).toLowerCase();
+      const phrase = searchPhrase.toLowerCase();
+      
+      if (!elementText || !phrase) return 0;
+
+      // Exact match gets highest score
+      if (elementText === phrase) return 10;
+      
+      // Word boundary matches get high score
+      const wordBoundaryRegex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (wordBoundaryRegex.test(elementText)) return 8;
+      
+      // Starts with gets good score
+      if (elementText.startsWith(phrase)) return 6;
+      
+      // Contains gets medium score
+      if (elementText.includes(phrase)) return 4;
+      
+      // Fuzzy matching for slight variations
+      const similarity = this.calculateSimilarity(elementText, phrase);
+      if (similarity > 0.8) return 3;
+      if (similarity > 0.6) return 2;
+      
+      return 0;
+    }
+
+    // 🆕 Simple similarity calculation for fuzzy matching
+    calculateSimilarity(str1, str2) {
+      const longer = str1.length > str2.length ? str1 : str2;
+      const shorter = str1.length > str2.length ? str2 : str1;
+      
+      if (longer.length === 0) return 1.0;
+      
+      const editDistance = this.levenshteinDistance(longer, shorter);
+      return (longer.length - editDistance) / longer.length;
+    }
+
+    levenshteinDistance(str1, str2) {
+      const matrix = Array(str2.length + 1).fill(null).map(() => 
+        Array(str1.length + 1).fill(null)
+      );
+      
+      for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+      for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+      
+      for (let j = 1; j <= str2.length; j++) {
+        for (let i = 1; i <= str1.length; i++) {
+          const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+          matrix[j][i] = Math.min(
+            matrix[j][i - 1] + 1,
+            matrix[j - 1][i] + 1,
+            matrix[j - 1][i - 1] + indicator
+          );
+        }
+      }
+      
+      return matrix[str2.length][str1.length];
+    }
+
+    highlightElement(searchText) {
+      // Extract phrase from quotes or use full text
+      let phrase = searchText.trim();
+      const quotedMatch = phrase.match(/['"]([^'"]+)['"]/);
+      if (quotedMatch) {
+        phrase = quotedMatch[1];
+      }
+
+      phrase = phrase.toLowerCase();
+      if (!phrase || phrase.length < 2) return false;
+
+      // Get all interactive elements
+      const elements = this.getInteractiveElements();
+      
+      // Score all matches
+      const matches = elements
+        .map(el => ({
+          el,
+          text: this.getElementText(el),
+          score: this.scoreMatch(el, phrase)
+        }))
+        .filter(match => match.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      if (!matches.length) {
+        console.log('[VoicePilot] No interactive elements matching:', phrase);
+        return false;
+      }
+
+      // Highlight the best match
       this.clearHighlights();
-      const best = matches[0].el;
-      this.addHighlight(best, true);
-      best.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      console.log('[VoicePilot] Highlighting control:', matches[0].label);
+      const bestMatch = matches[0];
+      this.addHighlight(bestMatch.el, true);
+      bestMatch.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      console.log('[VoicePilot] Highlighting element:', {
+        text: bestMatch.text,
+        type: bestMatch.el.tagName,
+        score: bestMatch.score
+      });
+      
       return true;
     }
 
-    addHighlight(el, isPrimary=false) {
+    addHighlight(el, isPrimary = false) {
       el.classList.add(this.highlightClass);
       this.highlightedElements.add(el);
 
@@ -548,8 +729,8 @@
     clearHighlights() {
       this.highlightedElements.forEach(el => {
         el.classList.remove(this.highlightClass);
-        el.querySelectorAll(`.voicepilot-highlight-badge`)
-          .forEach(b => b.remove());
+        el.querySelectorAll(`.${this.highlightClass}-badge`)
+          .forEach(badge => badge.remove());
       });
       this.highlightedElements.clear();
     }
@@ -623,11 +804,288 @@
   };
 
   // ────────────────────────────────────────────────────
-  // Widget creation (unchanged)…
+  // Widget creation
   // ────────────────────────────────────────────────────
   function createWidget() {
-    /* … (all of your existing widget code—startCall, endCall, UI, etc.—
-         remains exactly the same as before) … */
+    // Create widget container
+    const widget = document.createElement('div');
+    widget.id = 'voicepilot-widget';
+    
+    // Position mapping
+    const positions = {
+      'bottom-right': { bottom: '20px', right: '20px' },
+      'bottom-left': { bottom: '20px', left: '20px' },
+      'top-right': { top: '20px', right: '20px' },
+      'top-left': { top: '20px', left: '20px' }
+    };
+    
+    const pos = positions[position] || positions['bottom-right'];
+    
+    // Apply styles
+    Object.assign(widget.style, {
+      position: 'fixed',
+      zIndex: '10000',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      ...pos
+    });
+
+    // Widget HTML
+    widget.innerHTML = `
+      <div id="voicepilot-container" style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        padding: 20px;
+        min-width: 320px;
+        max-width: 400px;
+        color: white;
+        transition: all 0.3s ease;
+      ">
+        <div id="voicepilot-header" style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 15px;
+        ">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
+            🎯 Voice Guide
+          </h3>
+          <button id="voicepilot-close" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">×</button>
+        </div>
+        
+        <div id="voicepilot-status" style="
+          text-align: center;
+          margin-bottom: 20px;
+        ">
+          <div id="voicepilot-status-indicator" style="
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+          ">🎤</div>
+          <div id="voicepilot-status-text" style="
+            font-size: 14px;
+            opacity: 0.9;
+          ">Ready to help</div>
+        </div>
+        
+        <div id="voicepilot-controls" style="
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        ">
+          <button id="voicepilot-start" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+          ">Start Call</button>
+          <button id="voicepilot-end" style="
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: none;
+          ">End Call</button>
+        </div>
+        
+        <div id="voicepilot-transcript" style="
+          margin-top: 15px;
+          padding: 10px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 10px;
+          font-size: 12px;
+          max-height: 100px;
+          overflow-y: auto;
+          display: none;
+        "></div>
+      </div>
+    `;
+
+    document.body.appendChild(widget);
+
+    // Get elements
+    const container = widget.querySelector('#voicepilot-container');
+    const closeBtn = widget.querySelector('#voicepilot-close');
+    const startBtn = widget.querySelector('#voicepilot-start');
+    const endBtn = widget.querySelector('#voicepilot-end');
+    const statusIndicator = widget.querySelector('#voicepilot-status-indicator');
+    const statusText = widget.querySelector('#voicepilot-status-text');
+    const transcript = widget.querySelector('#voicepilot-transcript');
+
+    let isCallActive = false;
+    let geminiSession = null;
+
+    // Close widget
+    closeBtn.addEventListener('click', () => {
+      widget.style.display = 'none';
+    });
+
+    // Start call function
+    async function startCall() {
+      if (isCallActive) return;
+
+      try {
+        statusText.textContent = 'Connecting...';
+        statusIndicator.textContent = '⏳';
+
+        // Check for API key
+        const apiKey = window.voicepilotGoogleApiKey;
+        if (!apiKey) {
+          throw new Error('Google API key not provided');
+        }
+
+        // Initialize Gemini Live session
+        const { GoogleGenerativeAI } = await import('https://esm.run/@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(apiKey);
+        
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-2.0-flash-exp",
+          systemInstruction: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+
+Your role:
+- Help users complete tasks step-by-step
+- Guide them through the interface with clear instructions
+- Answer questions about features and functionality
+- Provide contextual help based on what they're currently viewing
+
+Context awareness:
+- You can see the current page context through the page summary
+- When you mention UI elements like buttons, forms, or links, they will be automatically highlighted
+- Speak naturally and conversationally
+
+Guidelines:
+- Be concise but helpful
+- Give step-by-step instructions when needed
+- Ask clarifying questions if the user's request is unclear
+- Stay focused on helping with the current application
+
+Current page context: ${window.voicePilotGetPageContext()}`
+        });
+
+        // Start live session
+        geminiSession = model.startChat({
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+          }
+        });
+
+        isCallActive = true;
+        statusText.textContent = 'Connected - Speak now';
+        statusIndicator.textContent = '🎯';
+        startBtn.style.display = 'none';
+        endBtn.style.display = 'block';
+        transcript.style.display = 'block';
+
+        console.log('[VoicePilot] Call started successfully');
+
+      } catch (error) {
+        console.error('[VoicePilot] Failed to start call:', error);
+        statusText.textContent = 'Connection failed';
+        statusIndicator.textContent = '❌';
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
+      }
+    }
+
+    // End call function
+    function endCall() {
+      if (!isCallActive) return;
+
+      try {
+        if (geminiSession) {
+          // Clean up session
+          geminiSession = null;
+        }
+
+        isCallActive = false;
+        statusText.textContent = 'Call ended';
+        statusIndicator.textContent = '📞';
+        startBtn.style.display = 'block';
+        endBtn.style.display = 'none';
+        transcript.style.display = 'none';
+        
+        // Clear any highlights
+        window.voicePilotClearHighlights();
+
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 2000);
+
+        console.log('[VoicePilot] Call ended');
+
+      } catch (error) {
+        console.error('[VoicePilot] Error ending call:', error);
+      }
+    }
+
+    // Event listeners
+    startBtn.addEventListener('click', startCall);
+    endBtn.addEventListener('click', endCall);
+
+    // Hover effects
+    startBtn.addEventListener('mouseenter', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    startBtn.addEventListener('mouseleave', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+
+    endBtn.addEventListener('mouseenter', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+    endBtn.addEventListener('mouseleave', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.1)';
+    });
+
+    closeBtn.addEventListener('mouseenter', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+
+    // Return widget API
+    return {
+      show: () => widget.style.display = 'block',
+      hide: () => widget.style.display = 'none',
+      startCall,
+      endCall,
+      isActive: () => isCallActive
+    };
   }
 
   // Initialize widget
