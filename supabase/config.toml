@@ -266,6 +266,11 @@ inspector_port = 8083
 enabled = true
 verify_jwt = false
 
+# Configure the relay Edge Function to enable outbound socket connections
+[functions.relay]
+enabled = true
+deno_socket = true
+
 [analytics]
 enabled = true
 port = 54327
