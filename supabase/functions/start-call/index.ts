@@ -66,9 +66,15 @@ serve(async (req) => {
       }
     }
 
-    // Build the relay URL
+    // Build the relay URL with proper protocol detection
     const url = new URL(req.url);
-    const relayUrl = `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}/functions/v1/relay`;
+    
+    // Check x-forwarded-proto header to determine if the original request was HTTPS
+    const forwardedProto = req.headers.get('x-forwarded-proto');
+    const isSecure = forwardedProto === 'https' || url.protocol === 'https:';
+    const wsProtocol = isSecure ? 'wss:' : 'ws:';
+    
+    const relayUrl = `${wsProtocol}//${url.host}/functions/v1/relay`;
 
     return new Response(
       JSON.stringify({ relayUrl }),
