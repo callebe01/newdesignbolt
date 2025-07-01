@@ -6,12 +6,14 @@
 // Using multiple methods to ensure JWT verification is disabled
 export const config = { 
   verify_jwt: false,
-  cors: true 
+  cors: true,
+  auth: false
 };
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-serve((req) => {
+// Additional JWT bypass - handle requests without authentication
+const handler = (req: Request) => {
   // Add CORS headers for preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -116,7 +118,6 @@ serve((req) => {
   
   gemini.onclose = (e) => {
     console.log("[Relay] Gemini socket closed:", e.code, e.reason);
-    closeBoth(e.code, e.reason);
   };
 
   browser.onopen = () => {
@@ -129,4 +130,7 @@ serve((req) => {
 
   /* 7️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
-});
+};
+
+// Serve without JWT verification
+serve(handler);
