@@ -2,15 +2,37 @@
 //  relay – Voice Pilot WebSocket proxy  (Supabase Edge Function)
 //--------------------------------------------------------------
 
-// 🔓  PUBLIC FUNCTION  –  disables Supabase’s JWT check
-export const config = { verify_jwt: false };
+// 🔓  PUBLIC FUNCTION  –  disables Supabase's JWT check
+// Using multiple methods to ensure JWT verification is disabled
+export const config = { 
+  verify_jwt: false,
+  cors: true 
+};
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 serve((req) => {
+  // Add CORS headers for preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info, apikey",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
   /* 1️⃣  Only accept Upgrade requests */
   if (req.headers.get("upgrade") !== "websocket") {
-    return new Response("Expected WebSocket upgrade", { status: 400 });
+    return new Response("Expected WebSocket upgrade", { 
+      status: 400,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
   }
 
   /* 2️⃣  Browser ⇄ Relay socket */
@@ -21,7 +43,12 @@ serve((req) => {
   if (!KEY) {
     console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
     browser.close(1011, "Server mis-config");
-    return new Response("Server mis-config", { status: 500 });
+    return new Response("Server mis-config", { 
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
   }
 
   /* 4️⃣  Relay ⇄ Gemini socket */
@@ -34,18 +61,71 @@ serve((req) => {
   const gemini = new WebSocket(geminiURL);
 
   /* 5️⃣  Pipe traffic both ways */
-  browser.onmessage = (e) => gemini.readyState === 1 && gemini.send(e.data);
-  gemini.onmessage  = (e) => browser.readyState === 1 && browser.send(e.data);
+  browser.onmessage = (e) => {
+    if (gemini.readyState === 1) {
+      try {
+        gemini.send(e.data);
+      } catch (error) {
+        console.error("[Relay] Error sending to Gemini:", error);
+      }
+    }
+  };
+  
+  gemini.onmessage = (e) => {
+    if (browser.readyState === 1) {
+      try {
+        browser.send(e.data);
+      } catch (error) {
+        console.error("[Relay] Error sending to browser:", error);
+      }
+    }
+  };
 
   /* 6️⃣  Symmetric close / error handling */
   const closeBoth = (code = 1000, reason = "") => {
-    try { if (browser.readyState < 2) browser.close(code, reason); } catch {}
-    try { if (gemini.readyState  < 2) gemini.close(code, reason);  } catch {}
+    try { 
+      if (browser.readyState < 2) {
+        browser.close(code, reason); 
+      }
+    } catch (error) {
+      console.error("[Relay] Error closing browser socket:", error);
+    }
+    try { 
+      if (gemini.readyState < 2) {
+        gemini.close(code, reason);  
+      }
+    } catch (error) {
+      console.error("[Relay] Error closing Gemini socket:", error);
+    }
   };
-  browser.onerror = () => closeBoth(1011, "Browser error");
-  gemini.onerror  = () => closeBoth(1011, "Gemini error");
-  browser.onclose = (e) => closeBoth(e.code, e.reason);
-  gemini.onclose  = (e) => closeBoth(e.code, e.reason);
+
+  browser.onerror = (error) => {
+    console.error("[Relay] Browser socket error:", error);
+    closeBoth(1011, "Browser error");
+  };
+  
+  gemini.onerror = (error) => {
+    console.error("[Relay] Gemini socket error:", error);
+    closeBoth(1011, "Gemini error");
+  };
+  
+  browser.onclose = (e) => {
+    console.log("[Relay] Browser socket closed:", e.code, e.reason);
+    closeBoth(e.code, e.reason);
+  };
+  
+  gemini.onclose = (e) => {
+    console.log("[Relay] Gemini socket closed:", e.code, e.reason);
+    closeBoth(e.code, e.reason);
+  };
+
+  browser.onopen = () => {
+    console.log("[Relay] Browser WebSocket connection established");
+  };
+
+  gemini.onopen = () => {
+    console.log("[Relay] Gemini WebSocket connection established");
+  };
 
   /* 7️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
