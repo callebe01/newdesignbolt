@@ -5,10 +5,16 @@
   const currentScript = document.currentScript;
   const agentId = currentScript?.getAttribute('data-agent');
   const position = currentScript?.getAttribute('data-position') || 'bottom-right';
+  const googleApiKey = currentScript?.getAttribute('data-google-api-key');
 
   if (!agentId) {
     console.error('VoicePilot: data-agent attribute is required');
     return;
+  }
+
+  // Set global API key if provided
+  if (googleApiKey) {
+    window.voicepilotGoogleApiKey = googleApiKey;
   }
 
   // ═══════════════════════════════════════════════
@@ -1048,7 +1054,7 @@
     const transcript = widget.querySelector('#voicepilot-transcript');
 
     let isCallActive = false;
-    let websocketRef = null;
+    let geminiSession = null;
 
     // Close widget
     closeBtn.addEventListener('click', () => {
@@ -1063,53 +1069,19 @@
         statusText.textContent = 'Connecting...';
         statusIndicator.textContent = '⏳';
 
-        // ✅ UPDATED: Use Supabase URL for proxy WebSocket connection
-        // Get Supabase URL from the current page's environment or use default
-        const supabaseUrl = window.voicepilotSupabaseUrl || 
-                           (window.location.hostname === 'localhost' ? 'https://ljfidzppyflrrszkgusa.supabase.co' : 
-                            `https://${window.location.hostname}`);
+        // Check for API key
+        const apiKey = window.voicepilotGoogleApiKey;
+        if (!apiKey) {
+          throw new Error('Google API key not provided');
+        }
+
+        // Initialize Gemini Live session
+        const { GoogleGenerativeAI } = await import('https://esm.run/@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(apiKey);
         
-        const protocol = supabaseUrl.startsWith('https://') ? 'wss://' : 'ws://';
-        const host = supabaseUrl.replace(/^https?:\/\//, '');
-        const wsUrl = `${protocol}${host}/functions/v1/gemini-proxy`;
-        
-        console.log('[VoicePilot] Connecting to proxy WebSocket:', wsUrl);
-
-        const ws = new WebSocket(wsUrl);
-        websocketRef = ws;
-
-        ws.onopen = () => {
-          console.log('[VoicePilot] WebSocket connected to proxy');
-          statusText.textContent = 'Connected - Speak now';
-          statusIndicator.textContent = '🎯';
-          startBtn.style.display = 'none';
-          endBtn.style.display = 'block';
-          transcript.style.display = 'block';
-          isCallActive = true;
-
-          // Get current page context
-          const pageContext = window.voicePilotGetPageContext();
-          console.log('[VoicePilot] Page context:', pageContext);
-
-          // Send setup message
-          const setupMsg = {
-            setup: {
-              model: 'models/gemini-2.0-flash-live-001',
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: 'Kore'
-                    }
-                  }
-                }
-              },
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
-              systemInstruction: {
-                parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-2.0-flash-exp",
+          systemInstruction: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
 
 Your role:
 - Help users complete tasks step-by-step
@@ -1128,170 +1100,36 @@ Guidelines:
 - Ask clarifying questions if the user's request is unclear
 - Stay focused on helping with the current application
 
-Current page context: ${pageContext}`
-                }]
-              }
-            }
-          };
+Current page context: ${window.voicePilotGetPageContext()}`
+        });
 
-          ws.send(JSON.stringify(setupMsg));
-        };
-
-        ws.onmessage = async (event) => {
-          if (!(event.data instanceof Blob)) {
-            return;
+        // Start live session
+        geminiSession = model.startChat({
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
           }
+        });
 
-          let maybeText = null;
-          try {
-            maybeText = await event.data.text();
-          } catch {
-            maybeText = null;
-          }
+        isCallActive = true;
+        statusText.textContent = 'Connected - Speak now';
+        statusIndicator.textContent = '🎯';
+        startBtn.style.display = 'none';
+        endBtn.style.display = 'block';
+        transcript.style.display = 'block';
 
-          if (maybeText) {
-            try {
-              const parsed = JSON.parse(maybeText);
-              console.log('[VoicePilot] Received message:', parsed);
-
-              if (parsed.setupComplete) {
-                console.log('[VoicePilot] Setup complete');
-                // Send initial greeting
-                const greeting = {
-                  clientContent: {
-                    turns: [{
-                      role: 'user',
-                      parts: [{ text: 'Hello!' }]
-                    }],
-                    turnComplete: true
-                  }
-                };
-                ws.send(JSON.stringify(greeting));
-              }
-
-              if (parsed.serverContent) {
-                const sc = parsed.serverContent;
-
-                // Handle AI speech transcription
-                if (sc.outputTranscription) {
-                  const { text, finished } = sc.outputTranscription;
-                  
-                  if (text) {
-                    transcript.textContent += text;
-                    transcript.scrollTop = transcript.scrollHeight;
-                    
-                    // Real-time highlighting
-                    if (window.voicePilotHighlightStream) {
-                      window.voicePilotHighlightStream(text);
-                    }
-                  }
-
-                  if (finished && text) {
-                    // Highlight complete phrases
-                    if (window.voicePilotHighlight) {
-                      window.voicePilotHighlight(text);
-                    }
-                  }
-                }
-
-                // Handle user speech transcription
-                if (sc.inputTranscription?.text) {
-                  const userText = sc.inputTranscription.text.trim();
-                  if (userText) {
-                    transcript.textContent += `\n[You]: ${userText}`;
-                    transcript.scrollTop = transcript.scrollHeight;
-                  }
-                }
-
-                // Handle audio data
-                const mt = sc.modelTurn;
-                if (mt?.parts) {
-                  for (const part of mt.parts) {
-                    if (part.inlineData && typeof part.inlineData.data === 'string') {
-                      try {
-                        const base64str = part.inlineData.data;
-                        const binaryStr = atob(base64str);
-                        const len = binaryStr.length;
-                        const rawBuffer = new Uint8Array(len);
-                        for (let i = 0; i < len; i++) {
-                          rawBuffer[i] = binaryStr.charCodeAt(i);
-                        }
-                        const pcmBlob = new Blob([rawBuffer.buffer], {
-                          type: 'audio/pcm;rate=24000',
-                        });
-                        playAudioBuffer(pcmBlob);
-                      } catch (err) {
-                        console.error('[VoicePilot] Error decoding audio:', err);
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (parseError) {
-              console.error('[VoicePilot] JSON parse error:', parseError);
-            }
-          } else {
-            // Handle binary audio data
-            playAudioBuffer(event.data);
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error('[VoicePilot] WebSocket error:', error);
-          statusText.textContent = 'Connection failed';
-          statusIndicator.textContent = '❌';
-        };
-
-        ws.onclose = (event) => {
-          console.log('[VoicePilot] WebSocket closed:', event.code, event.reason);
-          isCallActive = false;
-          statusText.textContent = 'Call ended';
-          statusIndicator.textContent = '📞';
-          startBtn.style.display = 'block';
-          endBtn.style.display = 'none';
-          transcript.style.display = 'none';
-          websocketRef = null;
-        };
+        console.log('[VoicePilot] Call started successfully');
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
         statusText.textContent = 'Connection failed';
         statusIndicator.textContent = '❌';
-      }
-    }
-
-    // Audio playback function
-    let audioContext = null;
-    let audioQueueTime = 0;
-
-    async function playAudioBuffer(pcmBlob) {
-      try {
-        const arrayBuffer = await pcmBlob.arrayBuffer();
-        const pcm16 = new Int16Array(arrayBuffer);
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-          float32[i] = pcm16[i] / 32768;
-        }
-
-        if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        const buffer = audioContext.createBuffer(1, float32.length, 24000);
-        buffer.copyToChannel(float32, 0, 0);
-
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-
-        let startAt = audioContext.currentTime;
-        if (audioQueueTime > audioContext.currentTime) {
-          startAt = audioQueueTime;
-        }
-        source.start(startAt);
-        audioQueueTime = startAt + buffer.duration;
-      } catch (err) {
-        console.error('[VoicePilot] Audio playback error:', err);
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
       }
     }
 
@@ -1300,9 +1138,9 @@ Current page context: ${pageContext}`
       if (!isCallActive) return;
 
       try {
-        if (websocketRef) {
-          websocketRef.close();
-          websocketRef = null;
+        if (geminiSession) {
+          // Clean up session
+          geminiSession = null;
         }
 
         isCallActive = false;
@@ -1312,15 +1150,15 @@ Current page context: ${pageContext}`
         endBtn.style.display = 'none';
         transcript.style.display = 'none';
         
-        // Clear highlights
-        if (window.voicePilotClearHighlights) {
-          window.voicePilotClearHighlights();
-        }
+        // Clear any highlights
+        window.voicePilotClearHighlights();
 
         setTimeout(() => {
           statusText.textContent = 'Ready to help';
           statusIndicator.textContent = '🎤';
         }, 2000);
+
+        console.log('[VoicePilot] Call ended');
 
       } catch (error) {
         console.error('[VoicePilot] Error ending call:', error);

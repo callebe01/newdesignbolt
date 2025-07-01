@@ -377,6 +377,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         conversationIdRef.current = conversationId;
       }
 
+      // ✅ REMOVED: Client-side URL validation that was causing CORS errors
+      // The Gemini API will handle URL access from its own servers
+
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
         return;
@@ -394,19 +397,21 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
-      // ✅ UPDATED: Use Supabase URL for proxy WebSocket connection
-      const supabaseUrl = env.VITE_SUPABASE_URL || 'https://ljfidzppyflrrszkgusa.supabase.co';
-      const protocol = supabaseUrl.startsWith('https://') ? 'wss://' : 'ws://';
-      const host = supabaseUrl.replace(/^https?:\/\//, '');
-      const wsUrl = `${protocol}${host}/functions/v1/gemini-proxy`;
-      
-      console.log('[Live] WebSocket URL (via proxy):', wsUrl);
+      const apiKey =
+        (window as any).voicepilotGoogleApiKey ||
+        env.VITE_GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
+      }
+
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      console.log('[Live] WebSocket URL:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
       websocketRef.current = ws;
 
       ws.onopen = () => {
-        console.log('[Live][WebSocket] onopen: connection established via proxy');
+        console.log('[Live][WebSocket] onopen: connection established');
         setStatus('connecting');
 
         // ✅ Get current page context and initialize monitoring
@@ -707,7 +712,7 @@ When responding, consider the user's current location and what they can see on t
 
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
-          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to proxy`);
+          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to Gemini`);
         }
       };
 
