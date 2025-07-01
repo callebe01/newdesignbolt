@@ -1,82 +1,52 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+//--------------------------------------------------------------
+//  relay – Voice Pilot WebSocket proxy  (Supabase Edge Function)
+//--------------------------------------------------------------
 
-serve(async (req) => {
-  // 1️⃣ Check for WebSocket upgrade
+// 🔓  PUBLIC FUNCTION  –  disables Supabase’s JWT check
+export const config = { verify_jwt: false };
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+serve((req) => {
+  /* 1️⃣  Only accept Upgrade requests */
   if (req.headers.get("upgrade") !== "websocket") {
     return new Response("Expected WebSocket upgrade", { status: 400 });
   }
 
-  // 2️⃣ Create WebSocket pair for browser ⇄ relay communication
-  const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
+  /* 2️⃣  Browser ⇄ Relay socket */
+  const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
-  // 3️⃣ Get Google API key from environment
-  const GEMINI_KEY = Deno.env.get("GOOGLE_API_KEY");
-  if (!GEMINI_KEY) {
-    console.error("GOOGLE_API_KEY not found in environment");
-    return new Response("Server configuration error", { status: 500 });
+  /* 3️⃣  Load API key (GOOGLE_API_KEY preferred, fallback GEMINI_API_KEY) */
+  const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
+  if (!KEY) {
+    console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
+    browser.close(1011, "Server mis-config");
+    return new Response("Server mis-config", { status: 500 });
   }
 
-  // 4️⃣ Build Gemini WebSocket URL
-  const geminiUrl = 
-    `wss://generativelanguage.googleapis.com/ws/` +
-    `google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_KEY}`;
+  /* 4️⃣  Relay ⇄ Gemini socket */
+  const geminiURL =
+    "wss://generativelanguage.googleapis.com/ws/" +
+    "google.ai.generativelanguage.v1beta.GenerativeService." +
+    "BidiGenerateContent?key=" +
+    encodeURIComponent(KEY);
 
-  let geminiSocket: WebSocket | null = null;
+  const gemini = new WebSocket(geminiURL);
 
-  // 5️⃣ Handle client socket events
-  clientSocket.onopen = () => {
-    console.log("[Relay] Client connected, establishing Gemini connection...");
-    
-    // Connect to Gemini when client connects
-    geminiSocket = new WebSocket(geminiUrl);
-    
-    // 6️⃣ Pipe Gemini messages to client
-    geminiSocket.onmessage = (event) => {
-      if (clientSocket.readyState === WebSocket.OPEN) {
-        clientSocket.send(event.data);
-      }
-    };
+  /* 5️⃣  Pipe traffic both ways */
+  browser.onmessage = (e) => gemini.readyState === 1 && gemini.send(e.data);
+  gemini.onmessage  = (e) => browser.readyState === 1 && browser.send(e.data);
 
-    geminiSocket.onopen = () => {
-      console.log("[Relay] Gemini connection established");
-    };
-
-    geminiSocket.onclose = (event) => {
-      console.log(`[Relay] Gemini connection closed: ${event.code} ${event.reason}`);
-      if (clientSocket.readyState === WebSocket.OPEN) {
-        clientSocket.close(event.code, event.reason);
-      }
-    };
-
-    geminiSocket.onerror = (error) => {
-      console.error("[Relay] Gemini connection error:", error);
-      if (clientSocket.readyState === WebSocket.OPEN) {
-        clientSocket.close(1011, "Gemini connection error");
-      }
-    };
+  /* 6️⃣  Symmetric close / error handling */
+  const closeBoth = (code = 1000, reason = "") => {
+    try { if (browser.readyState < 2) browser.close(code, reason); } catch {}
+    try { if (gemini.readyState  < 2) gemini.close(code, reason);  } catch {}
   };
+  browser.onerror = () => closeBoth(1011, "Browser error");
+  gemini.onerror  = () => closeBoth(1011, "Gemini error");
+  browser.onclose = (e) => closeBoth(e.code, e.reason);
+  gemini.onclose  = (e) => closeBoth(e.code, e.reason);
 
-  // 7️⃣ Pipe client messages to Gemini
-  clientSocket.onmessage = (event) => {
-    if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-      geminiSocket.send(event.data);
-    }
-  };
-
-  // 8️⃣ Handle client disconnect
-  clientSocket.onclose = (event) => {
-    console.log(`[Relay] Client disconnected: ${event.code} ${event.reason}`);
-    if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-      geminiSocket.close(event.code, event.reason);
-    }
-  };
-
-  clientSocket.onerror = (error) => {
-    console.error("[Relay] Client connection error:", error);
-    if (geminiSocket && geminiSocket.readyState === WebSocket.OPEN) {
-      geminiSocket.close(1011, "Client connection error");
-    }
-  };
-
+  /* 7️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
 });
