@@ -373,6 +373,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
+      // ✅ NEW: Check if WebSocket already exists and clean it up
+      if (websocketRef.current) {
+        console.warn('[Live] startCall() called but WebSocket already exists. Cleaning up previous connection...');
+        endCall(); // Clean up the existing connection
+        // Wait a brief moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
       // Check agent owner's usage limits if agentId is provided
       if (agentId) {
         const canUse = await checkAgentOwnerUsage(agentId);
@@ -383,11 +391,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         // Create conversation record
         const conversationId = await createConversationRecord(agentId);
         conversationIdRef.current = conversationId;
-      }
-
-      if (websocketRef.current) {
-        console.warn('[Live] startCall() called but WebSocket already exists.');
-        return;
       }
 
       // Start duration timer
@@ -672,6 +675,12 @@ When responding, consider the user's current location and what they can see on t
         websocketRef.current = null;
         // ✅ Stop page context monitoring when call ends
         stopPageContextMonitoring();
+        
+        // ✅ NEW: Call endCall() on WebSocket close to ensure complete cleanup
+        if (!callEndedRef.current) {
+          console.log('[Live] WebSocket closed unexpectedly, calling endCall() for cleanup');
+          endCall();
+        }
       };
     } catch (err: any) {
       console.error('[Live] Failed to start call:', err);
