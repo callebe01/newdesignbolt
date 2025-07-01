@@ -1063,12 +1063,15 @@
         statusText.textContent = 'Connecting...';
         statusIndicator.textContent = '⏳';
 
-        // Get the current origin for the WebSocket URL
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
+        // ✅ UPDATED: Use Supabase URL for proxy WebSocket connection
+        // Get Supabase URL from the current page's environment or use default
+        const supabaseUrl = window.voicepilotSupabaseUrl || 
+                           (window.location.hostname === 'localhost' ? 'https://ljfidzppyflrrszkgusa.supabase.co' : 
+                            `https://${window.location.hostname}`);
         
-        // Construct WebSocket URL to our proxy function
-        const wsUrl = `${protocol}//${host}/functions/v1/gemini-proxy`;
+        const protocol = supabaseUrl.startsWith('https://') ? 'wss://' : 'ws://';
+        const host = supabaseUrl.replace(/^https?:\/\//, '');
+        const wsUrl = `${protocol}${host}/functions/v1/gemini-proxy`;
         
         console.log('[VoicePilot] Connecting to proxy WebSocket:', wsUrl);
 

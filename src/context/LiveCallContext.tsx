@@ -394,10 +394,11 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
-      // ✅ UPDATED: Use proxy WebSocket URL instead of direct Google API
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/functions/v1/gemini-proxy`;
+      // ✅ UPDATED: Use Supabase URL for proxy WebSocket connection
+      const supabaseUrl = env.VITE_SUPABASE_URL || 'https://ljfidzppyflrrszkgusa.supabase.co';
+      const protocol = supabaseUrl.startsWith('https://') ? 'wss://' : 'ws://';
+      const host = supabaseUrl.replace(/^https?:\/\//, '');
+      const wsUrl = `${protocol}${host}/functions/v1/gemini-proxy`;
       
       console.log('[Live] WebSocket URL (via proxy):', wsUrl);
 
