@@ -83,18 +83,26 @@ const handler = (req: Request) => {
     }
   };
 
-  /* 6️⃣  Symmetric close / error handling */
+  /* 6️⃣  Symmetric close / error handling with proper close codes */
   const closeBoth = (code = 1000, reason = "") => {
+    // ✅ FIX: Sanitize close code for Gemini WebSocket
+    // WebSocket close codes must be either 1000 or in the range 3000-4999
+    let geminiCloseCode = code;
+    if (geminiCloseCode !== 1000 && (geminiCloseCode < 3000 || geminiCloseCode > 4999)) {
+      console.log(`[Relay] Invalid close code ${geminiCloseCode} received, using 1011 for Gemini`);
+      geminiCloseCode = 1011; // Use 1011 (Internal Error) for invalid codes
+    }
+
     try { 
       if (browser.readyState < 2) {
-        browser.close(code, reason); 
+        browser.close(code, reason); // Use original code for browser
       }
     } catch (error) {
       console.error("[Relay] Error closing browser socket:", error);
     }
     try { 
       if (gemini.readyState < 2) {
-        gemini.close(code, reason);  
+        gemini.close(geminiCloseCode, reason); // Use sanitized code for Gemini
       }
     } catch (error) {
       console.error("[Relay] Error closing Gemini socket:", error);
@@ -118,6 +126,15 @@ const handler = (req: Request) => {
   
   gemini.onclose = (e) => {
     console.log("[Relay] Gemini socket closed:", e.code, e.reason);
+    // ✅ FIX: Don't call closeBoth here to avoid double-closing
+    // Just close the browser socket if it's still open
+    try {
+      if (browser.readyState < 2) {
+        browser.close(e.code, e.reason);
+      }
+    } catch (error) {
+      console.error("[Relay] Error closing browser socket from Gemini close:", error);
+    }
   };
 
   browser.onopen = () => {
