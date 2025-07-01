@@ -377,9 +377,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         conversationIdRef.current = conversationId;
       }
 
-      // ✅ REMOVED: Client-side URL validation that was causing CORS errors
-      // The Gemini API will handle URL access from its own servers
-
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
         return;
@@ -397,21 +394,18 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
-      const apiKey =
-        (window as any).voicepilotGoogleApiKey ||
-        env.VITE_GOOGLE_API_KEY;
-      if (!apiKey) {
-        throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
-      }
-
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-      console.log('[Live] WebSocket URL:', wsUrl);
+      // ✅ UPDATED: Use proxy WebSocket URL instead of direct Google API
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      const wsUrl = `${protocol}//${host}/functions/v1/gemini-proxy`;
+      
+      console.log('[Live] WebSocket URL (via proxy):', wsUrl);
 
       const ws = new WebSocket(wsUrl);
       websocketRef.current = ws;
 
       ws.onopen = () => {
-        console.log('[Live][WebSocket] onopen: connection established');
+        console.log('[Live][WebSocket] onopen: connection established via proxy');
         setStatus('connecting');
 
         // ✅ Get current page context and initialize monitoring
@@ -712,7 +706,7 @@ When responding, consider the user's current location and what they can see on t
 
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
-          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to Gemini`);
+          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to proxy`);
         }
       };
 
