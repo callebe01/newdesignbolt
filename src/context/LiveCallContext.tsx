@@ -74,7 +74,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const pageContextIntervalRef = useRef<number | null>(null);
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvas | null>(null);
   const screenIntervalRef = useRef<number | null>(null);
   const detectionInProgressRef = useRef(false);
 
@@ -231,13 +231,17 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const checkAgentOwnerUsage = async (agentId: string): Promise<boolean> => {
     try {
+      // Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
       const response = await fetch(
         `${env.VITE_SUPABASE_URL}/functions/v1/check-agent-usage`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ 
             agentId,
@@ -262,13 +266,17 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const recordAgentUsage = async (agentId: string, minutes: number): Promise<void> => {
     try {
+      // Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
       await fetch(
         `${env.VITE_SUPABASE_URL}/functions/v1/record-agent-usage`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ 
             agentId,
@@ -394,10 +402,17 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
+      // ✅ Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
       // ✅ NEW: Get relay URL from backend instead of direct Gemini connection
       const response = await fetch(`${env.VITE_SUPABASE_URL}/functions/v1/start-call`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
+        },
         body: JSON.stringify({ 
           agentId, 
           instructions: systemInstruction, 
