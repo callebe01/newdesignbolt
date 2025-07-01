@@ -10,15 +10,12 @@ export const config = {
   auth: false
 };
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 // Additional JWT bypass - handle requests without authentication
 const handler = (req: Request) => {
-  console.log("[Relay] Handler called, method:", req.method, "URL:", req.url);
-  
   // Add CORS headers for preflight requests
   if (req.method === "OPTIONS") {
-    console.log("[Relay] Handling OPTIONS request");
     return new Response(null, {
       status: 200,
       headers: {
@@ -32,7 +29,6 @@ const handler = (req: Request) => {
 
   /* 1️⃣  Only accept Upgrade requests */
   if (req.headers.get("upgrade") !== "websocket") {
-    console.log("[Relay] Non-WebSocket request rejected");
     return new Response("Expected WebSocket upgrade", { 
       status: 400,
       headers: {
@@ -41,8 +37,6 @@ const handler = (req: Request) => {
     });
   }
 
-  console.log("[Relay] WebSocket upgrade request received");
-
   /* 2️⃣  Browser ⇄ Relay socket */
   const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
@@ -50,15 +44,14 @@ const handler = (req: Request) => {
   const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
   if (!KEY) {
     console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
-    // Close browser connection immediately with proper error code
-    browser.onopen = () => {
-      console.log("[Relay] Closing browser connection due to missing API key");
-      browser.close(1011, "Server configuration error: Missing API key");
-    };
-    return response;
+    browser.close(1011, "Server mis-config");
+    return new Response("Server mis-config", { 
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
   }
-
-  console.log("[Relay] API key found, proceeding with connection setup");
 
   /* 4️⃣  Relay ⇄ Gemini socket */
   const geminiURL =
@@ -67,113 +60,77 @@ const handler = (req: Request) => {
     "BidiGenerateContent?key=" +
     encodeURIComponent(KEY);
 
-  console.log("[Relay] Gemini URL constructed");
+  const gemini = new WebSocket(geminiURL);
 
-  let gemini: WebSocket | null = null;
-  let geminiConnected = false;
-  let browserConnected = false;
-
-  /* 5️⃣  Handle browser connection */
-  browser.onopen = () => {
-    console.log("[Relay] Browser WebSocket connection established");
-    browserConnected = true;
-    
-    // Now try to connect to Gemini
-    try {
-      console.log("[Relay] Attempting to connect to Gemini...");
-      gemini = new WebSocket(geminiURL);
-      
-      gemini.onopen = () => {
-        console.log("[Relay] Gemini WebSocket connection established");
-        geminiConnected = true;
-      };
-      
-      gemini.onmessage = (e) => {
-        if (browser.readyState === 1) {
-          try {
-            browser.send(e.data);
-          } catch (error) {
-            console.error("[Relay] Error sending to browser:", error);
-          }
-        }
-      };
-      
-      gemini.onerror = (error) => {
-        console.error("[Relay] Gemini socket error:", error);
-        if (browser.readyState === 1) {
-          browser.close(1011, "Failed to connect to AI service");
-        }
-      };
-      
-      gemini.onclose = (e) => {
-        console.log("[Relay] Gemini socket closed:", e.code, e.reason);
-        geminiConnected = false;
-        if (browser.readyState === 1) {
-          browser.close(e.code, e.reason || "AI service disconnected");
-        }
-      };
-      
-    } catch (error) {
-      console.error("[Relay] Failed to create Gemini WebSocket:", error);
-      if (browser.readyState === 1) {
-        browser.close(1011, "Failed to initialize AI connection");
-      }
-    }
-  };
-
-  /* 6️⃣  Handle browser messages */
+  /* 5️⃣  Pipe traffic both ways */
   browser.onmessage = (e) => {
-    if (gemini && gemini.readyState === 1) {
+    if (gemini.readyState === 1) {
       try {
         gemini.send(e.data);
       } catch (error) {
         console.error("[Relay] Error sending to Gemini:", error);
-        if (browser.readyState === 1) {
-          browser.close(1011, "Failed to send message to AI service");
-        }
-      }
-    } else {
-      console.warn("[Relay] Received message but Gemini not connected");
-    }
-  };
-
-  /* 7️⃣  Handle browser errors and close */
-  browser.onerror = (error) => {
-    console.error("[Relay] Browser socket error:", error);
-    browserConnected = false;
-    if (gemini && gemini.readyState < 2) {
-      try {
-        gemini.close(1011, "Browser error");
-      } catch (e) {
-        console.error("[Relay] Error closing Gemini socket:", e);
       }
     }
   };
   
-  browser.onclose = (e) => {
-    console.log("[Relay] Browser socket closed:", e.code, e.reason);
-    browserConnected = false;
-    if (gemini && gemini.readyState < 2) {
+  gemini.onmessage = (e) => {
+    if (browser.readyState === 1) {
       try {
-        // Use sanitized close code for Gemini
-        let geminiCloseCode = e.code;
-        if (geminiCloseCode !== 1000 && (geminiCloseCode < 3000 || geminiCloseCode > 4999)) {
-          geminiCloseCode = 1011;
-        }
-        gemini.close(geminiCloseCode, e.reason);
+        browser.send(e.data);
       } catch (error) {
-        console.error("[Relay] Error closing Gemini socket:", error);
+        console.error("[Relay] Error sending to browser:", error);
       }
     }
   };
 
-  console.log("[Relay] WebSocket handlers set up, returning response");
+  /* 6️⃣  Symmetric close / error handling */
+  const closeBoth = (code = 1000, reason = "") => {
+    try { 
+      if (browser.readyState < 2) {
+        browser.close(code, reason); 
+      }
+    } catch (error) {
+      console.error("[Relay] Error closing browser socket:", error);
+    }
+    try { 
+      if (gemini.readyState < 2) {
+        gemini.close(code, reason);  
+      }
+    } catch (error) {
+      console.error("[Relay] Error closing Gemini socket:", error);
+    }
+  };
 
-  /* 8️⃣  Handshake successful – return 101 Switching Protocols */
+  browser.onerror = (error) => {
+    console.error("[Relay] Browser socket error:", error);
+    closeBoth(1011, "Browser error");
+  };
+  
+  gemini.onerror = (error) => {
+    console.error("[Relay] Gemini socket error:", error);
+    closeBoth(1011, "Gemini error");
+  };
+  
+  browser.onclose = (e) => {
+    console.log("[Relay] Browser socket closed:", e.code, e.reason);
+    closeBoth(e.code, e.reason);
+  };
+  
+  gemini.onclose = (e) => {
+    console.log("[Relay] Gemini socket closed:", e.code, e.reason);
+  };
+
+  browser.onopen = () => {
+    console.log("[Relay] Browser WebSocket connection established");
+  };
+
+  gemini.onopen = () => {
+    console.log("[Relay] Gemini WebSocket connection established");
+  };
+
+  /* 7️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
 };
-
-console.log("[Relay] Function loaded, starting server...");
 
 // Serve without JWT verification
 serve(handler);
