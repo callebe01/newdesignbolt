@@ -377,9 +377,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         conversationIdRef.current = conversationId;
       }
 
-      // ✅ REMOVED: Client-side URL validation that was causing CORS errors
-      // The Gemini API will handle URL access from its own servers
-
       if (websocketRef.current) {
         console.warn('[Live] startCall() called but WebSocket already exists.');
         return;
@@ -397,17 +394,26 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         }, maxDuration * 1000);
       }
 
-      const apiKey =
-        (window as any).voicepilotGoogleApiKey ||
-        env.VITE_GOOGLE_API_KEY;
-      if (!apiKey) {
-        throw new Error('Missing VITE_GOOGLE_API_KEY. Check your .env.');
+      // ✅ NEW: Get relay URL from backend instead of direct Gemini connection
+      const response = await fetch(`${env.VITE_SUPABASE_URL}/functions/v1/start-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          agentId, 
+          instructions: systemInstruction, 
+          documentationUrls 
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start call');
       }
 
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-      console.log('[Live] WebSocket URL:', wsUrl);
+      const { relayUrl } = await response.json();
+      console.log('[Live] Using relay URL:', relayUrl);
 
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(relayUrl);
       websocketRef.current = ws;
 
       ws.onopen = () => {
@@ -712,7 +718,7 @@ When responding, consider the user's current location and what they can see on t
 
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
-          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to Gemini`);
+          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to relay`);
         }
       };
 
