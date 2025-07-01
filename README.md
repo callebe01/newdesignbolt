@@ -15,7 +15,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 `VITE_OPENAI_API_KEY` is used for transcript analysis via OpenAI.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` connect the app to your Supabase backend for persistence.
 
-2. Create a `supabase/.env` file with the following format for deploying Edge Functions:
+2. **CRITICAL**: Create a `supabase/.env` file with the following format for deploying Edge Functions:
 
 ```
 SUPABASE_URL=https://ljfidzppyflrrszkgusa.supabase.co
@@ -24,13 +24,21 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOOGLE_API_KEY=your-google-api-key
 ```
 
-The `GOOGLE_API_KEY` is required for the `gemini-proxy` Edge Function to communicate with Google's Gemini Live API.
+The `GOOGLE_API_KEY` is **REQUIRED** for the `gemini-proxy` Edge Function to communicate with Google's Gemini Live API. Without this key, the voice chat functionality will not work.
 
-Pass this file when deploying Edge Functions:
+**Deploy the Edge Functions with the environment file:**
 
 ```bash
-supabase functions deploy analyze-transcripts --env-file ./supabase/.env
+# Install the Supabase CLI if you don't have it
+npm install -g supabase
+
+# Deploy the gemini-proxy function (REQUIRED for voice chat)
 supabase functions deploy gemini-proxy --env-file ./supabase/.env
+
+# Deploy other functions
+supabase functions deploy analyze-transcripts --env-file ./supabase/.env
+supabase functions deploy check-agent-usage --env-file ./supabase/.env
+supabase functions deploy record-agent-usage --env-file ./supabase/.env
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is required so functions can write results back to Supabase. If this variable is omitted, analysis output will not be saved.
@@ -40,9 +48,6 @@ If either variable is missing or incorrect, functions will return a **401 Unauth
 3. Initialize the Supabase schema:
 
 ```bash
-# Install the Supabase CLI if you don't have it
-npm install -g supabase
-
 # Apply migrations from supabase/migrations
 supabase db push
 ```
@@ -62,6 +67,30 @@ npm run dev
 ```
 
 This will launch Vite in development mode.
+
+## Troubleshooting WebSocket Errors
+
+If you see WebSocket connection errors in the browser console:
+
+1. **Check that the `gemini-proxy` function is deployed:**
+   ```bash
+   supabase functions list
+   ```
+
+2. **Verify the `GOOGLE_API_KEY` is set in `supabase/.env`:**
+   ```bash
+   cat supabase/.env | grep GOOGLE_API_KEY
+   ```
+
+3. **Redeploy the function with the environment file:**
+   ```bash
+   supabase functions deploy gemini-proxy --env-file ./supabase/.env
+   ```
+
+4. **Check function logs for errors:**
+   ```bash
+   supabase functions logs gemini-proxy
+   ```
 
 ## Manual Testing
 

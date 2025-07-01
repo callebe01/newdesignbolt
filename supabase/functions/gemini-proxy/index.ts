@@ -25,12 +25,14 @@ Deno.serve(async (req) => {
   try {
     const apiKey = Deno.env.get("GOOGLE_API_KEY");
     if (!apiKey) {
-      console.error("GOOGLE_API_KEY environment variable not set");
-      return new Response("Server configuration error", {
+      console.error("[Gemini Proxy] GOOGLE_API_KEY environment variable not set");
+      return new Response("Server configuration error: GOOGLE_API_KEY not configured", {
         status: 500,
         headers: corsHeaders,
       });
     }
+
+    console.log("[Gemini Proxy] API key found, setting up WebSocket proxy");
 
     // Extract query parameters from the original request
     const url = new URL(req.url);
@@ -49,72 +51,85 @@ Deno.serve(async (req) => {
 
     console.log("[Gemini Proxy] Establishing WebSocket connection to Google API");
 
-    // Create WebSocket connection to Google API
-    const googleWs = new WebSocket(googleUrl.toString());
-    
-    // Upgrade the incoming request to WebSocket
+    // Upgrade the incoming request to WebSocket first
     const { socket: clientWs, response } = Deno.upgradeWebSocket(req);
+    
+    let googleWs: WebSocket | null = null;
+    let connectionEstablished = false;
 
-    // Set up message forwarding from client to Google API
+    // Set up client WebSocket handlers
     clientWs.onopen = () => {
-      console.log("[Gemini Proxy] Client WebSocket connected");
+      console.log("[Gemini Proxy] Client WebSocket connected, connecting to Google API");
+      
+      try {
+        // Create WebSocket connection to Google API after client connects
+        googleWs = new WebSocket(googleUrl.toString());
+        
+        googleWs.onopen = () => {
+          console.log("[Gemini Proxy] Google API WebSocket connected successfully");
+          connectionEstablished = true;
+        };
+
+        googleWs.onmessage = (event) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            console.log("[Gemini Proxy] Forwarding message from Google API to client");
+            clientWs.send(event.data);
+          } else {
+            console.warn("[Gemini Proxy] Client WebSocket not ready, message dropped");
+          }
+        };
+
+        googleWs.onclose = (event) => {
+          console.log(`[Gemini Proxy] Google API WebSocket closed: ${event.code} ${event.reason}`);
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.close(event.code, event.reason);
+          }
+        };
+
+        googleWs.onerror = (event) => {
+          console.error("[Gemini Proxy] Google API WebSocket error:", event);
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.close(1011, "Google API connection failed");
+          }
+        };
+      } catch (error) {
+        console.error("[Gemini Proxy] Error creating Google WebSocket:", error);
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.close(1011, "Failed to connect to Google API");
+        }
+      }
     };
 
     clientWs.onmessage = (event) => {
-      if (googleWs.readyState === WebSocket.OPEN) {
+      if (googleWs && googleWs.readyState === WebSocket.OPEN) {
         console.log("[Gemini Proxy] Forwarding message from client to Google API");
         googleWs.send(event.data);
       } else {
         console.warn("[Gemini Proxy] Google WebSocket not ready, message dropped");
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.close(1011, "Google API not connected");
+        }
       }
     };
 
     clientWs.onclose = (event) => {
       console.log(`[Gemini Proxy] Client WebSocket closed: ${event.code} ${event.reason}`);
-      if (googleWs.readyState === WebSocket.OPEN) {
+      if (googleWs && googleWs.readyState === WebSocket.OPEN) {
         googleWs.close();
       }
     };
 
     clientWs.onerror = (event) => {
       console.error("[Gemini Proxy] Client WebSocket error:", event);
-      if (googleWs.readyState === WebSocket.OPEN) {
+      if (googleWs && googleWs.readyState === WebSocket.OPEN) {
         googleWs.close();
-      }
-    };
-
-    // Set up message forwarding from Google API to client
-    googleWs.onopen = () => {
-      console.log("[Gemini Proxy] Google API WebSocket connected");
-    };
-
-    googleWs.onmessage = (event) => {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        console.log("[Gemini Proxy] Forwarding message from Google API to client");
-        clientWs.send(event.data);
-      } else {
-        console.warn("[Gemini Proxy] Client WebSocket not ready, message dropped");
-      }
-    };
-
-    googleWs.onclose = (event) => {
-      console.log(`[Gemini Proxy] Google API WebSocket closed: ${event.code} ${event.reason}`);
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.close(event.code, event.reason);
-      }
-    };
-
-    googleWs.onerror = (event) => {
-      console.error("[Gemini Proxy] Google API WebSocket error:", event);
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.close(1011, "Google API connection failed");
       }
     };
 
     return response;
   } catch (error) {
     console.error("[Gemini Proxy] Error setting up WebSocket proxy:", error);
-    return new Response("Failed to establish WebSocket connection", {
+    return new Response(`Failed to establish WebSocket connection: ${error.message}`, {
       status: 500,
       headers: corsHeaders,
     });
