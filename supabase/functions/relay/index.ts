@@ -44,13 +44,11 @@ const handler = (req: Request) => {
   const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
   if (!KEY) {
     console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
-    browser.close(1011, "Server mis-config");
-    return new Response("Server mis-config", { 
-      status: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      }
-    });
+    // Close browser connection immediately with proper error code
+    browser.onopen = () => {
+      browser.close(1011, "Server configuration error: Missing API key");
+    };
+    return response;
   }
 
   /* 4️⃣  Relay ⇄ Gemini socket */
@@ -60,92 +58,104 @@ const handler = (req: Request) => {
     "BidiGenerateContent?key=" +
     encodeURIComponent(KEY);
 
-  const gemini = new WebSocket(geminiURL);
+  let gemini: WebSocket | null = null;
+  let geminiConnected = false;
+  let browserConnected = false;
 
-  /* 5️⃣  Pipe traffic both ways */
+  /* 5️⃣  Handle browser connection */
+  browser.onopen = () => {
+    console.log("[Relay] Browser WebSocket connection established");
+    browserConnected = true;
+    
+    // Now try to connect to Gemini
+    try {
+      gemini = new WebSocket(geminiURL);
+      
+      gemini.onopen = () => {
+        console.log("[Relay] Gemini WebSocket connection established");
+        geminiConnected = true;
+      };
+      
+      gemini.onmessage = (e) => {
+        if (browser.readyState === 1) {
+          try {
+            browser.send(e.data);
+          } catch (error) {
+            console.error("[Relay] Error sending to browser:", error);
+          }
+        }
+      };
+      
+      gemini.onerror = (error) => {
+        console.error("[Relay] Gemini socket error:", error);
+        if (browser.readyState === 1) {
+          browser.close(1011, "Failed to connect to AI service");
+        }
+      };
+      
+      gemini.onclose = (e) => {
+        console.log("[Relay] Gemini socket closed:", e.code, e.reason);
+        geminiConnected = false;
+        if (browser.readyState === 1) {
+          browser.close(e.code, e.reason || "AI service disconnected");
+        }
+      };
+      
+    } catch (error) {
+      console.error("[Relay] Failed to create Gemini WebSocket:", error);
+      if (browser.readyState === 1) {
+        browser.close(1011, "Failed to initialize AI connection");
+      }
+    }
+  };
+
+  /* 6️⃣  Handle browser messages */
   browser.onmessage = (e) => {
-    if (gemini.readyState === 1) {
+    if (gemini && gemini.readyState === 1) {
       try {
         gemini.send(e.data);
       } catch (error) {
         console.error("[Relay] Error sending to Gemini:", error);
+        if (browser.readyState === 1) {
+          browser.close(1011, "Failed to send message to AI service");
+        }
       }
-    }
-  };
-  
-  gemini.onmessage = (e) => {
-    if (browser.readyState === 1) {
-      try {
-        browser.send(e.data);
-      } catch (error) {
-        console.error("[Relay] Error sending to browser:", error);
-      }
+    } else {
+      console.warn("[Relay] Received message but Gemini not connected");
     }
   };
 
-  /* 6️⃣  Symmetric close / error handling with proper close codes */
-  const closeBoth = (code = 1000, reason = "") => {
-    // ✅ FIX: Sanitize close code for Gemini WebSocket
-    // WebSocket close codes must be either 1000 or in the range 3000-4999
-    let geminiCloseCode = code;
-    if (geminiCloseCode !== 1000 && (geminiCloseCode < 3000 || geminiCloseCode > 4999)) {
-      console.log(`[Relay] Invalid close code ${geminiCloseCode} received, using 1011 for Gemini`);
-      geminiCloseCode = 1011; // Use 1011 (Internal Error) for invalid codes
-    }
-
-    try { 
-      if (browser.readyState < 2) {
-        browser.close(code, reason); // Use original code for browser
-      }
-    } catch (error) {
-      console.error("[Relay] Error closing browser socket:", error);
-    }
-    try { 
-      if (gemini.readyState < 2) {
-        gemini.close(geminiCloseCode, reason); // Use sanitized code for Gemini
-      }
-    } catch (error) {
-      console.error("[Relay] Error closing Gemini socket:", error);
-    }
-  };
-
+  /* 7️⃣  Handle browser errors and close */
   browser.onerror = (error) => {
     console.error("[Relay] Browser socket error:", error);
-    closeBoth(1011, "Browser error");
-  };
-  
-  gemini.onerror = (error) => {
-    console.error("[Relay] Gemini socket error:", error);
-    closeBoth(1011, "Gemini error");
+    browserConnected = false;
+    if (gemini && gemini.readyState < 2) {
+      try {
+        gemini.close(1011, "Browser error");
+      } catch (e) {
+        console.error("[Relay] Error closing Gemini socket:", e);
+      }
+    }
   };
   
   browser.onclose = (e) => {
     console.log("[Relay] Browser socket closed:", e.code, e.reason);
-    closeBoth(e.code, e.reason);
-  };
-  
-  gemini.onclose = (e) => {
-    console.log("[Relay] Gemini socket closed:", e.code, e.reason);
-    // ✅ FIX: Don't call closeBoth here to avoid double-closing
-    // Just close the browser socket if it's still open
-    try {
-      if (browser.readyState < 2) {
-        browser.close(e.code, e.reason);
+    browserConnected = false;
+    if (gemini && gemini.readyState < 2) {
+      try {
+        // Use sanitized close code for Gemini
+        let geminiCloseCode = e.code;
+        if (geminiCloseCode !== 1000 && (geminiCloseCode < 3000 || geminiCloseCode > 4999)) {
+          geminiCloseCode = 1011;
+        }
+        gemini.close(geminiCloseCode, e.reason);
+      } catch (error) {
+        console.error("[Relay] Error closing Gemini socket:", error);
       }
-    } catch (error) {
-      console.error("[Relay] Error closing browser socket from Gemini close:", error);
     }
   };
 
-  browser.onopen = () => {
-    console.log("[Relay] Browser WebSocket connection established");
-  };
-
-  gemini.onopen = () => {
-    console.log("[Relay] Gemini WebSocket connection established");
-  };
-
-  /* 7️⃣  Handshake successful – return 101 Switching Protocols */
+  /* 8️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
 };
 
