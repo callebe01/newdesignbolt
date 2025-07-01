@@ -10,12 +10,15 @@ export const config = {
   auth: false
 };
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 // Additional JWT bypass - handle requests without authentication
 const handler = (req: Request) => {
+  console.log("[Relay] Handler called, method:", req.method, "URL:", req.url);
+  
   // Add CORS headers for preflight requests
   if (req.method === "OPTIONS") {
+    console.log("[Relay] Handling OPTIONS request");
     return new Response(null, {
       status: 200,
       headers: {
@@ -29,6 +32,7 @@ const handler = (req: Request) => {
 
   /* 1️⃣  Only accept Upgrade requests */
   if (req.headers.get("upgrade") !== "websocket") {
+    console.log("[Relay] Non-WebSocket request rejected");
     return new Response("Expected WebSocket upgrade", { 
       status: 400,
       headers: {
@@ -36,6 +40,8 @@ const handler = (req: Request) => {
       }
     });
   }
+
+  console.log("[Relay] WebSocket upgrade request received");
 
   /* 2️⃣  Browser ⇄ Relay socket */
   const { socket: browser, response } = Deno.upgradeWebSocket(req);
@@ -46,10 +52,13 @@ const handler = (req: Request) => {
     console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
     // Close browser connection immediately with proper error code
     browser.onopen = () => {
+      console.log("[Relay] Closing browser connection due to missing API key");
       browser.close(1011, "Server configuration error: Missing API key");
     };
     return response;
   }
+
+  console.log("[Relay] API key found, proceeding with connection setup");
 
   /* 4️⃣  Relay ⇄ Gemini socket */
   const geminiURL =
@@ -57,6 +66,8 @@ const handler = (req: Request) => {
     "google.ai.generativelanguage.v1beta.GenerativeService." +
     "BidiGenerateContent?key=" +
     encodeURIComponent(KEY);
+
+  console.log("[Relay] Gemini URL constructed");
 
   let gemini: WebSocket | null = null;
   let geminiConnected = false;
@@ -69,6 +80,7 @@ const handler = (req: Request) => {
     
     // Now try to connect to Gemini
     try {
+      console.log("[Relay] Attempting to connect to Gemini...");
       gemini = new WebSocket(geminiURL);
       
       gemini.onopen = () => {
@@ -155,9 +167,13 @@ const handler = (req: Request) => {
     }
   };
 
+  console.log("[Relay] WebSocket handlers set up, returning response");
+
   /* 8️⃣  Handshake successful – return 101 Switching Protocols */
   return response;
 };
+
+console.log("[Relay] Function loaded, starting server...");
 
 // Serve without JWT verification
 serve(handler);
