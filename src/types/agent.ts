@@ -8,7 +8,6 @@ export interface Agent {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
-  canSeeScreenshare: boolean;
   callDuration: number;
   documentationUrls?: string[];
 }

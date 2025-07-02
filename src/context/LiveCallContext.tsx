@@ -15,18 +15,14 @@ const env: any =
 
 interface LiveCallContextType {
   status: LiveCallStatus;
-  isScreenSharing: boolean;
   isMicrophoneActive: boolean;
-  isVideoActive: boolean;
   errorMessage: string | null;
   transcript: string;
   duration: number;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
   startCall: (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string) => Promise<void>;
   endCall: (fromUnload?: boolean) => void;
-  toggleScreenShare: () => Promise<void>;
   toggleMicrophone: () => void;
-  toggleVideo: () => void;
 }
 
 const LiveCallContext = createContext<LiveCallContextType | undefined>(undefined);
@@ -35,18 +31,14 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [status, setStatus] = useState<LiveCallStatus>('idle');
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
-  const [isVideoActive, setIsVideoActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
   const [duration, setDuration] = useState(0);
   const { user } = useAuth();
 
   const websocketRef = useRef<WebSocket | null>(null);
-  const screenStream = useRef<MediaStream | null>(null);
   const microphoneStream = useRef<MediaStream | null>(null);
-  const videoStream = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueTimeRef = useRef<number>(0);
   const greetingSentRef = useRef(false);
@@ -67,10 +59,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
   const lastSentPageContextRef = useRef<string>('');
   const pageContextIntervalRef = useRef<number | null>(null);
 
-  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const screenCanvasRef = useRef<HTMLCanvas | null>(null);
-  const screenIntervalRef = useRef<number | null>(null);
-
   const handleBeforeUnload = () => {
     endCall(true);
   };
@@ -90,14 +78,13 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         websocketRef.current.close();
         websocketRef.current = null;
       }
-      [screenStream.current, microphoneStream.current, videoStream.current].forEach(
+      [microphoneStream.current].forEach(
         (stream) => {
           if (stream) {
             stream.getTracks().forEach((t) => t.stop());
           }
         }
       );
-      stopScreenStreaming();
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
         audioContextRef.current = null;
@@ -778,88 +765,6 @@ When responding, consider the user's current location and what they can see on t
     }
   };
 
-  const startScreenStreaming = () => {
-    try {
-      if (!screenStream.current || screenIntervalRef.current) {
-        return;
-      }
-
-      let video = screenVideoRef.current;
-      if (!video) {
-        video = document.createElement('video');
-        video.playsInline = true;
-        video.muted = true;
-        screenVideoRef.current = video;
-      }
-      video.srcObject = screenStream.current;
-      video.play().catch(() => {});
-
-      let canvas = screenCanvasRef.current;
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        screenCanvasRef.current = canvas;
-      }
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Canvas not supported');
-      }
-
-      const capture = () => {
-        if (
-          !screenStream.current ||
-          websocketRef.current?.readyState !== WebSocket.OPEN
-        ) {
-          return;
-        }
-        if (!video!.videoWidth || !video!.videoHeight) {
-          return;
-        }
-        canvas!.width = video!.videoWidth;
-        canvas!.height = video!.videoHeight;
-        ctx.drawImage(video!, 0, 0, canvas!.width, canvas!.height);
-        canvas!.toBlob(
-          (blob) => {
-            if (!blob) return;
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const dataUrl = reader.result as string;
-              const base64 = dataUrl.split(',')[1];
-              const payload = {
-                realtime_input: {
-                  video: { data: base64, mime_type: blob.type },
-                },
-              };
-              try {
-                websocketRef.current?.send(JSON.stringify(payload));
-              } catch (err) {
-                console.error('[Live] Screen send error:', err);
-                setErrorMessage('Failed to send screen frame.');
-              }
-            };
-            reader.readAsDataURL(blob);
-          },
-          'image/jpeg'
-        );
-      };
-
-      screenIntervalRef.current = window.setInterval(capture, 500);
-    } catch (err) {
-      console.error('[Live] startScreenStreaming error:', err);
-      setErrorMessage('Failed to start screen streaming.');
-    }
-  };
-
-  const stopScreenStreaming = () => {
-    if (screenIntervalRef.current) {
-      clearInterval(screenIntervalRef.current);
-      screenIntervalRef.current = null;
-    }
-    if (screenVideoRef.current) {
-      screenVideoRef.current.pause();
-      screenVideoRef.current.srcObject = null;
-    }
-  };
-
   const toggleMicrophone = (): void => {
     try {
       setErrorMessage(null);
@@ -884,59 +789,6 @@ When responding, consider the user's current location and what they can see on t
     } catch (err) {
       console.error('[Live] toggleMicrophone error:', err);
       setErrorMessage('Failed to toggle microphone.');
-    }
-  };
-
-  const toggleScreenShare = async (): Promise<void> => {
-    try {
-      setErrorMessage(null);
-
-      if (isScreenSharing && screenStream.current) {
-        screenStream.current.getTracks().forEach((t) => t.stop());
-        screenStream.current = null;
-        stopScreenStreaming();
-        setIsScreenSharing(false);
-      } else {
-        const screen = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-        });
-        screenStream.current = screen;
-        screen.getVideoTracks()[0].addEventListener('ended', () => {
-          setIsScreenSharing(false);
-          screenStream.current = null;
-          stopScreenStreaming();
-        });
-        startScreenStreaming();
-        setIsScreenSharing(true);
-      }
-    } catch (err) {
-      console.error('[Live] Screen sharing error:', err);
-      setErrorMessage('Failed to toggle screen sharing.');
-    }
-  };
-
-  const toggleVideo = (): void => {
-    try {
-      setErrorMessage(null);
-      if (isVideoActive && videoStream.current) {
-        videoStream.current.getTracks().forEach((t) => t.stop());
-        videoStream.current = null;
-        setIsVideoActive(false);
-      } else {
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then((stream) => {
-            videoStream.current = stream;
-            setIsVideoActive(true);
-          })
-          .catch((err) => {
-            console.error('[Live] Video error:', err);
-            setErrorMessage('Failed to access camera.');
-          });
-      }
-    } catch (err) {
-      console.error('[Live] Video toggle error:', err);
-      setErrorMessage('Failed to toggle video.');
     }
   };
 
@@ -1012,25 +864,20 @@ When responding, consider the user's current location and what they can see on t
         websocketRef.current.close();
         websocketRef.current = null;
       }
-      stopScreenStreaming();
-      [screenStream.current, microphoneStream.current, videoStream.current].forEach(
+      [microphoneStream.current].forEach(
         (stream) => {
           if (stream) {
             stream.getTracks().forEach((t) => t.stop());
           }
         }
       );
-      screenStream.current = null;
       microphoneStream.current = null;
-      videoStream.current = null;
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(() => {});
         audioContextRef.current = null;
         audioQueueTimeRef.current = 0;
       }
-      setIsScreenSharing(false);
       setIsMicrophoneActive(false);
-      setIsVideoActive(false);
       setStatus('ended');
       agentOwnerIdRef.current = null;
       currentAgentIdRef.current = null;
@@ -1050,18 +897,14 @@ When responding, consider the user's current location and what they can see on t
     <LiveCallContext.Provider
       value={{
         status,
-        isScreenSharing,
         isMicrophoneActive,
-        isVideoActive,
         errorMessage,
         transcript,
         duration,
         setTranscript,
         startCall,
         endCall,
-        toggleScreenShare,
         toggleMicrophone,
-        toggleVideo,
       }}
     >
       {children}

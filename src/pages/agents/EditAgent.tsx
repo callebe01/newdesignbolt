@@ -29,7 +29,6 @@ export const EditAgent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
   const [duration, setDuration] = useState(300);
   const [documentationUrls, setDocumentationUrls] = useState<string[]>([]);
   const [newUrl, setNewUrl] = useState('');
@@ -46,7 +45,6 @@ export const EditAgent: React.FC = () => {
           setAgent(fetchedAgent);
           setName(fetchedAgent.name);
           setInstructions(fetchedAgent.instructions);
-          setCanSeeScreenshare(fetchedAgent.canSeeScreenshare);
           setDuration(fetchedAgent.callDuration);
           setDocumentationUrls(fetchedAgent.documentationUrls || []);
         } else {
@@ -99,7 +97,6 @@ export const EditAgent: React.FC = () => {
       await updateAgent(agentId!, {
         name,
         instructions,
-        canSeeScreenshare,
         callDuration: duration,
         documentationUrls
       });
@@ -282,19 +279,6 @@ export const EditAgent: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
-                  <input
-                    type="checkbox"
-                    id="editCanSeeScreenshare"
-                    checked={canSeeScreenshare}
-                    onChange={(e) => setCanSeeScreenshare(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="editCanSeeScreenshare" className="text-sm font-medium flex-1">
-                    Allow this agent to see screen shares
-                  </label>
                 </div>
               </CardContent>
             </Card>

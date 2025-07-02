@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Monitor, Video, VideoOff, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, PhoneOff } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { formatTime } from '../../utils/format';
 import { useLiveCall } from '../../context/LiveCallContext';
@@ -12,11 +12,7 @@ interface SessionControlsProps {
 export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }) => {
   const { 
     isMicrophoneActive, 
-    isVideoActive, 
-    isScreenSharing,
     toggleMicrophone,
-    toggleVideo,
-    toggleScreenShare,
     endCall,
   } = useLiveCall();
   
@@ -36,7 +32,7 @@ export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <Button
           variant={isMicrophoneActive ? 'primary' : 'outline'}
           size="lg"
@@ -50,34 +46,6 @@ export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }
           )}
           <span className="text-xs mt-1">
             {isMicrophoneActive ? 'Mute' : 'Unmute'}
-          </span>
-        </Button>
-
-        <Button
-          variant={isScreenSharing ? 'primary' : 'outline'}
-          size="lg"
-          onClick={() => toggleScreenShare()}
-          className="flex flex-col items-center py-4 h-auto"
-        >
-          <Monitor className="h-6 w-6 mb-1" />
-          <span className="text-xs mt-1">
-            {isScreenSharing ? 'Stop Share' : 'Share Screen'}
-          </span>
-        </Button>
-
-        <Button
-          variant={isVideoActive ? 'primary' : 'outline'}
-          size="lg"
-          onClick={toggleVideo}
-          className="flex flex-col items-center py-4 h-auto"
-        >
-          {isVideoActive ? (
-            <Video className="h-6 w-6 mb-1" />
-          ) : (
-            <VideoOff className="h-6 w-6 mb-1" />
-          )}
-          <span className="text-xs mt-1">
-            {isVideoActive ? 'Stop Video' : 'Start Video'}
           </span>
         </Button>
       </div>

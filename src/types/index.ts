@@ -105,7 +105,6 @@ export interface Agent {
   status: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
-  canSeeScreenshare: boolean;
   callDuration: number;
   documentationUrls?: string[];
 }

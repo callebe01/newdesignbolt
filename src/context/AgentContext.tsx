@@ -14,7 +14,6 @@ interface AgentContextType {
   createAgent: (
     name: string,
     instructions: string,
-    canSeeScreenshare: boolean,
     duration: number,
     documentationUrls?: string[]
   ) => Promise<Agent>;
@@ -38,7 +37,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     created_at: string;
     updated_at: string;
     user_id: string;
-    can_see_screenshare: boolean;
     call_duration: number;
     documentation_urls: string[] | null;
   }
@@ -50,8 +48,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     status: data.status,
     createdAt: new Date(data.created_at),
     updatedAt: new Date(data.updated_at),
-    userId: data.user_id,
-    canSeeScreenshare: data.can_see_screenshare,
     callDuration: data.call_duration,
     documentationUrls: data.documentation_urls || [],
   });
@@ -103,7 +99,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const createAgent = async (
     name: string,
     instructions: string,
-    canSeeScreenshare: boolean,
     duration: number,
     documentationUrls: string[] = []
   ): Promise<Agent> => {
@@ -125,7 +120,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           instructions,
           status: 'active',
           user_id: user.id,
-          can_see_screenshare: canSeeScreenshare,
           call_duration: duration,
           documentation_urls: documentationUrls,
         })
