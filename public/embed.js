@@ -949,14 +949,14 @@
     // Widget HTML
     widget.innerHTML = `
       <div id="voicepilot-container" style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #fdfdfd 0%, #f0f0f0 100%);
         border-radius: 25px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
         padding: 20px;
         min-width: 320px;
         max-width: 400px;
-        color: white;
-        transition: all 0.3s ease;
+        color: #333;
+        transition: all 0.15s ease;
       ">
         <div id="voicepilot-header" style="
           display: flex;
@@ -968,17 +968,18 @@
             🎯 Voice Guide
           </h3>
           <button id="voicepilot-close" style="
-            background: rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.05);
             border: none;
             border-radius: 50%;
             width: 30px;
             height: 30px;
-            color: white;
+            color: #333;
             cursor: pointer;
             font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background 0.15s ease;
           ">×</button>
         </div>
         
@@ -987,15 +988,16 @@
           margin-bottom: 20px;
         ">
           <div id="voicepilot-status-indicator" style="
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.05);
             margin: 0 auto 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 24px;
+            transition: background 0.15s ease;
           ">🎤</div>
           <div id="voicepilot-status-text" style="
             font-size: 14px;
@@ -1009,26 +1011,26 @@
           justify-content: center;
         ">
           <button id="voicepilot-start" style="
-            background: rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.05);
             border: none;
             border-radius: 20px;
             padding: 12px 24px;
-            color: white;
+            color: #333;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
-            transition: all 0.2s ease;
+            transition: background 0.15s ease;
           ">Start Call</button>
           <button id="voicepilot-end" style="
-            background: rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.03);
             border: none;
             border-radius: 20px;
             padding: 12px 24px;
-            color: white;
+            color: #333;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
-            transition: all 0.2s ease;
+            transition: background 0.15s ease;
             display: none;
           ">End Call</button>
         </div>
@@ -1036,7 +1038,7 @@
         <div id="voicepilot-transcript" style="
           margin-top: 15px;
           padding: 10px;
-          background: rgba(255,255,255,0.1);
+          background: #f5f5f5;
           border-radius: 10px;
           font-size: 12px;
           max-height: 100px;
