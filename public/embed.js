@@ -1061,6 +1061,8 @@
 
     let isCallActive = false;
     let websocket = null;
+    let audioContext = null;
+    let audioQueueTime = 0; // Track when the next audio should start
 
     // Close widget
     closeBtn.addEventListener('click', () => {
@@ -1140,6 +1142,10 @@
         }
 
         console.log('[VoicePilot] Got relay URL:', relayUrl);
+
+        // Initialize audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioQueueTime = audioContext.currentTime;
 
         // Connect to the relay WebSocket
         websocket = new WebSocket(relayUrl);
@@ -1362,16 +1368,58 @@ Current page context: ${pageContext}`
       }
     }
 
+    // Fixed audio buffer playback for raw PCM data
     async function playAudioBuffer(arrayBuffer) {
       try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        if (!audioContext) {
+          console.warn('[VoicePilot] Audio context not initialized');
+          return;
+        }
+
+        // Assume the incoming data is raw PCM (16-bit signed integers)
+        const int16Array = new Int16Array(arrayBuffer);
+        const sampleRate = 24000; // Common sample rate for voice data
+        const numberOfChannels = 1; // Mono audio
+        
+        // Create AudioBuffer manually for raw PCM data
+        const audioBuffer = audioContext.createBuffer(
+          numberOfChannels,
+          int16Array.length,
+          sampleRate
+        );
+        
+        // Convert Int16 to Float32 and copy to AudioBuffer
+        const channelData = audioBuffer.getChannelData(0);
+        for (let i = 0; i < int16Array.length; i++) {
+          // Convert from 16-bit signed integer to float (-1.0 to 1.0)
+          channelData[i] = int16Array[i] / 32768.0;
+        }
+        
+        // Create and configure audio source
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        source.start();
+        
+        // Queue audio to play smoothly without gaps
+        const startTime = Math.max(audioContext.currentTime, audioQueueTime);
+        source.start(startTime);
+        
+        // Update queue time for next audio chunk
+        audioQueueTime = startTime + audioBuffer.duration;
+        
+        console.log('[VoicePilot] Playing audio chunk:', {
+          duration: audioBuffer.duration,
+          sampleRate: sampleRate,
+          samples: int16Array.length
+        });
+        
       } catch (error) {
         console.error('[VoicePilot] Error playing audio buffer:', error);
+        
+        // Reset audio queue time on error to prevent getting stuck
+        if (audioContext) {
+          audioQueueTime = audioContext.currentTime;
+        }
       }
     }
 
