@@ -9,16 +9,11 @@ import { ThemeProvider } from '../context/ThemeContext';
 export interface EmbedOptions {
   agent: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
-  googleApiKey?: string;
 }
 
 function mount(options: EmbedOptions) {
-  const { agent, position = 'bottom-right', googleApiKey } = options;
+  const { agent, position = 'bottom-right' } = options;
   if (!agent) return null;
-
-  if (googleApiKey) {
-    (window as any).voicepilotGoogleApiKey = googleApiKey;
-  }
 
   const container = document.createElement('div');
   container.id = 'voicepilot-widget';
@@ -120,12 +115,10 @@ if (typeof document !== 'undefined') {
   if (cur && !(window as any).voicepilot) {
     const agent = cur.getAttribute('data-agent');
     const position = (cur.getAttribute('data-position') || undefined) as any;
-    const key = cur.getAttribute('data-google-api-key') || undefined;
     if (agent) {
       (window as any).voicepilot = mount({
         agent,
-        position,
-        googleApiKey: key
+        position
       });
     }
   }

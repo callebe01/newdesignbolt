@@ -3,13 +3,11 @@ import React, { useEffect } from 'react';
 interface EmbeddedWidgetProps {
   agentId: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
-  googleApiKey?: string;
 }
 
 export const EmbeddedWidget: React.FC<EmbeddedWidgetProps> = ({ 
   agentId, 
-  position = 'bottom-right',
-  googleApiKey
+  position = 'bottom-right'
 }) => {
   useEffect(() => {
     // Create script element
@@ -17,9 +15,6 @@ export const EmbeddedWidget: React.FC<EmbeddedWidgetProps> = ({
     script.src = '/embed.js';
     script.setAttribute('data-agent', agentId);
     script.setAttribute('data-position', position);
-    if (googleApiKey) {
-      script.setAttribute('data-google-api-key', googleApiKey);
-    }
     script.async = true;
 
     // Add to document
@@ -43,7 +38,7 @@ export const EmbeddedWidget: React.FC<EmbeddedWidgetProps> = ({
         delete window.voicepilot;
       }
     };
-  }, [agentId, position, googleApiKey]);
+  }, [agentId, position]);
 
   return null; // This component doesn't render anything visible
 };
