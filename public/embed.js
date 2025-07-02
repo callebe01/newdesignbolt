@@ -7,7 +7,6 @@
   const position = currentScript?.getAttribute('data-position') || 'bottom-right';
   const supabaseUrl = currentScript?.getAttribute('data-supabase-url');
   const supabaseAnonKey = currentScript?.getAttribute('data-supabase-anon-key');
-  const googleApiKey = currentScript?.getAttribute('data-google-api-key');
 
   if (!agentId) {
     console.error('VoicePilot: data-agent attribute is required');
@@ -20,9 +19,6 @@
   }
   if (supabaseAnonKey) {
     window.voicepilotSupabaseKey = supabaseAnonKey;
-  }
-  if (googleApiKey) {
-    window.voicepilotGoogleApiKey = googleApiKey;
   }
 
   // ═══════════════════════════════════════════════
@@ -467,307 +463,6 @@
         @keyframes badge-appear {
           0% { opacity: 0; transform: translateY(-4px) scale(0.8); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* VoicePilot Widget Styles */
-        #voicepilot-widget {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          z-index: 999999;
-          position: fixed;
-        }
-
-        .voicepilot-floating-button {
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          border: none;
-          cursor: pointer;
-          box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .voicepilot-floating-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
-        }
-
-        .voicepilot-floating-button.pulse {
-          animation: voicepilot-pulse 2s infinite;
-        }
-
-        @keyframes voicepilot-pulse {
-          0% { box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3); }
-          50% { box-shadow: 0 8px 32px rgba(59, 130, 246, 0.6), 0 0 0 10px rgba(59, 130, 246, 0.1); }
-          100% { box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3); }
-        }
-
-        .voicepilot-logo {
-          width: 28px;
-          height: 28px;
-          filter: brightness(0) invert(1);
-        }
-
-        .voicepilot-expanded-widget {
-          width: 320px;
-          background: #ffffff;
-          border-radius: 16px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          position: absolute;
-          bottom: 72px;
-          right: 0;
-          opacity: 0;
-          transform: translateY(20px) scale(0.95);
-          visibility: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          overflow: hidden;
-        }
-
-        .voicepilot-expanded-widget.is-visible {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-          visibility: visible;
-        }
-
-        .voicepilot-header {
-          padding: 20px;
-          border-bottom: 1px solid #f1f5f9;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .voicepilot-header-left {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .voicepilot-header-logo {
-          width: 32px;
-          height: 32px;
-        }
-
-        .voicepilot-header-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #1e293b;
-          margin: 0;
-        }
-
-        .voicepilot-close-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: #f8fafc;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s ease;
-          color: #64748b;
-        }
-
-        .voicepilot-close-btn:hover {
-          background: #e2e8f0;
-          color: #475569;
-        }
-
-        .voicepilot-status-area {
-          padding: 20px;
-          text-align: center;
-        }
-
-        .voicepilot-status-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          background: #f1f5f9;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 12px;
-          font-size: 20px;
-          transition: all 0.3s ease;
-        }
-
-        .voicepilot-status-icon.ready {
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-        }
-
-        .voicepilot-status-icon.connecting {
-          background: #fbbf24;
-          color: white;
-        }
-
-        .voicepilot-status-icon.connected {
-          background: #10b981;
-          color: white;
-          animation: voicepilot-pulse 2s infinite;
-        }
-
-        .voicepilot-status-icon.error {
-          background: #ef4444;
-          color: white;
-        }
-
-        .voicepilot-status-text {
-          font-size: 14px;
-          color: #64748b;
-          margin: 0;
-        }
-
-        .voicepilot-controls {
-          padding: 0 20px 20px;
-          display: flex;
-          gap: 8px;
-        }
-
-        .voicepilot-btn {
-          flex: 1;
-          padding: 12px 16px;
-          border-radius: 8px;
-          border: none;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-        }
-
-        .voicepilot-btn-primary {
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-        }
-
-        .voicepilot-btn-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-
-        .voicepilot-btn-secondary {
-          background: #f8fafc;
-          color: #475569;
-          border: 1px solid #e2e8f0;
-        }
-
-        .voicepilot-btn-secondary:hover {
-          background: #f1f5f9;
-        }
-
-        .voicepilot-btn-danger {
-          background: #ef4444;
-          color: white;
-        }
-
-        .voicepilot-btn-danger:hover {
-          background: #dc2626;
-        }
-
-        .voicepilot-transcript {
-          margin: 0 20px 20px;
-          padding: 16px;
-          background: #f8fafc;
-          border-radius: 8px;
-          font-size: 13px;
-          line-height: 1.5;
-          color: #475569;
-          max-height: 120px;
-          overflow-y: auto;
-          display: none;
-        }
-
-        .voicepilot-transcript.visible {
-          display: block;
-        }
-
-        .voicepilot-error {
-          margin: 0 20px 20px;
-          padding: 12px;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          border-radius: 8px;
-          color: #dc2626;
-          font-size: 13px;
-          display: none;
-        }
-
-        .voicepilot-error.visible {
-          display: block;
-        }
-
-        .voicepilot-spinner {
-          width: 20px;
-          height: 20px;
-          border: 2px solid #ffffff;
-          border-top: 2px solid transparent;
-          border-radius: 50%;
-          animation: voicepilot-spin 1s linear infinite;
-        }
-
-        @keyframes voicepilot-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-          .voicepilot-expanded-widget {
-            background: #1e293b;
-            border-color: #334155;
-          }
-
-          .voicepilot-header {
-            border-bottom-color: #334155;
-          }
-
-          .voicepilot-header-title {
-            color: #f1f5f9;
-          }
-
-          .voicepilot-close-btn {
-            background: #334155;
-            color: #94a3b8;
-          }
-
-          .voicepilot-close-btn:hover {
-            background: #475569;
-            color: #cbd5e1;
-          }
-
-          .voicepilot-status-icon {
-            background: #334155;
-          }
-
-          .voicepilot-status-text {
-            color: #94a3b8;
-          }
-
-          .voicepilot-btn-secondary {
-            background: #334155;
-            color: #cbd5e1;
-            border-color: #475569;
-          }
-
-          .voicepilot-btn-secondary:hover {
-            background: #475569;
-          }
-
-          .voicepilot-transcript {
-            background: #334155;
-            color: #cbd5e1;
-          }
         }
       `;
       document.head.appendChild(this.highlightStyle);
@@ -1246,317 +941,418 @@
     // Apply styles
     Object.assign(widget.style, {
       position: 'fixed',
-      zIndex: '999999',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      zIndex: '10000',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
       ...pos
     });
 
     // Widget HTML with new design
     widget.innerHTML = `
-      <!-- Floating Button -->
-      <button class="voicepilot-floating-button" id="voicepilot-floating-button">
-        <img src="/logovp.png" alt="Voice Pilot" class="voicepilot-logo" />
-      </button>
+      <div id="voicepilot-container" style="
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      ">
+        <!-- Minimized State -->
+        <div id="voicepilot-minimized" style="
+          width: 56px;
+          height: 56px;
+          background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+          border-radius: 50%;
+          box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 3px solid rgba(255, 255, 255, 0.2);
+        ">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" fill="white"/>
+            <path d="M12 1v6m0 8v6m11-7h-6m-8 0H1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
 
-      <!-- Expanded Widget -->
-      <div class="voicepilot-expanded-widget" id="voicepilot-expanded-widget">
-        <!-- Header -->
-        <div class="voicepilot-header">
-          <div class="voicepilot-header-left">
-            <img src="/logovp.png" alt="Voice Pilot" class="voicepilot-header-logo" />
-            <h3 class="voicepilot-header-title">Voice Pilot</h3>
+        <!-- Expanded State -->
+        <div id="voicepilot-expanded" style="
+          width: 320px;
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          overflow: hidden;
+          display: none;
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          transform-origin: bottom right;
+        ">
+          <!-- Header -->
+          <div style="
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+            padding: 16px;
+            color: white;
+            position: relative;
+          ">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="
+                  width: 32px;
+                  height: 32px;
+                  background: rgba(255, 255, 255, 0.2);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                ">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="3" fill="white"/>
+                    <path d="M12 1v6m0 8v6m11-7h-6m-8 0H1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style="font-weight: 600; font-size: 14px;">Voice Pilot</div>
+                  <div id="voicepilot-status-text" style="font-size: 12px; opacity: 0.9;">Ready to help</div>
+                </div>
+              </div>
+              <button id="voicepilot-close" style="
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 50%;
+                width: 28px;
+                height: 28px;
+                color: white;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+              ">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
-          <button class="voicepilot-close-btn" id="voicepilot-close-expanded">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
 
-        <!-- Status Area -->
-        <div class="voicepilot-status-area">
-          <div class="voicepilot-status-icon ready" id="voicepilot-status-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9,22 9,12 15,12 15,22"></polyline>
-            </svg>
+          <!-- Content -->
+          <div id="voicepilot-content" style="padding: 20px;">
+            <!-- Ready State -->
+            <div id="voicepilot-ready" style="text-align: center;">
+              <div style="
+                width: 48px;
+                height: 48px;
+                background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 16px;
+                opacity: 0.1;
+              ">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="white"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #1F2937;">Start Voice Chat</h3>
+              <p style="margin: 0 0 20px; font-size: 14px; color: #6B7280; line-height: 1.4;">
+                Get instant help and guidance through voice conversation
+              </p>
+              <button id="voicepilot-start" style="
+                width: 100%;
+                background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+              ">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Start Call
+              </button>
+            </div>
+
+            <!-- Connecting State -->
+            <div id="voicepilot-connecting" style="text-align: center; display: none;">
+              <div style="
+                width: 48px;
+                height: 48px;
+                background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 16px;
+                animation: pulse 2s infinite;
+              ">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
+                  <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #1F2937;">Connecting...</h3>
+              <p style="margin: 0; font-size: 14px; color: #6B7280;">
+                Setting up your voice connection
+              </p>
+            </div>
+
+            <!-- Active State -->
+            <div id="voicepilot-active" style="display: none;">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <div style="
+                  width: 12px;
+                  height: 12px;
+                  background: #10B981;
+                  border-radius: 50%;
+                  animation: pulse 2s infinite;
+                "></div>
+                <span style="font-size: 14px; font-weight: 600; color: #1F2937;">Live Call</span>
+                <span id="voicepilot-duration" style="font-size: 12px; color: #6B7280; margin-left: auto;">00:00</span>
+              </div>
+
+              <!-- Transcript -->
+              <div id="voicepilot-transcript" style="
+                background: #F9FAFB;
+                border: 1px solid #E5E7EB;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 16px;
+                max-height: 120px;
+                overflow-y: auto;
+                font-size: 13px;
+                line-height: 1.4;
+                color: #374151;
+                display: none;
+              "></div>
+
+              <!-- Controls -->
+              <div style="display: flex; gap: 8px;">
+                <button id="voicepilot-mute" style="
+                  flex: 1;
+                  background: #F3F4F6;
+                  color: #374151;
+                  border: 1px solid #D1D5DB;
+                  border-radius: 8px;
+                  padding: 10px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 6px;
+                ">
+                  <svg id="voicepilot-mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <span id="voicepilot-mute-text">Mute</span>
+                </button>
+                <button id="voicepilot-end" style="
+                  flex: 1;
+                  background: #EF4444;
+                  color: white;
+                  border: none;
+                  border-radius: 8px;
+                  padding: 10px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 6px;
+                ">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 5.5C3 14.06 9.94 21 18.5 21c.386 0 .77-.014 1.148-.042.435-.032.852-.08 1.262-.144V16.5a1 1 0 0 0-1-1H15a2 2 0 0 1-2-2v-2.5a1 1 0 0 0-1-1H8a2 2 0 0 1-2-2V5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1v.5z" fill="currentColor"/>
+                  </svg>
+                  End Call
+                </button>
+              </div>
+            </div>
           </div>
-          <p class="voicepilot-status-text" id="voicepilot-status-text">Ready to help</p>
         </div>
-
-        <!-- Controls -->
-        <div class="voicepilot-controls" id="voicepilot-controls">
-          <button class="voicepilot-btn voicepilot-btn-primary" id="voicepilot-start-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            </svg>
-            Start Call
-          </button>
-        </div>
-
-        <!-- Transcript -->
-        <div class="voicepilot-transcript" id="voicepilot-transcript"></div>
-
-        <!-- Error Message -->
-        <div class="voicepilot-error" id="voicepilot-error"></div>
       </div>
+
+      <style>
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
+        #voicepilot-minimized:hover {
+          transform: scale(1.05);
+          box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
+        }
+        
+        #voicepilot-start:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+        }
+        
+        #voicepilot-mute:hover {
+          background: #E5E7EB;
+          border-color: #9CA3AF;
+        }
+        
+        #voicepilot-end:hover {
+          background: #DC2626;
+        }
+        
+        #voicepilot-close:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+      </style>
     `;
 
     document.body.appendChild(widget);
 
     // Get elements
-    const floatingButton = widget.querySelector('#voicepilot-floating-button');
-    const expandedWidget = widget.querySelector('#voicepilot-expanded-widget');
-    const closeBtn = widget.querySelector('#voicepilot-close-expanded');
-    const statusIcon = widget.querySelector('#voicepilot-status-icon');
+    const minimized = widget.querySelector('#voicepilot-minimized');
+    const expanded = widget.querySelector('#voicepilot-expanded');
+    const closeBtn = widget.querySelector('#voicepilot-close');
+    const startBtn = widget.querySelector('#voicepilot-start');
+    const muteBtn = widget.querySelector('#voicepilot-mute');
+    const endBtn = widget.querySelector('#voicepilot-end');
     const statusText = widget.querySelector('#voicepilot-status-text');
-    const controls = widget.querySelector('#voicepilot-controls');
-    const transcript = widget.querySelector('#voicepilot-transcript');
-    const errorDiv = widget.querySelector('#voicepilot-error');
+    const readyState = widget.querySelector('#voicepilot-ready');
+    const connectingState = widget.querySelector('#voicepilot-connecting');
+    const activeState = widget.querySelector('#voicepilot-active');
+    const transcriptDiv = widget.querySelector('#voicepilot-transcript');
+    const durationSpan = widget.querySelector('#voicepilot-duration');
+    const micIcon = widget.querySelector('#voicepilot-mic-icon');
+    const muteText = widget.querySelector('#voicepilot-mute-text');
 
     let isExpanded = false;
     let isCallActive = false;
     let websocket = null;
+    let isMuted = false;
+    let callDuration = 0;
+    let durationInterval = null;
 
-    // Toggle expanded widget
-    function toggleExpandedWidget(show) {
-      isExpanded = show;
-      if (show) {
-        expandedWidget.classList.add('is-visible');
-        floatingButton.style.display = 'none';
-      } else {
-        expandedWidget.classList.remove('is-visible');
-        floatingButton.style.display = 'flex';
-      }
+    // State management
+    function showState(state) {
+      readyState.style.display = state === 'ready' ? 'block' : 'none';
+      connectingState.style.display = state === 'connecting' ? 'block' : 'none';
+      activeState.style.display = state === 'active' ? 'block' : 'none';
     }
 
-    // Update status display
-    function updateStatusDisplay(status, message) {
-      // Clear existing classes
-      statusIcon.className = 'voicepilot-status-icon';
-      
-      // Update icon and styling based on status
-      switch (status) {
-        case 'ready':
-          statusIcon.classList.add('ready');
-          statusIcon.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9,22 9,12 15,12 15,22"></polyline>
-            </svg>
-          `;
-          floatingButton.classList.remove('pulse');
-          break;
-        case 'connecting':
-          statusIcon.classList.add('connecting');
-          statusIcon.innerHTML = '<div class="voicepilot-spinner"></div>';
-          floatingButton.classList.add('pulse');
-          break;
-        case 'connected':
-          statusIcon.classList.add('connected');
-          statusIcon.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-          `;
-          floatingButton.classList.add('pulse');
-          break;
-        case 'error':
-          statusIcon.classList.add('error');
-          statusIcon.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-            </svg>
-          `;
-          floatingButton.classList.remove('pulse');
-          break;
-      }
-      
-      statusText.textContent = message;
+    function expand() {
+      isExpanded = true;
+      minimized.style.display = 'none';
+      expanded.style.display = 'block';
+      expanded.style.animation = 'voicepilot-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     }
 
-    // Update controls based on call state
-    function updateControls() {
-      if (!isCallActive) {
-        controls.innerHTML = `
-          <button class="voicepilot-btn voicepilot-btn-primary" id="voicepilot-start-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            </svg>
-            Start Call
-          </button>
-        `;
-        
-        // Re-attach start button event
-        const startBtn = controls.querySelector('#voicepilot-start-btn');
-        startBtn.addEventListener('click', startCall);
-      } else {
-        controls.innerHTML = `
-          <button class="voicepilot-btn voicepilot-btn-secondary" id="voicepilot-mute-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-          </button>
-          <button class="voicepilot-btn voicepilot-btn-secondary" id="voicepilot-share-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-          </button>
-          <button class="voicepilot-btn voicepilot-btn-danger" id="voicepilot-end-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-            </svg>
-          </button>
-        `;
-        
-        // Re-attach control event listeners
-        const muteBtn = controls.querySelector('#voicepilot-mute-btn');
-        const shareBtn = controls.querySelector('#voicepilot-share-btn');
-        const endBtn = controls.querySelector('#voicepilot-end-btn');
-        
-        muteBtn.addEventListener('click', () => console.log('Mute clicked'));
-        shareBtn.addEventListener('click', () => console.log('Share screen clicked'));
-        endBtn.addEventListener('click', endCall);
-      }
+    function minimize() {
+      isExpanded = false;
+      expanded.style.display = 'none';
+      minimized.style.display = 'flex';
     }
 
-    // Show error message
-    function showError(message) {
-      errorDiv.textContent = message;
-      errorDiv.classList.add('visible');
-      setTimeout(() => {
-        errorDiv.classList.remove('visible');
-      }, 5000);
+    function updateDuration() {
+      const minutes = Math.floor(callDuration / 60);
+      const seconds = callDuration % 60;
+      durationSpan.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
+
+    // Event listeners
+    minimized.addEventListener('click', expand);
+    closeBtn.addEventListener('click', minimize);
 
     // Start call function
     async function startCall() {
       if (isCallActive) return;
 
       try {
-        updateStatusDisplay('connecting', 'Connecting...');
+        showState('connecting');
+        statusText.textContent = 'Connecting...';
 
-        // Get configuration - prioritize Google API key for direct connection
-        const apiKey = window.voicepilotGoogleApiKey;
+        // Get configuration
         const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
         const supabaseAnonKey = window.voicepilotSupabaseKey || '';
 
-        console.log('[VoicePilot] Configuration check:', {
-          hasApiKey: !!apiKey,
+        console.log('[VoicePilot] Starting call with configuration:', {
           hasSupabaseUrl: !!supabaseUrl,
-          hasSupabaseKey: !!supabaseAnonKey
+          hasSupabaseKey: !!supabaseAnonKey,
+          agentId: agentId
         });
 
-        if (apiKey) {
-          // Direct connection to Gemini Live API
-          console.log('[VoicePilot] Using direct Gemini Live API connection');
-          
-          const { GoogleGenerativeAI } = await import('https://esm.run/@google/generative-ai');
-          const genAI = new GoogleGenerativeAI(apiKey);
-          
-          const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-exp",
-            systemInstruction: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+        // Use relay through Supabase Edge Functions
+        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({
+            agentId: agentId,
+            instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
+            documentationUrls: []
+          })
+        });
 
-Your role:
-- Help users complete tasks step-by-step
-- Guide them through the interface with clear instructions
-- Answer questions about features and functionality
-- Provide contextual help based on what they're currently viewing
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start call');
+        }
 
-Context awareness:
-- You can see the current page context through the page summary
-- When you mention UI elements like buttons, forms, or links, they will be automatically highlighted
-- Speak naturally and conversationally
+        const { relayUrl } = await response.json();
+        console.log('[VoicePilot] Got relay URL:', relayUrl);
 
-Guidelines:
-- Be concise but helpful
-- Give step-by-step instructions when needed
-- Ask clarifying questions if the user's request is unclear
-- Stay focused on helping with the current application
+        // Connect to WebSocket
+        websocket = new WebSocket(relayUrl);
 
-Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}`
-          });
-
-          // Start live session
-          const geminiSession = model.startChat({
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 8192,
-            }
-          });
-
+        websocket.onopen = () => {
+          console.log('[VoicePilot] WebSocket connected');
           isCallActive = true;
-          updateStatusDisplay('connected', 'Connected - Speak now');
-          updateControls();
-          transcript.classList.add('visible');
+          showState('active');
+          statusText.textContent = 'Connected';
+          
+          // Start duration timer
+          callDuration = 0;
+          durationInterval = setInterval(() => {
+            callDuration++;
+            updateDuration();
+          }, 1000);
 
-          console.log('[VoicePilot] Direct Gemini connection established');
-
-        } else if (supabaseUrl && supabaseAnonKey) {
-          // Use relay through Supabase
-          console.log('[VoicePilot] Using Supabase relay connection');
-
-          const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-            },
-            body: JSON.stringify({
-              agentId: agentId,
-              instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
-              documentationUrls: []
-            })
-          });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to start call');
-          }
-
-          const { relayUrl } = await response.json();
-          console.log('[VoicePilot] Got relay URL:', relayUrl);
-
-          // Connect to WebSocket
-          websocket = new WebSocket(relayUrl);
-
-          websocket.onopen = () => {
-            console.log('[VoicePilot] WebSocket connected');
-            isCallActive = true;
-            updateStatusDisplay('connected', 'Connected - Speak now');
-            updateControls();
-            transcript.classList.add('visible');
-
-            // Send setup message
-            const setupMsg = {
-              setup: {
-                model: 'models/gemini-2.0-flash-live-001',
-                generationConfig: {
-                  responseModalities: ['AUDIO'],
-                  speechConfig: {
-                    voiceConfig: {
-                      prebuiltVoiceConfig: {
-                        voiceName: 'Kore'
-                      }
+          // Send setup message
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
                     }
                   }
-                },
-                outputAudioTranscription: {},
-                inputAudioTranscription: {},
-                systemInstruction: {
-                  parts: [{
-                    text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+                }
+              },
+              outputAudioTranscription: {},
+              inputAudioTranscription: {},
+              systemInstruction: {
+                parts: [{
+                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
 
 Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}
 
@@ -1567,41 +1363,51 @@ Your role:
 - Provide contextual help based on what they're currently viewing
 
 When you mention UI elements like buttons, forms, or links, they will be automatically highlighted. Speak naturally and conversationally.`
-                  }]
-                }
+                }]
               }
-            };
-
-            websocket.send(JSON.stringify(setupMsg));
+            }
           };
 
-          websocket.onmessage = (event) => {
-            // Handle incoming messages
-            console.log('[VoicePilot] Received message');
-          };
+          websocket.send(JSON.stringify(setupMsg));
+        };
 
-          websocket.onerror = (error) => {
-            console.error('[VoicePilot] WebSocket error:', error);
-            updateStatusDisplay('error', 'Connection failed');
-            showError('Connection failed');
-          };
+        websocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // Handle AI speech transcription
+            if (data.serverContent?.outputTranscription?.text) {
+              const text = data.serverContent.outputTranscription.text;
+              transcriptDiv.textContent += text;
+              transcriptDiv.style.display = 'block';
+              transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+              
+              // Highlight elements mentioned by AI
+              if (window.voicePilotHighlightStream) {
+                window.voicePilotHighlightStream(text);
+              }
+            }
+          } catch (err) {
+            console.log('[VoicePilot] Received non-JSON message (likely audio data)');
+          }
+        };
 
-          websocket.onclose = () => {
-            console.log('[VoicePilot] WebSocket closed');
-            isCallActive = false;
-            updateStatusDisplay('ready', 'Ready to help');
-            updateControls();
-            transcript.classList.remove('visible');
-          };
+        websocket.onerror = (error) => {
+          console.error('[VoicePilot] WebSocket error:', error);
+          statusText.textContent = 'Connection failed';
+          showState('ready');
+        };
 
-        } else {
-          throw new Error('No API configuration provided. Please provide either Google API key or Supabase configuration.');
-        }
+        websocket.onclose = () => {
+          console.log('[VoicePilot] WebSocket closed');
+          endCall();
+        };
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
-        updateStatusDisplay('error', 'Connection failed');
-        showError(error.message || 'Failed to start call');
+        statusText.textContent = 'Connection failed';
+        showState('ready');
+        alert('Failed to start call: ' + error.message);
       }
     }
 
@@ -1615,10 +1421,19 @@ When you mention UI elements like buttons, forms, or links, they will be automat
           websocket = null;
         }
 
+        if (durationInterval) {
+          clearInterval(durationInterval);
+          durationInterval = null;
+        }
+
         isCallActive = false;
-        updateStatusDisplay('ready', 'Ready to help');
-        updateControls();
-        transcript.classList.remove('visible');
+        isMuted = false;
+        callDuration = 0;
+        transcriptDiv.textContent = '';
+        transcriptDiv.style.display = 'none';
+        
+        showState('ready');
+        statusText.textContent = 'Ready to help';
         
         // Clear any highlights
         if (window.voicePilotClearHighlights) {
@@ -1632,26 +1447,61 @@ When you mention UI elements like buttons, forms, or links, they will be automat
       }
     }
 
-    // Event listeners
-    floatingButton.addEventListener('click', () => toggleExpandedWidget(true));
-    closeBtn.addEventListener('click', () => toggleExpandedWidget(false));
-
-    // Click outside to close
-    document.addEventListener('click', (event) => {
-      if (isExpanded && !widget.contains(event.target)) {
-        toggleExpandedWidget(false);
+    // Mute/unmute function
+    function toggleMute() {
+      isMuted = !isMuted;
+      
+      if (isMuted) {
+        muteBtn.style.background = '#EF4444';
+        muteBtn.style.color = 'white';
+        muteBtn.style.borderColor = '#EF4444';
+        muteText.textContent = 'Unmute';
+        micIcon.innerHTML = `
+          <path d="M1 1l22 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" fill="currentColor"/>
+          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        `;
+      } else {
+        muteBtn.style.background = '#F3F4F6';
+        muteBtn.style.color = '#374151';
+        muteBtn.style.borderColor = '#D1D5DB';
+        muteText.textContent = 'Mute';
+        micIcon.innerHTML = `
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        `;
       }
-    });
+    }
 
-    // Initial control setup
-    updateControls();
+    // Event listeners
+    startBtn.addEventListener('click', startCall);
+    muteBtn.addEventListener('click', toggleMute);
+    endBtn.addEventListener('click', endCall);
+
+    // Add expand animation CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes voicepilot-expand {
+        0% {
+          opacity: 0;
+          transform: scale(0.8) translateY(20px);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+    `;
+    document.head.appendChild(style);
 
     // Return widget API
     return {
-      show: () => widget.style.display = 'block',
-      hide: () => widget.style.display = 'none',
-      open: () => toggleExpandedWidget(true),
-      close: () => toggleExpandedWidget(false),
+      show: () => expand(),
+      hide: () => minimize(),
       startCall,
       endCall,
       isActive: () => isCallActive
