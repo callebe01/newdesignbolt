@@ -948,7 +948,7 @@
 
     // Widget HTML
     widget.innerHTML = `
-      <div id="voicepilot-container" style="
+      <div id="voicepilot-container" style="position: relative; 
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 25px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.3);
@@ -1043,6 +1043,44 @@
           overflow-y: auto;
           display: none;
         "></div>
+
+        <div id="voicepilot-consent" style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.6);
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          border-radius: inherit;
+          color: white;
+          text-align: center;
+        ">
+          <p style="margin-bottom: 15px;">Allow VoicePilot to access your microphone?</p>
+          <div style="display:flex; gap:10px;">
+            <button id="voicepilot-consent-accept" style="
+              background: rgba(255,255,255,0.2);
+              border: none;
+              border-radius: 20px;
+              padding: 8px 16px;
+              color: white;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+            ">Accept</button>
+            <button id="voicepilot-consent-cancel" style="
+              background: rgba(255,255,255,0.1);
+              border: none;
+              border-radius: 20px;
+              padding: 8px 16px;
+              color: white;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+            ">Cancel</button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -1056,6 +1094,9 @@
     const statusIndicator = widget.querySelector('#voicepilot-status-indicator');
     const statusText = widget.querySelector('#voicepilot-status-text');
     const transcript = widget.querySelector('#voicepilot-transcript');
+    const consentOverlay = widget.querySelector('#voicepilot-consent');
+    const consentAccept = widget.querySelector('#voicepilot-consent-accept');
+    const consentCancel = widget.querySelector('#voicepilot-consent-cancel');
 
     let isCallActive = false;
     let websocket = null;
@@ -1069,6 +1110,37 @@
     let pageContextIntervalRef = { current: null };
     let currentPageContextRef = { current: '' };
     let lastSentPageContextRef = { current: '' };
+
+    function showState(state) {
+      if (state === 'connecting') {
+        statusText.textContent = 'Connecting...';
+        statusIndicator.textContent = '⏳';
+      } else if (state === 'ready') {
+        statusText.textContent = 'Ready to help';
+        statusIndicator.textContent = '🎤';
+      }
+    }
+
+    function requestConsent() {
+      return new Promise((resolve) => {
+        consentOverlay.style.display = 'flex';
+        const onAccept = () => {
+          cleanup();
+          resolve(true);
+        };
+        const onCancel = () => {
+          cleanup();
+          resolve(false);
+        };
+        function cleanup() {
+          consentOverlay.style.display = 'none';
+          consentAccept.removeEventListener('click', onAccept);
+          consentCancel.removeEventListener('click', onCancel);
+        }
+        consentAccept.addEventListener('click', onAccept);
+        consentCancel.addEventListener('click', onCancel);
+      });
+    }
 
     // Initialize Supabase client
     let supabaseClient = null;
@@ -1283,9 +1355,15 @@
     async function startCall() {
       if (isCallActive) return;
 
+      const consent = await requestConsent();
+      if (!consent) {
+        showState('ready');
+        return;
+      }
+
+      showState('connecting');
+
       try {
-        statusText.textContent = 'Connecting...';
-        statusIndicator.textContent = '⏳';
 
         // Reset state
         committedTextRef.current = '';
