@@ -24,7 +24,7 @@ serve(async (req) => {
   try {
     const { agentId, instructions, documentationUrls } = await req.json();
 
-    // Optional: Reuse existing usage check logic
+    // Optional: Reuse existing usage check logic for authenticated agent owners
     if (agentId) {
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
