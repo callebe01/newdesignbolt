@@ -920,327 +920,133 @@
     return pageContextCapture.getContextSummary();
   };
 
-// ────────────────────────────────────────────────────
-// Widget creation
-// ────────────────────────────────────────────────────
-function createWidget() {
-  // Create widget container
-  const widget = document.createElement('div');
-  widget.id = 'voicepilot-widget';
-  
-  // Position mapping
-  const positions = {
-    'bottom-right': { bottom: '20px', right: '20px' },
-    'bottom-left': { bottom: '20px', left: '20px' },
-    'top-right': { top: '20px', right: '20px' },
-    'top-left': { top: '20px', left: '20px' }
-  };
-  
-  const pos = positions[position] || positions['bottom-right'];
-  
-  // Apply styles
-  Object.assign(widget.style, {
-    position: 'fixed',
-    zIndex: '10000',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    ...pos
-  });
+  // ────────────────────────────────────────────────────
+  // Widget creation
+  // ────────────────────────────────────────────────────
+  function createWidget() {
+    // Create widget container
+    const widget = document.createElement('div');
+    widget.id = 'voicepilot-widget';
+    
+    // Position mapping
+    const positions = {
+      'bottom-right': { bottom: '20px', right: '20px' },
+      'bottom-left': { bottom: '20px', left: '20px' },
+      'top-right': { top: '20px', right: '20px' },
+      'top-left': { top: '20px', left: '20px' }
+    };
+    
+    const pos = positions[position] || positions['bottom-right'];
+    
+    // Apply styles
+    Object.assign(widget.style, {
+      position: 'fixed',
+      zIndex: '10000',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      ...pos
+    });
 
-  // Inject CSS for the new design
-  const styleSheet = document.createElement('style');
-  styleSheet.id = 'voicepilot-widget-styles';
-  styleSheet.textContent = `
-    #voicepilot-widget * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* Minimized State */
-    .vp-minimized {
-      background: white;
-      border-radius: 24px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      padding: 8px 16px;
-      gap: 12px;
-      min-width: 140px;
-      height: 48px;
-      border: none;
-      font-family: inherit;
-    }
-
-    .vp-minimized:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-    }
-
-    /* Logo */
-    .vp-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
-      border-radius: 50%;
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .vp-logo::before {
-      content: '';
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 24px;
-      height: 24px;
-      background: linear-gradient(135deg, #0099cc 0%, #003d7a 100%);
-      border-radius: 50% 0 50% 50%;
-      transform: rotate(-45deg);
-    }
-
-    /* Brand Text */
-    .vp-brand {
-      font-weight: 600;
-      font-size: 14px;
-      color: #333;
-      white-space: nowrap;
-    }
-
-    /* Connected State Actions */
-    .vp-actions {
-      display: none;
-      gap: 8px;
-      margin-left: auto;
-    }
-
-    .vp-minimized.connected .vp-actions {
-      display: flex;
-    }
-
-    .vp-minimized.connected .vp-brand {
-      display: none;
-    }
-
-    .vp-minimized.connected {
-      animation: connectedGlow 2s infinite;
-    }
-
-    @keyframes connectedGlow {
-      0%, 100% { box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2); }
-      50% { box-shadow: 0 4px 30px rgba(0, 212, 255, 0.4); }
-    }
-
-    .vp-action-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: bold;
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    .vp-end-call {
-      background: #ff4444;
-      color: white;
-    }
-
-    .vp-end-call:hover {
-      background: #cc3333;
-      transform: scale(1.1);
-    }
-
-    .vp-expand {
-      background: #f0f0f0;
-      color: #666;
-    }
-
-    .vp-expand:hover {
-      background: #e0e0e0;
-      transform: scale(1.1);
-    }
-
-    /* Expanded Widget */
-    .vp-expanded {
-      position: absolute;
-      bottom: 56px;
-      right: 0;
-      width: 320px;
-      background: linear-gradient(135deg, #fdfdfd 0%, #f0f0f0 100%);
-      border-radius: 25px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      transform: translateY(20px) scale(0.9);
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      color: #333;
-      padding: 20px;
-      max-width: 400px;
-      min-width: 320px;
-    }
-
-    .vp-expanded.show {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .vp-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 15px;
-    }
-
-    .vp-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      color: #333;
-      font-size: 18px;
-      margin: 0;
-    }
-
-    .vp-title .vp-logo {
-      width: 24px;
-      height: 24px;
-    }
-
-    .vp-close {
-      background: rgba(0,0,0,0.05);
-      border: none;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      color: #333;
-      cursor: pointer;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s ease;
-      font-family: inherit;
-    }
-
-    .vp-close:hover {
-      background: rgba(0,0,0,0.1);
-    }
-
-    .vp-status {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .vp-status-indicator {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.05);
-      margin: 0 auto 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      transition: background 0.15s ease;
-    }
-
-    .vp-status-text {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
-    .vp-controls {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-    }
-
-    .vp-btn {
-      background: rgba(0,0,0,0.05);
-      border: none;
-      border-radius: 20px;
-      padding: 12px 24px;
-      color: #333;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.15s ease;
-      font-family: inherit;
-    }
-
-    .vp-btn:hover {
-      background: rgba(0,0,0,0.1);
-    }
-
-    .vp-btn.end {
-      background: rgba(0,0,0,0.03);
-      display: none;
-    }
-
-    .vp-transcript {
-      margin-top: 15px;
-      padding: 10px;
-      background: #f5f5f5;
-      border-radius: 10px;
-      font-size: 12px;
-      max-height: 100px;
-      overflow-y: auto;
-      display: none;
-    }
-
-    .vp-hidden {
-      display: none;
-    }
-  `;
-  document.head.appendChild(styleSheet);
-
-  // Widget HTML with new design
-  widget.innerHTML = `
-    <!-- Minimized State -->
-    <button class="vp-minimized" id="vp-minimized">
-      <div class="vp-logo"></div>
-      <span class="vp-brand">Voice Pilot</span>
-      
-      <!-- Actions when connected -->
-      <div class="vp-actions">
-        <button class="vp-action-btn vp-end-call" id="vp-end-call-mini" title="End Call">✕</button>
-        <button class="vp-action-btn vp-expand" id="vp-expand" title="Expand">↑</button>
+    // Widget HTML
+    widget.innerHTML = `
+      <div id="voicepilot-container" style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        padding: 20px;
+        min-width: 320px;
+        max-width: 400px;
+        color: white;
+        transition: all 0.3s ease;
+      ">
+        <div id="voicepilot-header" style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 15px;
+        ">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
+            🎯 Voice Guide
+          </h3>
+          <button id="voicepilot-close" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">×</button>
+        </div>
+        
+        <div id="voicepilot-status" style="
+          text-align: center;
+          margin-bottom: 20px;
+        ">
+          <div id="voicepilot-status-indicator" style="
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+          ">🎤</div>
+          <div id="voicepilot-status-text" style="
+            font-size: 14px;
+            opacity: 0.9;
+          ">Ready to help</div>
+        </div>
+        
+        <div id="voicepilot-controls" style="
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        ">
+          <button id="voicepilot-start" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+          ">Start Call</button>
+          <button id="voicepilot-end" style="
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: none;
+          ">End Call</button>
+        </div>
+        
+        <div id="voicepilot-transcript" style="
+          margin-top: 15px;
+          padding: 10px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 10px;
+          font-size: 12px;
+          max-height: 100px;
+          overflow-y: auto;
+          display: none;
+        "></div>
       </div>
-    </button>
+    `;
 
-    <!-- Expanded Widget -->
-    <div class="vp-expanded" id="voicepilot-container">
-      <div class="vp-header" id="voicepilot-header">
-        <h3 class="vp-title">
-          <div class="vp-logo"></div>
-          Voice Pilot
-        </h3>
-        <button class="vp-close" id="voicepilot-close">×</button>
-      </div>
-
-      <div class="vp-status" id="voicepilot-status">
-        <div class="vp-status-indicator" id="voicepilot-status-indicator">🎤</div>
-        <div class="vp-status-text" id="voicepilot-status-text">Ready to help</div>
-      </div>
-
-      <div class="vp-controls" id="voicepilot-controls">
-        <button class="vp-btn" id="voicepilot-start">Start Call</button>
-        <button class="vp-btn end" id="voicepilot-end">End Call</button>
-      </div>
-
-      <div class="vp-transcript" id="voicepilot-transcript"></div>
-    </div>
-  `;
-
-  document.body.appendChild(widget);
+    document.body.appendChild(widget);
 
     // Get elements
     const container = widget.querySelector('#voicepilot-container');
