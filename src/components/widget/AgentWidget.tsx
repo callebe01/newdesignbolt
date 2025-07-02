@@ -36,6 +36,14 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
   } = useLiveCall();
   const { getAgent } = useAgents();
   const [agent, setAgent] = useState<any>(null);
+  const [isTranscriptVisible, setTranscriptVisible] = useState(false);
+  const transcriptDivRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (transcriptDivRef.current) {
+      transcriptDivRef.current.style.display = isTranscriptVisible ? 'block' : 'none';
+    }
+  }, [isTranscriptVisible]);
 
   useEffect(() => {
     const loadAgent = async () => {
@@ -125,9 +133,21 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
                         </div>
 
                         {transcript && (
-                          <div className="mt-3 p-3 bg-muted rounded-lg text-sm max-h-32 overflow-y-auto">
-                            {transcript}
-                          </div>
+                          <>
+                            <button
+                              onClick={() => setTranscriptVisible((v) => !v)}
+                              className="mt-2 text-xs underline text-muted-foreground"
+                            >
+                              {isTranscriptVisible ? 'Hide Transcript' : 'Show Transcript'}
+                            </button>
+                            <div
+                              ref={transcriptDivRef}
+                              className="mt-3 p-3 bg-muted rounded-lg text-sm max-h-32 overflow-y-auto"
+                              style={{ display: 'none' }}
+                            >
+                              {transcript}
+                            </div>
+                          </>
                         )}
 
                         <div className="flex gap-2 mt-3">
