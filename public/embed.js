@@ -930,10 +930,10 @@
     
     // Position mapping
     const positions = {
-      'bottom-right': { bottom: '24px', right: '24px' },
-      'bottom-left': { bottom: '24px', left: '24px' },
-      'top-right': { top: '24px', right: '24px' },
-      'top-left': { top: '24px', left: '24px' }
+      'bottom-right': { bottom: '20px', right: '20px' },
+      'bottom-left': { bottom: '20px', left: '20px' },
+      'top-right': { top: '20px', right: '20px' },
+      'top-left': { top: '20px', left: '20px' }
     };
     
     const pos = positions[position] || positions['bottom-right'];
@@ -946,367 +946,405 @@
       ...pos
     });
 
-    // Widget HTML with new design
+    // Widget HTML
     widget.innerHTML = `
       <div id="voicepilot-container" style="
-        position: relative;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        padding: 20px;
+        min-width: 320px;
+        max-width: 400px;
+        color: white;
+        transition: all 0.3s ease;
       ">
-        <!-- Minimized State -->
-        <div id="voicepilot-minimized" style="
-          width: 56px;
-          height: 56px;
-          background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
-          border-radius: 50%;
-          box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+        <div id="voicepilot-header" style="
           display: flex;
           align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          border: 3px solid rgba(255, 255, 255, 0.2);
+          justify-content: space-between;
+          margin-bottom: 15px;
         ">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="3" fill="white"/>
-            <path d="M12 1v6m0 8v6m11-7h-6m-8 0H1" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </div>
-
-        <!-- Expanded State -->
-        <div id="voicepilot-expanded" style="
-          width: 320px;
-          background: white;
-          border-radius: 16px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          overflow: hidden;
-          display: none;
-          position: absolute;
-          bottom: 0;
-          right: 0;
-          transform-origin: bottom right;
-        ">
-          <!-- Header -->
-          <div style="
-            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
-            padding: 16px;
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
+            🎯 Voice Guide
+          </h3>
+          <button id="voicepilot-close" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
             color: white;
-            position: relative;
-          ">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="
-                  width: 32px;
-                  height: 32px;
-                  background: rgba(255, 255, 255, 0.2);
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                ">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="3" fill="white"/>
-                    <path d="M12 1v6m0 8v6m11-7h-6m-8 0H1" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <div>
-                  <div style="font-weight: 600; font-size: 14px;">Voice Pilot</div>
-                  <div id="voicepilot-status-text" style="font-size: 12px; opacity: 0.9;">Ready to help</div>
-                </div>
-              </div>
-              <button id="voicepilot-close" style="
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 50%;
-                width: 28px;
-                height: 28px;
-                color: white;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-              ">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Content -->
-          <div id="voicepilot-content" style="padding: 20px;">
-            <!-- Ready State -->
-            <div id="voicepilot-ready" style="text-align: center;">
-              <div style="
-                width: 48px;
-                height: 48px;
-                background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 16px;
-                opacity: 0.1;
-              ">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="white"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #1F2937;">Start Voice Chat</h3>
-              <p style="margin: 0 0 20px; font-size: 14px; color: #6B7280; line-height: 1.4;">
-                Get instant help and guidance through voice conversation
-              </p>
-              <button id="voicepilot-start" style="
-                width: 100%;
-                background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-              ">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                Start Call
-              </button>
-            </div>
-
-            <!-- Connecting State -->
-            <div id="voicepilot-connecting" style="text-align: center; display: none;">
-              <div style="
-                width: 48px;
-                height: 48px;
-                background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 16px;
-                animation: pulse 2s infinite;
-              ">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
-                  <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #1F2937;">Connecting...</h3>
-              <p style="margin: 0; font-size: 14px; color: #6B7280;">
-                Setting up your voice connection
-              </p>
-            </div>
-
-            <!-- Active State -->
-            <div id="voicepilot-active" style="display: none;">
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                <div style="
-                  width: 12px;
-                  height: 12px;
-                  background: #10B981;
-                  border-radius: 50%;
-                  animation: pulse 2s infinite;
-                "></div>
-                <span style="font-size: 14px; font-weight: 600; color: #1F2937;">Live Call</span>
-                <span id="voicepilot-duration" style="font-size: 12px; color: #6B7280; margin-left: auto;">00:00</span>
-              </div>
-
-              <!-- Transcript -->
-              <div id="voicepilot-transcript" style="
-                background: #F9FAFB;
-                border: 1px solid #E5E7EB;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 16px;
-                max-height: 120px;
-                overflow-y: auto;
-                font-size: 13px;
-                line-height: 1.4;
-                color: #374151;
-                display: none;
-              "></div>
-
-              <!-- Controls -->
-              <div style="display: flex; gap: 8px;">
-                <button id="voicepilot-mute" style="
-                  flex: 1;
-                  background: #F3F4F6;
-                  color: #374151;
-                  border: 1px solid #D1D5DB;
-                  border-radius: 8px;
-                  padding: 10px;
-                  font-size: 13px;
-                  font-weight: 500;
-                  cursor: pointer;
-                  transition: all 0.2s;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 6px;
-                ">
-                  <svg id="voicepilot-mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  <span id="voicepilot-mute-text">Mute</span>
-                </button>
-                <button id="voicepilot-end" style="
-                  flex: 1;
-                  background: #EF4444;
-                  color: white;
-                  border: none;
-                  border-radius: 8px;
-                  padding: 10px;
-                  font-size: 13px;
-                  font-weight: 500;
-                  cursor: pointer;
-                  transition: all 0.2s;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 6px;
-                ">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 5.5C3 14.06 9.94 21 18.5 21c.386 0 .77-.014 1.148-.042.435-.032.852-.08 1.262-.144V16.5a1 1 0 0 0-1-1H15a2 2 0 0 1-2-2v-2.5a1 1 0 0 0-1-1H8a2 2 0 0 1-2-2V5a1 1 0 0 0-1-1H3.5a1 1 0 0 0-1 1v.5z" fill="currentColor"/>
-                  </svg>
-                  End Call
-                </button>
-              </div>
-            </div>
-          </div>
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">×</button>
         </div>
+        
+        <div id="voicepilot-status" style="
+          text-align: center;
+          margin-bottom: 20px;
+        ">
+          <div id="voicepilot-status-indicator" style="
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+          ">🎤</div>
+          <div id="voicepilot-status-text" style="
+            font-size: 14px;
+            opacity: 0.9;
+          ">Ready to help</div>
+        </div>
+        
+        <div id="voicepilot-controls" style="
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        ">
+          <button id="voicepilot-start" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+          ">Start Call</button>
+          <button id="voicepilot-end" style="
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: none;
+          ">End Call</button>
+        </div>
+        
+        <div id="voicepilot-transcript" style="
+          margin-top: 15px;
+          padding: 10px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 10px;
+          font-size: 12px;
+          max-height: 100px;
+          overflow-y: auto;
+          display: none;
+        "></div>
       </div>
-
-      <style>
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
-        #voicepilot-minimized:hover {
-          transform: scale(1.05);
-          box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
-        }
-        
-        #voicepilot-start:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
-        }
-        
-        #voicepilot-mute:hover {
-          background: #E5E7EB;
-          border-color: #9CA3AF;
-        }
-        
-        #voicepilot-end:hover {
-          background: #DC2626;
-        }
-        
-        #voicepilot-close:hover {
-          background: rgba(255, 255, 255, 0.3);
-        }
-      </style>
     `;
 
     document.body.appendChild(widget);
 
     // Get elements
-    const minimized = widget.querySelector('#voicepilot-minimized');
-    const expanded = widget.querySelector('#voicepilot-expanded');
+    const container = widget.querySelector('#voicepilot-container');
     const closeBtn = widget.querySelector('#voicepilot-close');
     const startBtn = widget.querySelector('#voicepilot-start');
-    const muteBtn = widget.querySelector('#voicepilot-mute');
     const endBtn = widget.querySelector('#voicepilot-end');
+    const statusIndicator = widget.querySelector('#voicepilot-status-indicator');
     const statusText = widget.querySelector('#voicepilot-status-text');
-    const readyState = widget.querySelector('#voicepilot-ready');
-    const connectingState = widget.querySelector('#voicepilot-connecting');
-    const activeState = widget.querySelector('#voicepilot-active');
-    const transcriptDiv = widget.querySelector('#voicepilot-transcript');
-    const durationSpan = widget.querySelector('#voicepilot-duration');
-    const micIcon = widget.querySelector('#voicepilot-mic-icon');
-    const muteText = widget.querySelector('#voicepilot-mute-text');
+    const transcript = widget.querySelector('#voicepilot-transcript');
 
-    let isExpanded = false;
     let isCallActive = false;
     let websocket = null;
-    let isMuted = false;
-    let callDuration = 0;
-    let durationInterval = null;
 
-    // State management
-    function showState(state) {
-      readyState.style.display = state === 'ready' ? 'block' : 'none';
-      connectingState.style.display = state === 'connecting' ? 'block' : 'none';
-      activeState.style.display = state === 'active' ? 'block' : 'none';
+    // Audio processing refs (mirroring LiveCallContext)
+    let audioContextRef = { current: null };
+    let audioQueueTimeRef = { current: 0 };
+    let committedTextRef = { current: '' };
+    let partialTextRef = { current: '' };
+    let greetingSentRef = { current: false };
+    let pageContextIntervalRef = { current: null };
+    let currentPageContextRef = { current: '' };
+    let lastSentPageContextRef = { current: '' };
+
+    // Initialize Supabase client
+    let supabaseClient = null;
+    if (window.voicepilotSupabaseUrl && window.voicepilotSupabaseKey) {
+      // Dynamically import Supabase client
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+      document.head.appendChild(script);
+      
+      script.onload = () => {
+        supabaseClient = window.supabase.createClient(
+          window.voicepilotSupabaseUrl,
+          window.voicepilotSupabaseKey
+        );
+      };
     }
 
-    function expand() {
-      isExpanded = true;
-      minimized.style.display = 'none';
-      expanded.style.display = 'block';
-      expanded.style.animation = 'voicepilot-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-    }
+    // Audio processing functions (copied from LiveCallContext)
+    const playAudioBuffer = async (pcmBlob) => {
+      try {
+        console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
 
-    function minimize() {
-      isExpanded = false;
-      expanded.style.display = 'none';
-      minimized.style.display = 'flex';
-    }
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
 
-    function updateDuration() {
-      const minutes = Math.floor(callDuration / 60);
-      const seconds = callDuration % 60;
-      durationSpan.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
 
-    // Event listeners
-    minimized.addEventListener('click', expand);
-    closeBtn.addEventListener('click', minimize);
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+
+        let startAt = audioCtx.currentTime;
+        if (audioQueueTimeRef.current > audioCtx.currentTime) {
+          startAt = audioQueueTimeRef.current;
+        }
+        source.start(startAt);
+        audioQueueTimeRef.current = startAt + buffer.duration;
+        
+        console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
+      } catch (err) {
+        console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
+      }
+    };
+
+    const updateTranscriptDisplay = () => {
+      const committed = committedTextRef.current;
+      const partial = partialTextRef.current;
+      
+      // Smart spacing: add space between committed and partial if needed
+      let fullText = committed;
+      if (committed && partial) {
+        const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
+        fullText = committed + (needsSpace ? ' ' : '') + partial;
+      } else if (partial) {
+        fullText = partial;
+      }
+      
+      transcript.textContent = fullText;
+    };
+
+    const getPageContext = () => {
+      try {
+        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+          return window.voicePilotGetPageContext();
+        }
+      } catch (error) {
+        console.warn('[VoicePilot] Error getting page context:', error);
+      }
+      
+      // Fallback context
+      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+    };
+
+    const startPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+      }
+
+      pageContextIntervalRef.current = setInterval(() => {
+        if (!isCallActive || !websocket || websocket.readyState !== WebSocket.OPEN) {
+          return;
+        }
+
+        try {
+          const newContext = getPageContext();
+          currentPageContextRef.current = newContext;
+
+          // Check if context has changed significantly
+          if (newContext !== lastSentPageContextRef.current) {
+            console.log('[VoicePilot] Page context changed, updating AI:', newContext);
+            
+            // Send page context update to AI
+            const contextUpdateMessage = {
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [{ 
+                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                    }],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+
+            websocket.send(JSON.stringify(contextUpdateMessage));
+            lastSentPageContextRef.current = newContext;
+            
+            console.log('[VoicePilot] Sent page context update to AI');
+          }
+        } catch (error) {
+          console.warn('[VoicePilot] Error monitoring page context:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    const stopPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+        pageContextIntervalRef.current = null;
+      }
+    };
+
+    const startMicStreaming = async () => {
+      try {
+        console.log('[VoicePilot][Audio] Requesting microphone access...');
+        
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        
+        console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const sourceNode = audioCtx.createMediaStreamSource(micStream);
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+        sourceNode.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          const float32Data = event.inputBuffer.getChannelData(0);
+          const inRate = audioCtx.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(float32Data.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = float32Data[idx];
+            sample = Math.max(-1, Math.min(1, sample));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          const payload = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000',
+              },
+            },
+          };
+
+          if (websocket?.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify(payload));
+            // Log audio data transmission (throttled to avoid spam)
+            if (Math.random() < 0.01) { // Log ~1% of audio chunks
+              console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+            }
+          }
+        };
+
+        console.log('[VoicePilot][Audio] Microphone streaming started successfully');
+      } catch (err) {
+        console.error('[VoicePilot] Mic streaming error:', err);
+        statusText.textContent = 'Failed to capture microphone';
+      }
+    };
+
+    // Close widget
+    closeBtn.addEventListener('click', () => {
+      widget.style.display = 'none';
+    });
 
     // Start call function
     async function startCall() {
       if (isCallActive) return;
 
       try {
-        showState('connecting');
         statusText.textContent = 'Connecting...';
+        statusIndicator.textContent = '⏳';
 
-        // Get configuration
-        const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
-        const supabaseAnonKey = window.voicepilotSupabaseKey || '';
+        // Reset state
+        committedTextRef.current = '';
+        partialTextRef.current = '';
+        transcript.textContent = '';
+        greetingSentRef.current = false;
 
-        console.log('[VoicePilot] Starting call with configuration:', {
-          hasSupabaseUrl: !!supabaseUrl,
-          hasSupabaseKey: !!supabaseAnonKey,
-          agentId: agentId
+        console.log('[VoicePilot] Configuration check:', {
+          hasSupabaseUrl: !!window.voicepilotSupabaseUrl,
+          hasSupabaseKey: !!window.voicepilotSupabaseKey,
+          hasSupabaseClient: !!supabaseClient
         });
 
-        // Use relay through Supabase Edge Functions
-        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
+        // Fetch agent details from Supabase
+        let agentInstructions = 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.';
+        let documentationUrls = [];
+
+        if (supabaseClient && agentId) {
+          try {
+            console.log('[VoicePilot] Fetching agent details for ID:', agentId);
+            const { data: agent, error } = await supabaseClient
+              .from('agents')
+              .select('instructions, documentation_urls, status')
+              .eq('id', agentId)
+              .single();
+
+            if (error) {
+              console.error('[VoicePilot] Error fetching agent:', error);
+            } else if (agent) {
+              if (agent.status !== 'active') {
+                throw new Error('This agent is not currently active');
+              }
+              agentInstructions = agent.instructions || agentInstructions;
+              documentationUrls = agent.documentation_urls || [];
+              console.log('[VoicePilot] Using agent instructions:', agentInstructions.substring(0, 100) + '...');
+            } else {
+              console.warn('[VoicePilot] Agent not found, using default instructions');
+            }
+          } catch (err) {
+            console.error('[VoicePilot] Failed to fetch agent details:', err);
+            throw new Error('Failed to load agent configuration: ' + err.message);
+          }
+        } else {
+          console.warn('[VoicePilot] No Supabase client or agent ID, using default instructions');
+        }
+
+        // Use relay through Supabase
+        console.log('[VoicePilot] Using Supabase relay connection');
+
+        const response = await fetch(`${window.voicepilotSupabaseUrl}/functions/v1/start-call`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Authorization': `Bearer ${window.voicepilotSupabaseKey}`,
           },
           body: JSON.stringify({
             agentId: agentId,
-            instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
-            documentationUrls: []
+            instructions: agentInstructions,
+            documentationUrls: documentationUrls
           })
         });
 
@@ -1323,16 +1361,30 @@
 
         websocket.onopen = () => {
           console.log('[VoicePilot] WebSocket connected');
-          isCallActive = true;
-          showState('active');
-          statusText.textContent = 'Connected';
           
-          // Start duration timer
-          callDuration = 0;
-          durationInterval = setInterval(() => {
-            callDuration++;
-            updateDuration();
-          }, 1000);
+          // Get current page context and initialize monitoring
+          const pageContext = getPageContext();
+          currentPageContextRef.current = pageContext;
+          lastSentPageContextRef.current = pageContext;
+          console.log('[VoicePilot] Initial page context:', pageContext);
+
+          // Create URL context tools if documentation URLs are provided
+          const tools = [];
+          
+          if (documentationUrls?.length) {
+            tools.push({
+              url_context: {
+                urls: documentationUrls
+              }
+            });
+          }
+
+          // Enhanced system instruction with page context
+          const enhancedSystemInstruction = `${agentInstructions} 
+
+CURRENT PAGE CONTEXT: ${pageContext}
+
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
           // Send setup message
           const setupMsg = {
@@ -1348,66 +1400,231 @@
                   }
                 }
               },
+              tools: tools.length > 0 ? tools : undefined,
               outputAudioTranscription: {},
               inputAudioTranscription: {},
               systemInstruction: {
                 parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
-
-Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}
-
-Your role:
-- Help users complete tasks step-by-step
-- Guide them through the interface with clear instructions
-- Answer questions about features and functionality
-- Provide contextual help based on what they're currently viewing
-
-When you mention UI elements like buttons, forms, or links, they will be automatically highlighted. Speak naturally and conversationally.`
+                  text: enhancedSystemInstruction,
                 }]
               }
             }
           };
 
+          console.log('[VoicePilot] Sending setup:', setupMsg);
           websocket.send(JSON.stringify(setupMsg));
         };
 
-        websocket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            // Handle AI speech transcription
-            if (data.serverContent?.outputTranscription?.text) {
-              const text = data.serverContent.outputTranscription.text;
-              transcriptDiv.textContent += text;
-              transcriptDiv.style.display = 'block';
-              transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-              
-              // Highlight elements mentioned by AI
-              if (window.voicePilotHighlightStream) {
-                window.voicePilotHighlightStream(text);
-              }
-            }
-          } catch (err) {
-            console.log('[VoicePilot] Received non-JSON message (likely audio data)');
+        websocket.onmessage = async (ev) => {
+          let blob;
+
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (ev.data instanceof Blob) {
+            blob = ev.data;
+          } else if (ev.data instanceof ArrayBuffer) {
+            blob = new Blob([ev.data]);
+          } else {
+            return;
           }
+
+          let maybeText = null;
+          try {
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
+
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
+
+              if (parsed.setupComplete) {
+                console.log('[VoicePilot] Received setupComplete ✅');
+                isCallActive = true;
+                statusText.textContent = 'Connected - Speak now';
+                statusIndicator.textContent = '🎯';
+                startBtn.style.display = 'none';
+                endBtn.style.display = 'block';
+                transcript.style.display = 'block';
+
+                // Start page context monitoring when call becomes active
+                startPageContextMonitoring();
+
+                if (websocket.readyState === WebSocket.OPEN && !greetingSentRef.current) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  websocket.send(JSON.stringify(greeting));
+                  greetingSentRef.current = true;
+                  console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
+                }
+
+                startMicStreaming();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // Handle AI speech transcription with two-buffer system
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  
+                  if (text) {
+                    // Accumulate fragments in the partial buffer
+                    partialTextRef.current += text;
+                    
+                    // Update the display immediately with committed + partial
+                    updateTranscriptDisplay();
+                    
+                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                  }
+
+                  // When finished, move partial to committed and clear partial
+                  if (finished && partialTextRef.current) {
+                    const partialText = partialTextRef.current.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (committedTextRef.current && partialText) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      committedTextRef.current = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    partialTextRef.current = '';
+                    
+                    // Update display with committed text only
+                    updateTranscriptDisplay();
+                    
+                    // Highlight the complete phrase
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // Handle user speech transcription
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (committedTextRef.current) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      committedTextRef.current = userText;
+                    }
+                    
+                    updateTranscriptDisplay();
+                    console.log('[VoicePilot] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
+                        playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding inlineData audio:', err);
+                      }
+                    }
+                  }
+                  return; // Bail out after handling audio
+                }
+
+                // Check for turn complete to force commit partial buffer
+                if (sc.turnComplete && partialTextRef.current) {
+                  console.log('[VoicePilot] Turn complete - committing partial buffer');
+                  const partialText = partialTextRef.current.trim();
+                  
+                  // Move partial to committed
+                  if (committedTextRef.current && partialText) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    committedTextRef.current = partialText;
+                  }
+                  
+                  // Clear partial buffer
+                  partialTextRef.current = '';
+                  
+                  updateTranscriptDisplay();
+                  
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
+                  }
+                  
+                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
+                }
+              }
+
+              return;
+            } catch (parseError) {
+              console.error('[VoicePilot] JSON parse error:', parseError);
+              // Continue to fallback for binary data
+            }
+          }
+
+          console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
+          playAudioBuffer(blob);
         };
 
-        websocket.onerror = (error) => {
-          console.error('[VoicePilot] WebSocket error:', error);
+        websocket.onerror = (err) => {
+          console.error('[VoicePilot] WebSocket error:', err);
           statusText.textContent = 'Connection failed';
-          showState('ready');
+          statusIndicator.textContent = '❌';
         };
 
-        websocket.onclose = () => {
-          console.log('[VoicePilot] WebSocket closed');
-          endCall();
+        websocket.onclose = (ev) => {
+          console.log(`[VoicePilot] WebSocket closed: code=${ev.code}, reason="${ev.reason}"`);
+          isCallActive = false;
+          statusText.textContent = 'Call ended';
+          statusIndicator.textContent = '📞';
+          startBtn.style.display = 'block';
+          endBtn.style.display = 'none';
+          transcript.style.display = 'none';
+          websocket = null;
+          
+          // Stop page context monitoring when call ends
+          stopPageContextMonitoring();
         };
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
         statusText.textContent = 'Connection failed';
-        showState('ready');
-        alert('Failed to start call: ' + error.message);
+        statusIndicator.textContent = '❌';
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
       }
     }
 
@@ -1421,24 +1638,25 @@ When you mention UI elements like buttons, forms, or links, they will be automat
           websocket = null;
         }
 
-        if (durationInterval) {
-          clearInterval(durationInterval);
-          durationInterval = null;
-        }
-
         isCallActive = false;
-        isMuted = false;
-        callDuration = 0;
-        transcriptDiv.textContent = '';
-        transcriptDiv.style.display = 'none';
-        
-        showState('ready');
-        statusText.textContent = 'Ready to help';
+        statusText.textContent = 'Call ended';
+        statusIndicator.textContent = '📞';
+        startBtn.style.display = 'block';
+        endBtn.style.display = 'none';
+        transcript.style.display = 'none';
         
         // Clear any highlights
         if (window.voicePilotClearHighlights) {
           window.voicePilotClearHighlights();
         }
+
+        // Stop page context monitoring
+        stopPageContextMonitoring();
+
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 2000);
 
         console.log('[VoicePilot] Call ended');
 
@@ -1447,61 +1665,36 @@ When you mention UI elements like buttons, forms, or links, they will be automat
       }
     }
 
-    // Mute/unmute function
-    function toggleMute() {
-      isMuted = !isMuted;
-      
-      if (isMuted) {
-        muteBtn.style.background = '#EF4444';
-        muteBtn.style.color = 'white';
-        muteBtn.style.borderColor = '#EF4444';
-        muteText.textContent = 'Unmute';
-        micIcon.innerHTML = `
-          <path d="M1 1l22 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" fill="currentColor"/>
-          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        `;
-      } else {
-        muteBtn.style.background = '#F3F4F6';
-        muteBtn.style.color = '#374151';
-        muteBtn.style.borderColor = '#D1D5DB';
-        muteText.textContent = 'Mute';
-        micIcon.innerHTML = `
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        `;
-      }
-    }
-
     // Event listeners
     startBtn.addEventListener('click', startCall);
-    muteBtn.addEventListener('click', toggleMute);
     endBtn.addEventListener('click', endCall);
 
-    // Add expand animation CSS
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes voicepilot-expand {
-        0% {
-          opacity: 0;
-          transform: scale(0.8) translateY(20px);
-        }
-        100% {
-          opacity: 1;
-          transform: scale(1) translateY(0);
-        }
-      }
-    `;
-    document.head.appendChild(style);
+    // Hover effects
+    startBtn.addEventListener('mouseenter', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    startBtn.addEventListener('mouseleave', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+
+    endBtn.addEventListener('mouseenter', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+    endBtn.addEventListener('mouseleave', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.1)';
+    });
+
+    closeBtn.addEventListener('mouseenter', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
 
     // Return widget API
     return {
-      show: () => expand(),
-      hide: () => minimize(),
+      show: () => widget.style.display = 'block',
+      hide: () => widget.style.display = 'none',
       startCall,
       endCall,
       isActive: () => isCallActive

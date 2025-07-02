@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, X, MessageCircle } from 'lucide-react';
+import { Mic, MicOff, Monitor, X, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { useAgents } from '../../context/AgentContext';
@@ -28,6 +28,8 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
     status, 
     transcript,
     toggleMicrophone,
+    toggleScreenShare,
+    isScreenSharing,
     isMicrophoneActive,
     duration,
     errorMessage
@@ -48,8 +50,7 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
     await startCall(
       agent.instructions,
       agent.callDuration,
-      agent.documentationUrls,
-      agentId
+      agent.documentationUrls
     );
   };
 
@@ -146,12 +147,19 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
                             {isMicrophoneActive ? 'Mute' : 'Unmute'}
                           </button>
 
-                          <button
-                            onClick={handleEndCall}
-                            className="flex-1 bg-destructive text-destructive-foreground px-3 py-2 text-sm rounded-lg hover:bg-destructive/90 transition-colors"
-                          >
-                            End Call
-                          </button>
+                          {agent?.canSeeScreenshare && (
+                            <button
+                              onClick={toggleScreenShare}
+                              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                isScreenSharing
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted hover:bg-muted/80'
+                              }`}
+                            >
+                              <Monitor className="w-4 h-4" />
+                              {isScreenSharing ? 'Stop Share' : 'Share'}
+                            </button>
+                          )}
                         </div>
                       </>
                     )}
