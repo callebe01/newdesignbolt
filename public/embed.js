@@ -1061,7 +1061,7 @@
       widget.style.display = 'none';
     });
 
-    // Start call function - USES ABSOLUTE URL
+    // Start call function - ENHANCED ERROR HANDLING
     async function startCall() {
       if (isCallActive) return;
 
@@ -1084,12 +1084,54 @@
           })
         });
 
+        // Enhanced error handling for non-JSON responses
+        let errorData;
+        const contentType = response.headers.get('content-type');
+        
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to start call');
+          try {
+            if (contentType && contentType.includes('application/json')) {
+              errorData = await response.json();
+            } else {
+              // Handle non-JSON error responses (like HTML error pages)
+              const errorText = await response.text();
+              console.error('[VoicePilot] Non-JSON error response:', errorText);
+              
+              // Check for common error patterns
+              if (response.status === 500) {
+                throw new Error('Server configuration error. Please ensure the start-call function is properly deployed with required environment variables.');
+              } else if (response.status === 404) {
+                throw new Error('Start-call function not found. Please ensure it is deployed.');
+              } else {
+                throw new Error(`Server error (${response.status}). Please check the server configuration.`);
+              }
+            }
+          } catch (parseError) {
+            console.error('[VoicePilot] Error parsing response:', parseError);
+            throw new Error(`Failed to start call (${response.status}). Please check server configuration.`);
+          }
+          
+          throw new Error(errorData?.error || `Failed to start call (${response.status})`);
         }
 
-        const { relayUrl } = await response.json();
+        // Parse successful response
+        let responseData;
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            responseData = await response.json();
+          } else {
+            throw new Error('Expected JSON response but received different content type');
+          }
+        } catch (parseError) {
+          console.error('[VoicePilot] Error parsing successful response:', parseError);
+          throw new Error('Invalid response format from server');
+        }
+
+        const { relayUrl } = responseData;
+        if (!relayUrl) {
+          throw new Error('No relay URL received from server');
+        }
+
         console.log('[VoicePilot] Got relay URL:', relayUrl);
 
         // Connect to the relay WebSocket
@@ -1242,8 +1284,26 @@ Current page context: ${pageContext}`
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
-        statusText.textContent = 'Connection failed';
+        
+        // Enhanced error display with specific messages
+        let userMessage = 'Connection failed';
+        if (error.message.includes('configuration error') || error.message.includes('environment variables')) {
+          userMessage = 'Server setup required';
+        } else if (error.message.includes('not found')) {
+          userMessage = 'Service unavailable';
+        } else if (error.message.includes('Invalid response')) {
+          userMessage = 'Server error';
+        }
+        
+        statusText.textContent = userMessage;
         statusIndicator.textContent = '❌';
+        
+        // Show detailed error in console for debugging
+        console.error('[VoicePilot] Detailed error:', {
+          message: error.message,
+          stack: error.stack
+        });
+        
         setTimeout(() => {
           statusText.textContent = 'Ready to help';
           statusIndicator.textContent = '🎤';
