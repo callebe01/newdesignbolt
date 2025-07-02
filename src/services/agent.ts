@@ -4,6 +4,7 @@ import { Agent, AgentConversation, ConversationMessage, AgentAnalytics, AgentMet
 export async function createAgent(
   name: string,
   instructions: string,
+  canSeeScreenshare: boolean,
   duration: number,
   documentationUrls?: string[]
 ): Promise<Agent> {
@@ -13,6 +14,7 @@ export async function createAgent(
       name,
       instructions,
       status: 'active',
+      can_see_screenshare: canSeeScreenshare,
       call_duration: duration,
       documentation_urls: documentationUrls,
     })
@@ -37,6 +39,7 @@ export async function getAgent(id: string): Promise<Agent | null> {
 export async function updateAgent(id: string, updates: Partial<Agent>): Promise<Agent> {
   const {
     callDuration,
+    canSeeScreenshare,
     documentationUrls,
     ...rest
   } = updates as any;
@@ -48,6 +51,10 @@ export async function updateAgent(id: string, updates: Partial<Agent>): Promise<
 
   if (callDuration !== undefined) {
     updateData.call_duration = callDuration;
+  }
+
+  if (canSeeScreenshare !== undefined) {
+    updateData.can_see_screenshare = canSeeScreenshare;
   }
 
   if (documentationUrls !== undefined) {
@@ -189,6 +196,7 @@ function mapAgent(row: Record<string, any>): Agent {
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     userId: row.user_id,
+    canSeeScreenshare: row.can_see_screenshare,
     callDuration: row.call_duration,
     documentationUrls: row.documentation_urls || [],
   };

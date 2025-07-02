@@ -21,6 +21,7 @@ const DURATION_OPTIONS: DurationOption[] = [
 export const NewAgent: React.FC = () => {
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [canSeeScreenshare, setCanSeeScreenshare] = useState(false);
   const [duration, setDuration] = useState<number>(300); // Default to 5 minutes
   const [documentationUrls, setDocumentationUrls] = useState<string[]>([]);
   const [newUrl, setNewUrl] = useState('');
@@ -65,6 +66,7 @@ export const NewAgent: React.FC = () => {
       const agent = await createAgent(
         name,
         instructions,
+        canSeeScreenshare,
         duration,
         documentationUrls
       );
@@ -240,6 +242,19 @@ export const NewAgent: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="canSeeScreenshare"
+                    checked={canSeeScreenshare}
+                    onChange={(e) => setCanSeeScreenshare(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="canSeeScreenshare" className="text-sm font-medium flex-1">
+                    Allow this agent to see screen shares
+                  </label>
                 </div>
               </CardContent>
             </Card>

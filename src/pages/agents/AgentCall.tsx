@@ -1,3 +1,5 @@
+// src/components/AgentCall.tsx
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAgents } from '../../context/AgentContext';
@@ -30,7 +32,11 @@ export const AgentCall: React.FC = () => {
     status,
     transcript,
     toggleMicrophone,
+    toggleScreenShare,
+    toggleHighlightObjects,
+    isScreenSharing,
     isMicrophoneActive,
+    highlightObjects,
     duration,
     errorMessage,
     setTranscript
@@ -130,6 +136,20 @@ export const AgentCall: React.FC = () => {
             onClick={toggleMicrophone}
             label={isMicrophoneActive ? 'Mute' : 'Unmute'}
             variant={isMicrophoneActive ? 'outline' : 'primary'}
+          />
+
+          {agent?.canSeeScreenshare && (
+            <ControlButton
+              onClick={toggleScreenShare}
+              label={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
+              variant={isScreenSharing ? 'primary' : 'outline'}
+            />
+          )}
+
+          <ControlButton
+            onClick={toggleHighlightObjects}
+            label={highlightObjects ? 'Hide Boxes' : 'Show Boxes'}
+            variant={highlightObjects ? 'primary' : 'outline'}
           />
 
           <ControlButton
