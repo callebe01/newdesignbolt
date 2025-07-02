@@ -1063,6 +1063,7 @@
     let websocket = null;
     let audioContext = null;
     let audioQueueTime = 0; // Track when the next audio should start
+    let microphoneStream = null; // Track microphone stream
 
     // Close widget
     closeBtn.addEventListener('click', () => {
@@ -1206,6 +1207,9 @@ Current page context: ${pageContext}`
           };
 
           websocket.send(JSON.stringify(setupMsg));
+          
+          // Start microphone capture after setup
+          startMicrophoneCapture();
         };
 
         websocket.onmessage = async (event) => {
@@ -1289,6 +1293,9 @@ Current page context: ${pageContext}`
           endBtn.style.display = 'none';
           transcript.style.display = 'none';
           
+          // Stop microphone capture
+          stopMicrophoneCapture();
+          
           setTimeout(() => {
             statusText.textContent = 'Ready to help';
             statusIndicator.textContent = '🎤';
@@ -1324,6 +1331,108 @@ Current page context: ${pageContext}`
       }
     }
 
+    // ✅ NEW: Microphone capture functions
+    async function startMicrophoneCapture() {
+      try {
+        console.log('[VoicePilot] Starting microphone capture...');
+        
+        // Request microphone access
+        microphoneStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        console.log('[VoicePilot] Microphone access granted');
+
+        // Create audio processing pipeline
+        const audioCtx = audioContext;
+        const source = audioCtx.createMediaStreamSource(microphoneStream);
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+
+        source.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            return;
+          }
+
+          const inputBuffer = event.inputBuffer;
+          const inputData = inputBuffer.getChannelData(0);
+          
+          // Convert float32 to int16 for transmission
+          const outputBuffer = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            outputBuffer[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          // Convert to base64 for transmission
+          const uint8Array = new Uint8Array(outputBuffer.buffer);
+          let binary = '';
+          for (let i = 0; i < uint8Array.byteLength; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          // Send audio data to Gemini
+          const audioMessage = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000'
+              }
+            }
+          };
+
+          try {
+            websocket.send(JSON.stringify(audioMessage));
+          } catch (error) {
+            console.error('[VoicePilot] Error sending audio data:', error);
+          }
+        };
+
+        // Store processor reference for cleanup
+        microphoneStream.processor = processor;
+        
+        console.log('[VoicePilot] Microphone capture pipeline established');
+
+      } catch (error) {
+        console.error('[VoicePilot] Failed to start microphone capture:', error);
+        statusText.textContent = 'Microphone access denied';
+        statusIndicator.textContent = '🚫';
+        
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
+      }
+    }
+
+    function stopMicrophoneCapture() {
+      if (microphoneStream) {
+        console.log('[VoicePilot] Stopping microphone capture...');
+        
+        // Disconnect audio processor
+        if (microphoneStream.processor) {
+          microphoneStream.processor.disconnect();
+        }
+        
+        // Stop all tracks
+        microphoneStream.getTracks().forEach(track => {
+          track.stop();
+        });
+        
+        microphoneStream = null;
+        console.log('[VoicePilot] Microphone capture stopped');
+      }
+    }
+
     // End call function
     function endCall() {
       if (!isCallActive || !websocket) return;
@@ -1332,6 +1441,9 @@ Current page context: ${pageContext}`
         websocket.close();
         websocket = null;
         isCallActive = false;
+        
+        // Stop microphone capture
+        stopMicrophoneCapture();
         
         // Clear any highlights
         if (window.voicePilotClearHighlights) {
