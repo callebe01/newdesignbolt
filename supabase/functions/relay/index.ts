@@ -57,7 +57,10 @@ const handler = (req: Request) => {
     /* 3️⃣  Browser ⇄ Relay socket */
     const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
-    /* 4️⃣  Relay ⇄ Gemini socket - Include API key in URL as required by Google Live API */
+    /* 4️⃣  Message queue to buffer messages until Gemini connection is ready */
+    const messageQueue: any[] = [];
+
+    /* 5️⃣  Relay ⇄ Gemini socket - Include API key in URL as required by Google Live API */
     const geminiURL = 
       "wss://generativelanguage.googleapis.com/ws/" +
       "google.ai.generativelanguage.v1beta.GenerativeService." +
@@ -84,7 +87,7 @@ const handler = (req: Request) => {
     let browserClosed = false;
     let geminiClosed = false;
 
-    /* 5️⃣  Pipe traffic both ways */
+    /* 6️⃣  Pipe traffic both ways with message buffering */
     browser.onmessage = (e) => {
       if (gemini.readyState === WebSocket.OPEN && !geminiClosed) {
         try {
@@ -94,7 +97,9 @@ const handler = (req: Request) => {
           console.error("[Relay] Error sending to Gemini:", error);
         }
       } else {
-        console.warn("[Relay] Cannot send to Gemini - connection not open. State:", gemini.readyState);
+        // Buffer the message until Gemini connection is ready
+        console.log("[Relay] Buffering message - Gemini not ready. State:", gemini.readyState);
+        messageQueue.push(e.data);
       }
     };
     
@@ -111,7 +116,7 @@ const handler = (req: Request) => {
       }
     };
 
-    /* 6️⃣  IMPROVED: Sanitize close codes and prevent double-close */
+    /* 7️⃣  IMPROVED: Sanitize close codes and prevent double-close */
     const sanitizeCloseCode = (code: number): number => {
       // Ensure close code is in valid range (1000-4999)
       if (code < 1000 || code > 4999) {
@@ -154,7 +159,7 @@ const handler = (req: Request) => {
       }
     };
 
-    /* 7️⃣  IMPROVED: Better error and close handling with detailed logging */
+    /* 8️⃣  IMPROVED: Better error and close handling with detailed logging */
     browser.onerror = (error) => {
       console.error("[Relay] Browser socket error:", error);
       if (!browserClosed) {
@@ -207,9 +212,25 @@ const handler = (req: Request) => {
 
     gemini.onopen = () => {
       console.log("[Relay] Gemini Live API WebSocket connection established successfully");
+      
+      // ✅ NEW: Send all buffered messages now that Gemini is ready
+      if (messageQueue.length > 0) {
+        console.log(`[Relay] Sending ${messageQueue.length} buffered messages to Gemini`);
+        for (const message of messageQueue) {
+          try {
+            gemini.send(message);
+            console.log("[Relay] Sent buffered message to Gemini");
+          } catch (error) {
+            console.error("[Relay] Error sending buffered message to Gemini:", error);
+          }
+        }
+        // Clear the queue after sending all messages
+        messageQueue.length = 0;
+        console.log("[Relay] Message queue cleared");
+      }
     };
 
-    /* 8️⃣  Handshake successful – return 101 Switching Protocols */
+    /* 9️⃣  Handshake successful – return 101 Switching Protocols */
     console.log("[Relay] WebSocket upgrade successful, returning response");
     return response;
 
