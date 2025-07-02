@@ -47,6 +47,8 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
     setIsExpanded(false);
   };
 
+  const minimize = () => setIsExpanded(false);
+
   const toggleWidget = () => {
     if (status === 'active') {
       setIsExpanded(!isExpanded);
@@ -54,6 +56,26 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
       setIsExpanded(true);
     }
   };
+
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const expandedEl = document.getElementById('voicepilot-expanded');
+      const toggleBtn = document.getElementById('voicepilot-toggle');
+      if (
+        expandedEl &&
+        !expandedEl.contains(e.target as Node) &&
+        toggleBtn &&
+        !toggleBtn.contains(e.target as Node)
+      ) {
+        minimize();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [isExpanded]);
 
   // ✅ IMPROVED: Better status text based on call state
   const getStatusText = () => {
@@ -79,6 +101,7 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            id="voicepilot-expanded"
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
@@ -195,6 +218,7 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
 
       {/* Floating button */}
       <motion.button
+        id="voicepilot-toggle"
         onClick={toggleWidget}
         className="bg-black dark:bg-gray-900 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center overflow-hidden group"
         whileHover={{ scale: 1.05 }}
