@@ -5,21 +5,17 @@
   const currentScript = document.currentScript;
   const agentId = currentScript?.getAttribute('data-agent');
   const position = currentScript?.getAttribute('data-position') || 'bottom-right';
-  const supabaseUrl = currentScript?.getAttribute('data-supabase-url');
-  const supabaseAnonKey = currentScript?.getAttribute('data-supabase-anon-key');
+  const supabaseUrl = currentScript?.getAttribute('data-supabase-url') || 'https://ljfidzppyflrrszkgusa.supabase.co';
+  const supabaseAnonKey = currentScript?.getAttribute('data-supabase-anon-key') || '';
 
   if (!agentId) {
     console.error('VoicePilot: data-agent attribute is required');
     return;
   }
 
-  // Set global Supabase configuration if provided
-  if (supabaseUrl) {
-    window.voicepilotSupabaseUrl = supabaseUrl;
-  }
-  if (supabaseAnonKey) {
-    window.voicepilotSupabaseAnonKey = supabaseAnonKey;
-  }
+  // Set global Supabase configuration
+  window.voicepilotSupabaseUrl = supabaseUrl;
+  window.voicepilotSupabaseKey = supabaseAnonKey;
 
   // ═══════════════════════════════════════════════
   // Enhanced Page Context Capture System - GENERIC APPROACH
@@ -921,6 +917,686 @@
   };
 
   // ────────────────────────────────────────────────────
+  // Live Call Context (simplified version of LiveCallContext)
+  // ────────────────────────────────────────────────────
+  class LiveCallContext {
+    constructor() {
+      this.status = 'idle';
+      this.isScreenSharing = false;
+      this.isMicrophoneActive = false;
+      this.isVideoActive = false;
+      this.errorMessage = null;
+      this.transcript = '';
+      this.duration = 0;
+      this.highlightObjects = false;
+
+      this.websocketRef = null;
+      this.screenStream = null;
+      this.microphoneStream = null;
+      this.videoStream = null;
+      this.audioContextRef = null;
+      this.audioQueueTimeRef = 0;
+      this.greetingSentRef = false;
+      this.durationTimerRef = null;
+      this.maxDurationTimerRef = null;
+      this.usageRecordedRef = false;
+      this.callEndedRef = false;
+      this.agentOwnerIdRef = null;
+      this.currentAgentIdRef = null;
+      this.conversationIdRef = null;
+
+      // ✅ TWO-BUFFER SYSTEM FOR REAL-TIME TRANSCRIPTION
+      this.committedTextRef = '';
+      this.partialTextRef = '';
+
+      // ✅ PAGE CONTEXT MONITORING REFS
+      this.currentPageContextRef = '';
+      this.lastSentPageContextRef = '';
+      this.pageContextIntervalRef = null;
+
+      this.screenVideoRef = null;
+      this.screenCanvasRef = null;
+      this.screenIntervalRef = null;
+      this.detectionInProgressRef = false;
+    }
+
+    // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
+    updateTranscriptDisplay() {
+      const committed = this.committedTextRef;
+      const partial = this.partialTextRef;
+      
+      // Smart spacing: add space between committed and partial if needed
+      let fullText = committed;
+      if (committed && partial) {
+        const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
+        fullText = committed + (needsSpace ? ' ' : '') + partial;
+      } else if (partial) {
+        fullText = partial;
+      }
+      
+      this.transcript = fullText;
+      this.onTranscriptUpdate?.(fullText);
+    }
+
+    async playAudioBuffer(pcmBlob) {
+      try {
+        console.log('[Live][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        if (!this.audioContextRef) {
+          this.audioContextRef = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = this.audioContextRef;
+
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+
+        let startAt = audioCtx.currentTime;
+        if (this.audioQueueTimeRef > audioCtx.currentTime) {
+          startAt = this.audioQueueTimeRef;
+        }
+        source.start(startAt);
+        this.audioQueueTimeRef = startAt + buffer.duration;
+        
+        console.log('[Live][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
+      } catch (err) {
+        console.error('[Live] playAudioBuffer() error decoding PCM16:', err);
+      }
+    }
+
+    // ✅ NEW: Get page context for AI system instruction
+    getPageContext() {
+      try {
+        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+          return window.voicePilotGetPageContext();
+        }
+      } catch (error) {
+        console.warn('[Live] Error getting page context:', error);
+      }
+      
+      // Fallback context
+      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+    }
+
+    // ✅ NEW: Monitor page context changes during active call
+    startPageContextMonitoring() {
+      if (this.pageContextIntervalRef) {
+        clearInterval(this.pageContextIntervalRef);
+      }
+
+      this.pageContextIntervalRef = setInterval(() => {
+        if (this.status !== 'active' || !this.websocketRef || this.websocketRef.readyState !== WebSocket.OPEN) {
+          return;
+        }
+
+        try {
+          const newContext = this.getPageContext();
+          this.currentPageContextRef = newContext;
+
+          // Check if context has changed significantly
+          if (newContext !== this.lastSentPageContextRef) {
+            console.log('[Live] Page context changed, updating AI:', newContext);
+            
+            // Send page context update to AI
+            const contextUpdateMessage = {
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [{ 
+                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                    }],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+
+            this.websocketRef.send(JSON.stringify(contextUpdateMessage));
+            this.lastSentPageContextRef = newContext;
+            
+            console.log('[Live] Sent page context update to AI');
+          }
+        } catch (error) {
+          console.warn('[Live] Error monitoring page context:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    }
+
+    stopPageContextMonitoring() {
+      if (this.pageContextIntervalRef) {
+        clearInterval(this.pageContextIntervalRef);
+        this.pageContextIntervalRef = null;
+      }
+    }
+
+    async startCall(systemInstruction, maxDuration, documentationUrls, agentId) {
+      try {
+        // ✅ IMPROVED: Check for existing WebSocket and handle stale connections
+        if (this.websocketRef) {
+          const ws = this.websocketRef;
+          
+          // Check the readyState of the existing WebSocket
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            console.warn('[Live] startCall() called but WebSocket is already active or connecting.');
+            return;
+          } else if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
+            console.log('[Live] Clearing stale WebSocket reference (state:', ws.readyState, ')');
+            // Attempt to close if still closing, then clear the reference
+            if (ws.readyState === WebSocket.CLOSING) {
+              try {
+                ws.close();
+              } catch (error) {
+                console.warn('[Live] Error closing stale WebSocket:', error);
+              }
+            }
+            this.websocketRef = null;
+          }
+        }
+
+        this.errorMessage = null;
+        this.duration = 0;
+        this.usageRecordedRef = false;
+        this.currentAgentIdRef = agentId || null;
+        this.conversationIdRef = null;
+        this.callEndedRef = false;
+        
+        // ✅ CLEAR BOTH BUFFERS AND TRANSCRIPT
+        this.committedTextRef = '';
+        this.partialTextRef = '';
+        this.transcript = '';
+
+        // Start duration timer
+        this.durationTimerRef = setInterval(() => {
+          this.duration += 1;
+          this.onDurationUpdate?.(this.duration);
+        }, 1000);
+
+        // Set max duration timer if specified
+        if (maxDuration) {
+          this.maxDurationTimerRef = setTimeout(() => {
+            this.endCall();
+          }, maxDuration * 1000);
+        }
+
+        // ✅ NEW: Get relay URL from backend instead of direct Gemini connection
+        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ 
+            agentId, 
+            instructions: systemInstruction, 
+            documentationUrls 
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start call');
+        }
+
+        const { relayUrl } = await response.json();
+        console.log('[Live] Using relay URL:', relayUrl);
+
+        const ws = new WebSocket(relayUrl);
+        this.websocketRef = ws;
+
+        ws.onopen = () => {
+          console.log('[Live][WebSocket] onopen: connection established');
+          this.status = 'connecting';
+          this.onStatusChange?.('connecting');
+
+          // ✅ Get current page context and initialize monitoring
+          const pageContext = this.getPageContext();
+          this.currentPageContextRef = pageContext;
+          this.lastSentPageContextRef = pageContext;
+          console.log('[Live] Initial page context:', pageContext);
+
+          // Create URL context tools if documentation URLs are provided
+          const tools = [];
+          
+          if (documentationUrls?.length) {
+            tools.push({
+              url_context: {
+                urls: documentationUrls
+              }
+            });
+          }
+
+          // ✅ Enhanced system instruction with page context
+          const enhancedSystemInstruction = `${systemInstruction || 'You are a helpful AI assistant.'} 
+
+CURRENT PAGE CONTEXT: ${pageContext}
+
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
+
+          // Setup message with tools and Kore voice - AUDIO ONLY
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO'], // ✅ AUDIO ONLY - no TEXT
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
+                    }
+                  }
+                }
+              },
+              tools: tools.length > 0 ? tools : undefined,
+              outputAudioTranscription: {}, // ✅ Enable transcription of AI speech
+              inputAudioTranscription: {},  // ✅ Enable transcription of user speech
+              systemInstruction: {
+                parts: [
+                  {
+                    text: enhancedSystemInstruction,
+                  },
+                ],
+              },
+            },
+          };
+
+          console.log('[Live][WebSocket] Sending setup:', setupMsg);
+          ws.send(JSON.stringify(setupMsg));
+        };
+
+        ws.onmessage = async (ev) => {
+          let blob;
+
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (ev.data instanceof Blob) {
+            blob = ev.data;                     // unchanged
+          } else if (ev.data instanceof ArrayBuffer) {
+            blob = new Blob([ev.data]);         // wrap the buffer
+          } else {
+            // unknown type – ignore
+            return;
+          }
+
+          // ↓ everything that previously used ev.data continues to use `blob`
+          let maybeText = null;
+          try {
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
+
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[Live][Debug] incoming JSON frame:', parsed);
+
+              if (parsed.setupComplete) {
+                console.log('[Live][WebSocket] Received setupComplete ✅');
+                this.status = 'active';
+                this.onStatusChange?.('active');
+
+                // ✅ Start page context monitoring when call becomes active
+                this.startPageContextMonitoring();
+
+                if (ws.readyState === WebSocket.OPEN && !this.greetingSentRef) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  ws.send(JSON.stringify(greeting));
+                  this.greetingSentRef = true;
+                  console.log('[Live] Sent initial text greeting: "Hello!"');
+                }
+
+                this.startMicStreaming();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH TWO-BUFFER SYSTEM
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  
+                  if (text) {
+                    // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
+                    this.partialTextRef += text;
+                    
+                    // 2) Update the display immediately with committed + partial
+                    this.updateTranscriptDisplay();
+                    
+                    console.log('[Live] AI transcription fragment (partial):', text);
+                  }
+
+                  // 3) When finished, MOVE partial to committed and clear partial
+                  if (finished && this.partialTextRef) {
+                    const partialText = this.partialTextRef.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (this.committedTextRef && partialText) {
+                      const needsSpace = !this.committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
+                      this.committedTextRef += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      this.committedTextRef = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    this.partialTextRef = '';
+                    
+                    // Update display with committed text only
+                    this.updateTranscriptDisplay();
+                    
+                    // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[Live] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // ✅ HANDLE USER SPEECH TRANSCRIPTION
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (this.committedTextRef) {
+                      const needsSpace = !this.committedTextRef.endsWith(' ') && !userText.startsWith(' ');
+                      this.committedTextRef += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      this.committedTextRef = userText;
+                    }
+                    
+                    this.updateTranscriptDisplay();
+                    console.log('[Live] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[Live][Debug] Decoded inlineData, scheduling audio playback');
+                        this.playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[Live] Error decoding inlineData audio:', err);
+                      }
+                    }
+                  }
+                  return; // ✅ BAIL OUT AFTER HANDLING AUDIO
+                }
+
+                // ✅ CHECK FOR TURN COMPLETE TO FORCE COMMIT PARTIAL BUFFER
+                if (sc.turnComplete && this.partialTextRef) {
+                  console.log('[Live] Turn complete - committing partial buffer');
+                  const partialText = this.partialTextRef.trim();
+                  
+                  // Move partial to committed
+                  if (this.committedTextRef && partialText) {
+                    const needsSpace = !this.committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
+                    this.committedTextRef += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    this.committedTextRef = partialText;
+                  }
+                  
+                  // Clear partial buffer
+                  this.partialTextRef = '';
+                  
+                  this.updateTranscriptDisplay();
+                  
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
+                  }
+                  
+                  console.log('[Live] AI said (turn complete commit):', partialText);
+                }
+              }
+
+              return;
+            } catch (parseError) {
+              console.error('[Live] JSON parse error:', parseError);
+              // Continue to fallback for binary data
+            }
+          }
+
+          console.log('[Live][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
+          this.playAudioBuffer(blob);
+        };
+
+        ws.onerror = (err) => {
+          console.error('[Live][WebSocket] onerror:', err);
+          this.errorMessage = 'WebSocket encountered an error.';
+          this.status = 'error';
+          this.onStatusChange?.('error');
+          this.onErrorChange?.('WebSocket encountered an error.');
+        };
+
+        ws.onclose = (ev) => {
+          console.log(`[Live][WebSocket] onclose: code=${ev.code}, reason="${ev.reason}"`);
+          this.status = 'ended';
+          this.onStatusChange?.('ended');
+          this.websocketRef = null;
+          // ✅ Stop page context monitoring when call ends
+          this.stopPageContextMonitoring();
+        };
+      } catch (err) {
+        console.error('[Live] Failed to start call:', err);
+        this.errorMessage = err.message ?? 'Failed to start call.';
+        this.status = 'error';
+        this.onStatusChange?.('error');
+        this.onErrorChange?.(err.message ?? 'Failed to start call.');
+      }
+    }
+
+    async startMicStreaming() {
+      try {
+        console.log('[Live][Audio] Requesting microphone access...');
+        
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        this.microphoneStream = micStream;
+        
+        console.log('[Live][Audio] Microphone access granted, setting up audio processing...');
+
+        if (!this.audioContextRef) {
+          this.audioContextRef = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = this.audioContextRef;
+
+        const sourceNode = audioCtx.createMediaStreamSource(micStream);
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+        sourceNode.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          const float32Data = event.inputBuffer.getChannelData(0);
+          const inRate = audioCtx.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(float32Data.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = float32Data[idx];
+            sample = Math.max(-1, Math.min(1, sample));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          const payload = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000',
+              },
+            },
+          };
+
+          if (this.websocketRef?.readyState === WebSocket.OPEN) {
+            this.websocketRef.send(JSON.stringify(payload));
+            // ✅ ADDED: Log audio data transmission (throttled to avoid spam)
+            if (Math.random() < 0.01) { // Log ~1% of audio chunks
+              console.log(`[Live][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+            }
+          }
+        };
+
+        this.isMicrophoneActive = true;
+        this.onMicrophoneChange?.(true);
+        console.log('[Live][Audio] Microphone streaming started successfully');
+      } catch (err) {
+        console.error('[Live] Mic streaming error:', err);
+        this.errorMessage = 'Failed to capture microphone.';
+        this.onErrorChange?.('Failed to capture microphone.');
+      }
+    }
+
+    toggleMicrophone() {
+      try {
+        this.errorMessage = null;
+        if (this.isMicrophoneActive && this.microphoneStream) {
+          console.log('[Live][Audio] Stopping microphone...');
+          if (this.audioContextRef) {
+            this.audioContextRef.close().catch(() => {});
+            this.audioContextRef = null;
+            this.audioQueueTimeRef = 0;
+          }
+          this.microphoneStream.getTracks().forEach((t) => t.stop());
+          this.microphoneStream = null;
+          this.isMicrophoneActive = false;
+          this.onMicrophoneChange?.(false);
+          console.log('[Live][Audio] Microphone stopped');
+        } else if (!this.isMicrophoneActive) {
+          console.log('[Live][Audio] Starting microphone...');
+          this.startMicStreaming().catch((err) => {
+            console.error('[Live] toggleMicrophone start error:', err);
+            this.errorMessage = 'Failed to start microphone.';
+            this.onErrorChange?.('Failed to start microphone.');
+          });
+        }
+      } catch (err) {
+        console.error('[Live] toggleMicrophone error:', err);
+        this.errorMessage = 'Failed to toggle microphone.';
+        this.onErrorChange?.('Failed to toggle microphone.');
+      }
+    }
+
+    endCall(fromUnload = false) {
+      if (this.callEndedRef) {
+        return;
+      }
+      this.callEndedRef = true;
+      
+      try {
+        const finalDuration = this.duration;
+        // ✅ GET FINAL TRANSCRIPT FROM BOTH BUFFERS
+        const finalTranscript = (this.committedTextRef + this.partialTextRef).trim();
+        const agentId = this.currentAgentIdRef;
+        const conversationId = this.conversationIdRef;
+
+        console.log('[Live] Ending call - Duration:', finalDuration, 'seconds, Transcript length:', finalTranscript.length);
+
+        // Clear any DOM highlights
+        if (window.voicePilotClearHighlights) {
+          window.voicePilotClearHighlights();
+        }
+
+        if (this.durationTimerRef) {
+          clearInterval(this.durationTimerRef);
+          this.durationTimerRef = null;
+        }
+        if (this.maxDurationTimerRef) {
+          clearTimeout(this.maxDurationTimerRef);
+          this.maxDurationTimerRef = null;
+        }
+
+        // ✅ Stop page context monitoring
+        this.stopPageContextMonitoring();
+
+        if (this.websocketRef) {
+          this.websocketRef.close();
+          this.websocketRef = null;
+        }
+        
+        [this.screenStream, this.microphoneStream, this.videoStream].forEach(
+          (stream) => {
+            if (stream) {
+              stream.getTracks().forEach((t) => t.stop());
+            }
+          }
+        );
+        this.screenStream = null;
+        this.microphoneStream = null;
+        this.videoStream = null;
+        if (this.audioContextRef) {
+          this.audioContextRef.close().catch(() => {});
+          this.audioContextRef = null;
+          this.audioQueueTimeRef = 0;
+        }
+        this.isScreenSharing = false;
+        this.isMicrophoneActive = false;
+        this.isVideoActive = false;
+        this.status = 'ended';
+        this.onStatusChange?.('ended');
+        this.agentOwnerIdRef = null;
+        this.currentAgentIdRef = null;
+        this.conversationIdRef = null;
+        
+        // ✅ CLEAR BOTH BUFFERS
+        this.committedTextRef = '';
+        this.partialTextRef = '';
+      } catch (err) {
+        console.error('[Live] Error ending call:', err);
+        this.errorMessage = 'Error ending call.';
+        this.status = 'error';
+        this.onStatusChange?.('error');
+        this.onErrorChange?.('Error ending call.');
+      }
+    }
+  }
+
+  // ────────────────────────────────────────────────────
   // Widget creation
   // ────────────────────────────────────────────────────
   function createWidget() {
@@ -946,6 +1622,11 @@
       ...pos
     });
 
+    // Create live call context
+    const liveCall = new LiveCallContext();
+    let agent = null;
+    let isExpanded = false;
+
     // Widget HTML
     widget.innerHTML = `
       <div id="voicepilot-container" style="
@@ -957,6 +1638,7 @@
         max-width: 400px;
         color: white;
         transition: all 0.3s ease;
+        display: none;
       ">
         <div id="voicepilot-header" style="
           display: flex;
@@ -1044,12 +1726,29 @@
           display: none;
         "></div>
       </div>
+
+      <button id="voicepilot-fab" style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        color: white;
+        cursor: pointer;
+        font-size: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">🎤</button>
     `;
 
     document.body.appendChild(widget);
 
     // Get elements
     const container = widget.querySelector('#voicepilot-container');
+    const fab = widget.querySelector('#voicepilot-fab');
     const closeBtn = widget.querySelector('#voicepilot-close');
     const startBtn = widget.querySelector('#voicepilot-start');
     const endBtn = widget.querySelector('#voicepilot-end');
@@ -1057,358 +1756,128 @@
     const statusText = widget.querySelector('#voicepilot-status-text');
     const transcript = widget.querySelector('#voicepilot-transcript');
 
-    let isCallActive = false;
-    let websocket = null;
-    let microphoneStream = null;
-    let audioContext = null;
-    let audioProcessor = null;
-
-    // ✅ FIXED: Proper microphone capture implementation
-    async function startMicrophoneCapture() {
+    // Load agent data
+    async function loadAgent() {
       try {
-        console.log('[VoicePilot] Starting microphone capture...');
-        
-        // Request microphone access
-        microphoneStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            sampleRate: 16000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        console.log('[VoicePilot] Microphone access granted');
-
-        // Create audio context
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 16000
-        });
-
-        // Create audio processing pipeline
-        const source = audioContext.createMediaStreamSource(microphoneStream);
-        const bufferSize = 4096;
-        audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-
-        // Connect the audio processing pipeline
-        source.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
-
-        // Process audio data and send to WebSocket
-        audioProcessor.onaudioprocess = (event) => {
-          if (!websocket || websocket.readyState !== WebSocket.OPEN) {
-            return;
-          }
-
-          const inputBuffer = event.inputBuffer;
-          const inputData = inputBuffer.getChannelData(0);
-          
-          // Convert float32 to int16
-          const pcm16 = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            const sample = Math.max(-1, Math.min(1, inputData[i]));
-            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-          }
-
-          // Convert to base64
-          const uint8Array = new Uint8Array(pcm16.buffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.byteLength; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64Audio = btoa(binary);
-
-          // Send audio data to Gemini Live API
-          const audioMessage = {
-            realtime_input: {
-              audio: {
-                data: base64Audio,
-                mime_type: 'audio/pcm;rate=16000'
-              }
-            }
-          };
-
-          try {
-            websocket.send(JSON.stringify(audioMessage));
-          } catch (error) {
-            console.error('[VoicePilot] Error sending audio data:', error);
-          }
+        // Create a simple Supabase client
+        const supabaseClient = {
+          from: (table) => ({
+            select: (columns) => ({
+              eq: (column, value) => ({
+                single: async () => {
+                  const response = await fetch(`${supabaseUrl}/rest/v1/${table}?${column}=eq.${value}&select=${columns}`, {
+                    headers: {
+                      'apikey': supabaseAnonKey,
+                      'Authorization': `Bearer ${supabaseAnonKey}`,
+                      'Content-Type': 'application/json',
+                    }
+                  });
+                  const data = await response.json();
+                  return { data: data[0] || null, error: response.ok ? null : data };
+                }
+              })
+            })
+          })
         };
 
-        console.log('[VoicePilot] Microphone capture setup complete');
-        return true;
-      } catch (error) {
-        console.error('[VoicePilot] Microphone capture failed:', error);
-        statusText.textContent = 'Microphone access denied';
-        statusIndicator.textContent = '❌';
-        return false;
-      }
-    }
+        const { data, error } = await supabaseClient
+          .from('agents')
+          .select('*')
+          .eq('id', agentId)
+          .single();
 
-    function stopMicrophoneCapture() {
-      console.log('[VoicePilot] Stopping microphone capture...');
-      
-      if (audioProcessor) {
-        audioProcessor.disconnect();
-        audioProcessor = null;
-      }
-      
-      if (audioContext) {
-        audioContext.close().catch(console.error);
-        audioContext = null;
-      }
-      
-      if (microphoneStream) {
-        microphoneStream.getTracks().forEach(track => track.stop());
-        microphoneStream = null;
-      }
-      
-      console.log('[VoicePilot] Microphone capture stopped');
-    }
-
-    // ✅ FIXED: Proper audio playback implementation
-    async function playAudioBuffer(pcmBlob) {
-      try {
-        console.log('[VoicePilot] Playing audio buffer, size:', pcmBlob.size, 'bytes');
-        
-        const arrayBuffer = await pcmBlob.arrayBuffer();
-        const pcm16 = new Int16Array(arrayBuffer);
-        
-        // Convert PCM16 to Float32
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-          float32[i] = pcm16[i] / 32768;
+        if (error || !data) {
+          console.error('Failed to load agent:', error);
+          return;
         }
 
-        // Create audio context if needed
-        if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        agent = {
+          id: data.id,
+          name: data.name,
+          instructions: data.instructions,
+          status: data.status,
+          canSeeScreenshare: data.can_see_screenshare,
+          callDuration: data.call_duration,
+          documentationUrls: data.documentation_urls || [],
+        };
 
-        // Create audio buffer
-        const audioBuffer = audioContext.createBuffer(1, float32.length, 24000);
-        audioBuffer.copyToChannel(float32, 0, 0);
-
-        // Create and play audio source
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start();
-        
-        console.log('[VoicePilot] Audio buffer played successfully');
-      } catch (error) {
-        console.error('[VoicePilot] Error playing audio buffer:', error);
+        console.log('Loaded agent:', agent);
+      } catch (err) {
+        console.error('Error loading agent:', err);
       }
     }
 
-    // Close widget
-    closeBtn.addEventListener('click', () => {
-      widget.style.display = 'none';
-    });
+    // Set up event handlers for live call context
+    liveCall.onStatusChange = (status) => {
+      console.log('[Widget] Status changed to:', status);
+      switch (status) {
+        case 'connecting':
+          statusText.textContent = 'Connecting...';
+          statusIndicator.textContent = '⏳';
+          break;
+        case 'active':
+          statusText.textContent = 'Connected - Speak now';
+          statusIndicator.textContent = '🎯';
+          startBtn.style.display = 'none';
+          endBtn.style.display = 'block';
+          transcript.style.display = 'block';
+          fab.textContent = '🔴';
+          break;
+        case 'ended':
+          statusText.textContent = 'Call ended';
+          statusIndicator.textContent = '📞';
+          startBtn.style.display = 'block';
+          endBtn.style.display = 'none';
+          transcript.style.display = 'none';
+          fab.textContent = '🎤';
+          setTimeout(() => {
+            statusText.textContent = 'Ready to help';
+            statusIndicator.textContent = '🎤';
+          }, 2000);
+          break;
+        case 'error':
+          statusText.textContent = 'Connection failed';
+          statusIndicator.textContent = '❌';
+          fab.textContent = '🎤';
+          setTimeout(() => {
+            statusText.textContent = 'Ready to help';
+            statusIndicator.textContent = '🎤';
+          }, 3000);
+          break;
+      }
+    };
+
+    liveCall.onTranscriptUpdate = (text) => {
+      transcript.textContent = text;
+    };
+
+    liveCall.onErrorChange = (error) => {
+      console.error('[Widget] Error:', error);
+    };
 
     // Start call function
     async function startCall() {
-      if (isCallActive) return;
+      if (liveCall.status === 'active' || liveCall.status === 'connecting') return;
 
       try {
-        statusText.textContent = 'Connecting...';
-        statusIndicator.textContent = '⏳';
-
-        console.log('[VoicePilot] Starting call for agent:', agentId);
-
-        // Get Supabase configuration
-        const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
-        const supabaseAnonKey = window.voicepilotSupabaseAnonKey || '';
-
-        console.log('[VoicePilot] Using Supabase URL:', supabaseUrl);
-
-        // Get relay URL from start-call function
-        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({
-            agentId: agentId,
-            instructions: 'You are a helpful AI assistant embedded in a web application.',
-            documentationUrls: []
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP ${response.status}`);
+        if (!agent) {
+          await loadAgent();
         }
 
-        const { relayUrl } = await response.json();
-        console.log('[VoicePilot] Got relay URL:', relayUrl);
+        if (!agent) {
+          throw new Error('Agent not found');
+        }
 
-        // Connect to WebSocket relay
-        websocket = new WebSocket(relayUrl);
+        await liveCall.startCall(
+          agent.instructions,
+          agent.callDuration,
+          agent.documentationUrls,
+          agentId
+        );
 
-        websocket.onopen = async () => {
-          console.log('[VoicePilot] WebSocket connected');
-          
-          // Get current page context
-          const pageContext = window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Web page';
-          
-          // Send setup message
-          const setupMessage = {
-            setup: {
-              model: 'models/gemini-2.0-flash-live-001',
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: 'Kore'
-                    }
-                  }
-                }
-              },
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
-              systemInstruction: {
-                parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a web application to help users navigate and use the app effectively.
-
-Your role:
-- Help users complete tasks step-by-step
-- Guide them through the interface with clear instructions
-- Answer questions about features and functionality
-- Provide contextual help based on what they're currently viewing
-
-Context awareness:
-- You can see the current page context through the page summary
-- When you mention UI elements like buttons, forms, or links, they will be automatically highlighted
-- Speak naturally and conversationally
-
-Guidelines:
-- Be concise but helpful
-- Give step-by-step instructions when needed
-- Ask clarifying questions if the user's request is unclear
-- Stay focused on helping with the current application
-
-Current page context: ${pageContext}`
-                }]
-              }
-            }
-          };
-
-          websocket.send(JSON.stringify(setupMessage));
-          console.log('[VoicePilot] Setup message sent');
-        };
-
-        websocket.onmessage = async (event) => {
-          try {
-            let data;
-            
-            // Handle both text and binary messages
-            if (typeof event.data === 'string') {
-              data = JSON.parse(event.data);
-              console.log('[VoicePilot] Received JSON message:', data);
-              
-              if (data.setupComplete) {
-                console.log('[VoicePilot] Setup complete, starting microphone');
-                isCallActive = true;
-                statusText.textContent = 'Connected - Speak now';
-                statusIndicator.textContent = '🎯';
-                startBtn.style.display = 'none';
-                endBtn.style.display = 'block';
-                transcript.style.display = 'block';
-                
-                // Start microphone capture
-                await startMicrophoneCapture();
-                
-                // Send initial greeting
-                const greeting = {
-                  clientContent: {
-                    turns: [{
-                      role: 'user',
-                      parts: [{ text: 'Hello!' }]
-                    }],
-                    turnComplete: true
-                  }
-                };
-                websocket.send(JSON.stringify(greeting));
-                return;
-              }
-
-              if (data.serverContent) {
-                const sc = data.serverContent;
-                
-                // Handle AI speech transcription
-                if (sc.outputTranscription) {
-                  const { text, finished } = sc.outputTranscription;
-                  if (text) {
-                    transcript.textContent += text;
-                    transcript.scrollTop = transcript.scrollHeight;
-                    
-                    // Real-time highlighting
-                    if (window.voicePilotHighlightStream) {
-                      window.voicePilotHighlightStream(text);
-                    }
-                  }
-                }
-
-                // Handle user speech transcription
-                if (sc.inputTranscription?.text) {
-                  const userText = sc.inputTranscription.text.trim();
-                  if (userText) {
-                    transcript.textContent += `\nUser: ${userText}\n`;
-                    transcript.scrollTop = transcript.scrollHeight;
-                  }
-                }
-
-                // Handle audio data
-                const mt = sc.modelTurn;
-                if (mt?.parts) {
-                  for (const part of mt.parts) {
-                    if (part.inlineData && typeof part.inlineData.data === 'string') {
-                      try {
-                        const base64str = part.inlineData.data;
-                        const binaryStr = atob(base64str);
-                        const len = binaryStr.length;
-                        const rawBuffer = new Uint8Array(len);
-                        for (let i = 0; i < len; i++) {
-                          rawBuffer[i] = binaryStr.charCodeAt(i);
-                        }
-                        const pcmBlob = new Blob([rawBuffer.buffer], {
-                          type: 'audio/pcm;rate=24000'
-                        });
-                        await playAudioBuffer(pcmBlob);
-                      } catch (err) {
-                        console.error('[VoicePilot] Error decoding audio:', err);
-                      }
-                    }
-                  }
-                }
-              }
-            } else {
-              // Handle binary audio data
-              console.log('[VoicePilot] Received binary audio data');
-              await playAudioBuffer(event.data);
-            }
-          } catch (error) {
-            console.error('[VoicePilot] Error processing message:', error);
-          }
-        };
-
-        websocket.onerror = (error) => {
-          console.error('[VoicePilot] WebSocket error:', error);
-          statusText.textContent = 'Connection error';
-          statusIndicator.textContent = '❌';
-        };
-
-        websocket.onclose = (event) => {
-          console.log('[VoicePilot] WebSocket closed:', event.code, event.reason);
-          endCall();
-        };
-
+        console.log('[Widget] Call started successfully');
       } catch (error) {
-        console.error('[VoicePilot] Failed to start call:', error);
+        console.error('[Widget] Failed to start call:', error);
         statusText.textContent = 'Connection failed';
         statusIndicator.textContent = '❌';
         setTimeout(() => {
@@ -1420,38 +1889,29 @@ Current page context: ${pageContext}`
 
     // End call function
     function endCall() {
-      if (!isCallActive) return;
+      liveCall.endCall();
+      console.log('[Widget] Call ended');
+    }
 
-      console.log('[VoicePilot] Ending call');
-
-      isCallActive = false;
-      statusText.textContent = 'Call ended';
-      statusIndicator.textContent = '📞';
-      startBtn.style.display = 'block';
-      endBtn.style.display = 'none';
-      transcript.style.display = 'none';
-      
-      // Stop microphone capture
-      stopMicrophoneCapture();
-      
-      // Close WebSocket
-      if (websocket) {
-        websocket.close();
-        websocket = null;
-      }
-      
-      // Clear any highlights
-      if (window.voicePilotClearHighlights) {
-        window.voicePilotClearHighlights();
-      }
-
-      setTimeout(() => {
-        statusText.textContent = 'Ready to help';
-        statusIndicator.textContent = '🎤';
-      }, 2000);
+    // Toggle widget visibility
+    function toggleWidget() {
+      isExpanded = !isExpanded;
+      container.style.display = isExpanded ? 'block' : 'none';
     }
 
     // Event listeners
+    fab.addEventListener('click', () => {
+      if (liveCall.status === 'idle' || liveCall.status === 'ended' || liveCall.status === 'error') {
+        toggleWidget();
+      } else {
+        endCall();
+      }
+    });
+
+    closeBtn.addEventListener('click', () => {
+      toggleWidget();
+    });
+
     startBtn.addEventListener('click', startCall);
     endBtn.addEventListener('click', endCall);
 
@@ -1477,13 +1937,29 @@ Current page context: ${pageContext}`
       closeBtn.style.background = 'rgba(255,255,255,0.2)';
     });
 
+    fab.addEventListener('mouseenter', () => {
+      fab.style.transform = 'scale(1.1)';
+    });
+    fab.addEventListener('mouseleave', () => {
+      fab.style.transform = 'scale(1)';
+    });
+
+    // Load agent data on initialization
+    loadAgent();
+
     // Return widget API
     return {
-      show: () => widget.style.display = 'block',
-      hide: () => widget.style.display = 'none',
+      show: () => {
+        isExpanded = true;
+        container.style.display = 'block';
+      },
+      hide: () => {
+        isExpanded = false;
+        container.style.display = 'none';
+      },
       startCall,
       endCall,
-      isActive: () => isCallActive
+      isActive: () => liveCall.status === 'active'
     };
   }
 
