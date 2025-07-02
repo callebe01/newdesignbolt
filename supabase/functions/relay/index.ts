@@ -39,7 +39,7 @@ const handler = (req: Request) => {
       });
     }
 
-    /* 2️⃣  Load API key directly from environment variables */
+    /* 2️⃣  Load API key from environment variables */
     const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
     
     if (!KEY) {
@@ -52,22 +52,22 @@ const handler = (req: Request) => {
       });
     }
 
-    console.log("[Relay] Using API key from environment variables");
+    console.log("[Relay] Using API key from environment variables (length:", KEY.length, ")");
 
     /* 3️⃣  Browser ⇄ Relay socket */
     const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
-    /* 4️⃣  Relay ⇄ Gemini socket - Using correct Gemini Live API endpoint WITHOUT key in URL */
-    // According to Google Live API docs, the WebSocket endpoint should not include the API key
-    // The API key authentication is handled server-side through environment variables
-    const geminiURL = "wss://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent";
+    /* 4️⃣  Relay ⇄ Gemini socket - Include API key in URL as required by Google Live API */
+    const geminiURL = 
+      "wss://generativelanguage.googleapis.com/ws/" +
+      "google.ai.generativelanguage.v1beta.GenerativeService." +
+      "BidiGenerateContent?key=" +
+      encodeURIComponent(KEY);
 
-    console.log("[Relay] Connecting to Gemini Live API:", geminiURL);
+    console.log("[Relay] Connecting to Gemini Live API:", geminiURL.replace(KEY, "***"));
     
     let gemini: WebSocket;
     try {
-      // Create WebSocket connection without API key in URL
-      // The authentication should be handled by the server environment
       gemini = new WebSocket(geminiURL);
     } catch (error) {
       console.error("[Relay] Failed to create WebSocket connection to Gemini:", error);
