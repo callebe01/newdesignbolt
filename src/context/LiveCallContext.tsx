@@ -359,6 +359,28 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const startCall = async (systemInstruction?: string, maxDuration?: number, documentationUrls?: string[], agentId?: string): Promise<void> => {
     try {
+      // ✅ IMPROVED: Check for existing WebSocket and handle stale connections
+      if (websocketRef.current) {
+        const ws = websocketRef.current;
+        
+        // Check the readyState of the existing WebSocket
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          console.warn('[Live] startCall() called but WebSocket is already active or connecting.');
+          return;
+        } else if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
+          console.log('[Live] Clearing stale WebSocket reference (state:', ws.readyState, ')');
+          // Attempt to close if still closing, then clear the reference
+          if (ws.readyState === WebSocket.CLOSING) {
+            try {
+              ws.close();
+            } catch (error) {
+              console.warn('[Live] Error closing stale WebSocket:', error);
+            }
+          }
+          websocketRef.current = null;
+        }
+      }
+
       setErrorMessage(null);
       setDuration(0);
       usageRecordedRef.current = false;
@@ -383,11 +405,6 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
         // Create conversation record
         const conversationId = await createConversationRecord(agentId);
         conversationIdRef.current = conversationId;
-      }
-
-      if (websocketRef.current) {
-        console.warn('[Live] startCall() called but WebSocket already exists.');
-        return;
       }
 
       // Start duration timer
