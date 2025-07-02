@@ -55,6 +55,25 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
     }
   };
 
+  // ✅ IMPROVED: Better status text based on call state
+  const getStatusText = () => {
+    switch (status) {
+      case 'connecting':
+        return 'Connecting...';
+      case 'active':
+        return `${formatTime(duration)} elapsed`;
+      case 'error':
+        return 'Connection failed';
+      case 'ended':
+        return 'Call ended';
+      default:
+        return 'Ready to help';
+    }
+  };
+
+  // ✅ IMPROVED: Determine if start button should be disabled
+  const isStartDisabled = status === 'connecting' || status === 'active';
+
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <AnimatePresence>
@@ -76,7 +95,7 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
                   <div>
                     <h3 className="font-semibold text-sm">{agent?.name || 'AI Assistant'}</h3>
                     <p className="text-xs opacity-90">
-                      {status === 'active' ? `${formatTime(duration)} elapsed` : 'Ready to help'}
+                      {getStatusText()}
                     </p>
                   </div>
                 </div>
@@ -97,14 +116,24 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
                     <Phone className="w-8 h-8 text-primary" />
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                    Start a voice conversation with your AI assistant
+                    {status === 'connecting' 
+                      ? 'Establishing connection...' 
+                      : 'Start a voice conversation with your AI assistant'
+                    }
                   </p>
                   <button
                     onClick={handleStartCall}
-                    className="w-full bg-gradient-to-r from-primary to-accent text-white py-3 px-4 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+                    disabled={isStartDisabled}
+                    className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+                      isStartDisabled
+                        ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-primary to-accent text-white hover:shadow-lg'
+                    }`}
                   >
                     <PhoneCall className="w-4 h-4" />
-                    <span>Start Voice Chat</span>
+                    <span>
+                      {status === 'connecting' ? 'Connecting...' : 'Start Voice Chat'}
+                    </span>
                   </button>
                 </div>
               ) : (
@@ -179,12 +208,15 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
           {status === 'active' && (
             <div className="absolute inset-0 bg-red-500/20 rounded-full animate-pulse"></div>
           )}
+          {status === 'connecting' && (
+            <div className="absolute inset-0 bg-yellow-500/20 rounded-full animate-pulse"></div>
+          )}
           <Phone className="w-6 h-6 text-white" />
         </div>
         
         {/* Text (only show when not active or expanded) */}
         <AnimatePresence>
-          {status !== 'active' && !isExpanded && (
+          {status !== 'active' && status !== 'connecting' && !isExpanded && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 'auto', opacity: 1 }}
@@ -206,6 +238,19 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
           >
             <span className="font-semibold text-xs whitespace-nowrap text-red-400">
               {formatTime(duration)}
+            </span>
+          </motion.div>
+        )}
+
+        {/* Connecting indicator */}
+        {status === 'connecting' && !isExpanded && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 'auto', opacity: 1 }}
+            className="px-4 py-0 overflow-hidden"
+          >
+            <span className="font-semibold text-xs whitespace-nowrap text-yellow-400">
+              CONNECTING
             </span>
           </motion.div>
         )}

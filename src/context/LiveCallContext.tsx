@@ -132,6 +132,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const playAudioBuffer = async (pcmBlob: Blob) => {
     try {
+      // ✅ ADDED: Log audio buffer reception
+      console.log('[Live][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+      
       const arrayBuffer = await pcmBlob.arrayBuffer();
       const pcm16 = new Int16Array(arrayBuffer);
       const float32 = new Float32Array(pcm16.length);
@@ -158,6 +161,9 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       source.start(startAt);
       audioQueueTimeRef.current = startAt + buffer.duration;
+      
+      // ✅ ADDED: Log successful audio playback
+      console.log('[Live][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
     } catch (err) {
       console.error('[Live] playAudioBuffer() error decoding PCM16:', err);
     }
@@ -708,10 +714,15 @@ When responding, consider the user's current location and what they can see on t
 
   const startMicStreaming = async () => {
     try {
+      // ✅ ADDED: Log microphone access attempt
+      console.log('[Live][Audio] Requesting microphone access...');
+      
       const micStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
       microphoneStream.current = micStream;
+      
+      console.log('[Live][Audio] Microphone access granted, setting up audio processing...');
 
       if (!audioContextRef.current) {
         audioContextRef.current =
@@ -759,11 +770,15 @@ When responding, consider the user's current location and what they can see on t
 
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           websocketRef.current.send(JSON.stringify(payload));
-          console.log(`[Live] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) as JSON to relay`);
+          // ✅ ADDED: Log audio data transmission (throttled to avoid spam)
+          if (Math.random() < 0.01) { // Log ~1% of audio chunks
+            console.log(`[Live][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+          }
         }
       };
 
       setIsMicrophoneActive(true);
+      console.log('[Live][Audio] Microphone streaming started successfully');
     } catch (err) {
       console.error('[Live] Mic streaming error:', err);
       setErrorMessage('Failed to capture microphone.');
@@ -879,6 +894,7 @@ When responding, consider the user's current location and what they can see on t
     try {
       setErrorMessage(null);
       if (isMicrophoneActive && microphoneStream.current) {
+        console.log('[Live][Audio] Stopping microphone...');
         if (audioContextRef.current) {
           audioContextRef.current.close().catch(() => {});
           audioContextRef.current = null;
@@ -887,7 +903,9 @@ When responding, consider the user's current location and what they can see on t
         microphoneStream.current.getTracks().forEach((t) => t.stop());
         microphoneStream.current = null;
         setIsMicrophoneActive(false);
+        console.log('[Live][Audio] Microphone stopped');
       } else if (!isMicrophoneActive) {
+        console.log('[Live][Audio] Starting microphone...');
         startMicStreaming().catch((err) => {
           console.error('[Live] toggleMicrophone start error:', err);
           setErrorMessage('Failed to start microphone.');
@@ -972,6 +990,8 @@ When responding, consider the user's current location and what they can see on t
       const finalTranscript = (committedTextRef.current + partialTextRef.current).trim();
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
+
+      console.log('[Live] Ending call - Duration:', finalDuration, 'seconds, Transcript length:', finalTranscript.length);
 
       // Clear any DOM highlights
       if (window.voicePilotClearHighlights) {
