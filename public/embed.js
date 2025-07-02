@@ -1077,43 +1077,58 @@
         statusText.textContent = 'Connecting...';
         statusIndicator.textContent = '⏳';
 
-        // Get Supabase configuration
+        // Get configuration - prioritize Google API key for direct connection
+        const apiKey = window.voicepilotGoogleApiKey;
         const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
         const supabaseAnonKey = window.voicepilotSupabaseKey || '';
 
-        if (!supabaseUrl || !supabaseAnonKey) {
-          throw new Error('Supabase configuration missing');
-        }
-
-        console.log('[VoicePilot] Using Supabase URL:', supabaseUrl);
-
-        // Get relay URL from start-call function
-        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({
-            agentId: agentId,
-            instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
-            documentationUrls: []
-          })
+        console.log('[VoicePilot] Configuration check:', {
+          hasApiKey: !!apiKey,
+          hasSupabaseUrl: !!supabaseUrl,
+          hasSupabaseKey: !!supabaseAnonKey
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to start call');
-        }
+        if (apiKey) {
+          // Direct connection to Gemini Live API
+          console.log('[VoicePilot] Using direct Gemini Live API connection');
+          
+          const { GoogleGenerativeAI } = await import('https://esm.run/@google/generative-ai');
+          const genAI = new GoogleGenerativeAI(apiKey);
+          
+          const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.0-flash-exp",
+            systemInstruction: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
 
-        const { relayUrl } = await response.json();
-        console.log('[VoicePilot] Got relay URL:', relayUrl);
+Your role:
+- Help users complete tasks step-by-step
+- Guide them through the interface with clear instructions
+- Answer questions about features and functionality
+- Provide contextual help based on what they're currently viewing
 
-        // Connect to WebSocket
-        websocket = new WebSocket(relayUrl);
+Context awareness:
+- You can see the current page context through the page summary
+- When you mention UI elements like buttons, forms, or links, they will be automatically highlighted
+- Speak naturally and conversationally
 
-        websocket.onopen = () => {
-          console.log('[VoicePilot] WebSocket connected');
+Guidelines:
+- Be concise but helpful
+- Give step-by-step instructions when needed
+- Ask clarifying questions if the user's request is unclear
+- Stay focused on helping with the current application
+
+Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}`
+          });
+
+          // Start live session
+          const geminiSession = model.startChat({
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            }
+          });
+
           isCallActive = true;
           statusText.textContent = 'Connected - Speak now';
           statusIndicator.textContent = '🎯';
@@ -1121,25 +1136,64 @@
           endBtn.style.display = 'block';
           transcript.style.display = 'block';
 
-          // Send setup message
-          const setupMsg = {
-            setup: {
-              model: 'models/gemini-2.0-flash-live-001',
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: 'Kore'
+          console.log('[VoicePilot] Direct Gemini connection established');
+
+        } else if (supabaseUrl && supabaseAnonKey) {
+          // Use relay through Supabase
+          console.log('[VoicePilot] Using Supabase relay connection');
+
+          const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+            },
+            body: JSON.stringify({
+              agentId: agentId,
+              instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
+              documentationUrls: []
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to start call');
+          }
+
+          const { relayUrl } = await response.json();
+          console.log('[VoicePilot] Got relay URL:', relayUrl);
+
+          // Connect to WebSocket
+          websocket = new WebSocket(relayUrl);
+
+          websocket.onopen = () => {
+            console.log('[VoicePilot] WebSocket connected');
+            isCallActive = true;
+            statusText.textContent = 'Connected - Speak now';
+            statusIndicator.textContent = '🎯';
+            startBtn.style.display = 'none';
+            endBtn.style.display = 'block';
+            transcript.style.display = 'block';
+
+            // Send setup message
+            const setupMsg = {
+              setup: {
+                model: 'models/gemini-2.0-flash-live-001',
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: {
+                        voiceName: 'Kore'
+                      }
                     }
                   }
-                }
-              },
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
-              systemInstruction: {
-                parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+                },
+                outputAudioTranscription: {},
+                inputAudioTranscription: {},
+                systemInstruction: {
+                  parts: [{
+                    text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
 
 Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}
 
@@ -1150,34 +1204,38 @@ Your role:
 - Provide contextual help based on what they're currently viewing
 
 When you mention UI elements like buttons, forms, or links, they will be automatically highlighted. Speak naturally and conversationally.`
-                }]
+                  }]
+                }
               }
-            }
+            };
+
+            websocket.send(JSON.stringify(setupMsg));
           };
 
-          websocket.send(JSON.stringify(setupMsg));
-        };
+          websocket.onmessage = (event) => {
+            // Handle incoming messages
+            console.log('[VoicePilot] Received message');
+          };
 
-        websocket.onmessage = (event) => {
-          // Handle incoming messages
-          console.log('[VoicePilot] Received message');
-        };
+          websocket.onerror = (error) => {
+            console.error('[VoicePilot] WebSocket error:', error);
+            statusText.textContent = 'Connection failed';
+            statusIndicator.textContent = '❌';
+          };
 
-        websocket.onerror = (error) => {
-          console.error('[VoicePilot] WebSocket error:', error);
-          statusText.textContent = 'Connection failed';
-          statusIndicator.textContent = '❌';
-        };
+          websocket.onclose = () => {
+            console.log('[VoicePilot] WebSocket closed');
+            isCallActive = false;
+            statusText.textContent = 'Call ended';
+            statusIndicator.textContent = '📞';
+            startBtn.style.display = 'block';
+            endBtn.style.display = 'none';
+            transcript.style.display = 'none';
+          };
 
-        websocket.onclose = () => {
-          console.log('[VoicePilot] WebSocket closed');
-          isCallActive = false;
-          statusText.textContent = 'Call ended';
-          statusIndicator.textContent = '📞';
-          startBtn.style.display = 'block';
-          endBtn.style.display = 'none';
-          transcript.style.display = 'none';
-        };
+        } else {
+          throw new Error('No API configuration provided. Please provide either Google API key or Supabase configuration.');
+        }
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);

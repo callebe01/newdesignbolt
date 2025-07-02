@@ -42,11 +42,18 @@
       script.src = '/embed.js';
       script.setAttribute('data-agent', '2d85d376-15e2-4eb6-8495-7023559b886a');
       script.setAttribute('data-position', 'bottom-right');
-      script.setAttribute('data-supabase-url', supabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co');
-      script.setAttribute('data-supabase-anon-key', supabaseAnonKey || '');
+      
+      // Set both Supabase and Google API key for maximum compatibility
+      if (supabaseUrl) {
+        script.setAttribute('data-supabase-url', supabaseUrl);
+      }
+      if (supabaseAnonKey) {
+        script.setAttribute('data-supabase-anon-key', supabaseAnonKey);
+      }
       if (googleApiKey) {
         script.setAttribute('data-google-api-key', googleApiKey);
       }
+      
       script.async = true;
       document.body.appendChild(script);
     </script>
