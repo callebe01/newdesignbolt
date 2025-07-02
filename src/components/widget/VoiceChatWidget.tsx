@@ -209,7 +209,9 @@ export const VoiceChatWidget: React.FC<VoiceChatWidgetProps> = ({ agentId }) => 
             <div className="absolute inset-0 bg-red-500/20 rounded-full animate-pulse"></div>
           )}
           {status === 'connecting' && (
-            <div className="absolute inset-0 bg-yellow-500/20 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 bg-yellow-500/20 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent border-b-transparent rounded-full animate-spin"></div>
+            </div>
           )}
           <Phone className="w-6 h-6 text-white" />
         </div>
