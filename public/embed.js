@@ -1059,6 +1059,28 @@
 
     let isCallActive = false;
     let websocket = null;
+    let greetingSentRef = false;
+
+    // ✅ TWO-BUFFER SYSTEM FOR REAL-TIME TRANSCRIPTION
+    let committedTextRef = ''; // All finalized text
+    let partialTextRef = '';   // Current in-flight fragment
+
+    // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
+    const updateTranscriptDisplay = () => {
+      const committed = committedTextRef;
+      const partial = partialTextRef;
+      
+      // Smart spacing: add space between committed and partial if needed
+      let fullText = committed;
+      if (committed && partial) {
+        const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
+        fullText = committed + (needsSpace ? ' ' : '') + partial;
+      } else if (partial) {
+        fullText = partial;
+      }
+      
+      transcript.textContent = fullText;
+    };
 
     // Close widget
     closeBtn.addEventListener('click', () => {
@@ -1159,9 +1181,185 @@ When you mention UI elements like buttons, forms, or links, they will be automat
           websocket.send(JSON.stringify(setupMsg));
         };
 
-        websocket.onmessage = (event) => {
-          // Handle incoming messages
-          console.log('[VoicePilot] Received message');
+        websocket.onmessage = async (event) => {
+          let blob;
+
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (event.data instanceof Blob) {
+            blob = event.data;
+          } else if (event.data instanceof ArrayBuffer) {
+            blob = new Blob([event.data]);
+          } else {
+            return;
+          }
+
+          // Try to parse as JSON first
+          let maybeText = null;
+          try {
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
+
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[VoicePilot] Received JSON message:', parsed);
+
+              if (parsed.setupComplete) {
+                console.log('[VoicePilot] Setup complete ✅');
+                
+                // Send initial greeting
+                if (!greetingSentRef) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  websocket.send(JSON.stringify(greeting));
+                  greetingSentRef = true;
+                  console.log('[VoicePilot] Sent initial greeting');
+                }
+
+                // Start microphone
+                startMicrophone();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH TWO-BUFFER SYSTEM
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  
+                  if (text) {
+                    // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
+                    partialTextRef += text;
+                    
+                    // 2) Update the display immediately with committed + partial
+                    updateTranscriptDisplay();
+                    
+                    // 3) Real-time highlighting for streaming text
+                    if (window.voicePilotHighlightStream) {
+                      window.voicePilotHighlightStream(text);
+                    }
+                    
+                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                  }
+
+                  // 3) When finished, MOVE partial to committed and clear partial
+                  if (finished && partialTextRef) {
+                    const partialText = partialTextRef.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (committedTextRef && partialText) {
+                      const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
+                      committedTextRef += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      committedTextRef = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    partialTextRef = '';
+                    
+                    // Update display with committed text only
+                    updateTranscriptDisplay();
+                    
+                    // ✅ HIGHLIGHT THE COMPLETE PHRASE
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // ✅ HANDLE USER SPEECH TRANSCRIPTION
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (committedTextRef) {
+                      const needsSpace = !committedTextRef.endsWith(' ') && !userText.startsWith(' ');
+                      committedTextRef += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      committedTextRef = userText;
+                    }
+                    
+                    updateTranscriptDisplay();
+                    console.log('[VoicePilot] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[VoicePilot] Playing audio buffer');
+                        playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding audio:', err);
+                      }
+                    }
+                  }
+                  return; // ✅ BAIL OUT AFTER HANDLING AUDIO
+                }
+
+                // ✅ CHECK FOR TURN COMPLETE TO FORCE COMMIT PARTIAL BUFFER
+                if (sc.turnComplete && partialTextRef) {
+                  console.log('[VoicePilot] Turn complete - committing partial buffer');
+                  const partialText = partialTextRef.trim();
+                  
+                  // Move partial to committed
+                  if (committedTextRef && partialText) {
+                    const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    committedTextRef = partialText;
+                  }
+                  
+                  // Clear partial buffer
+                  partialTextRef = '';
+                  
+                  updateTranscriptDisplay();
+                  
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
+                  }
+                  
+                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
+                }
+              }
+
+              return;
+            } catch (parseError) {
+              console.error('[VoicePilot] JSON parse error:', parseError);
+              // Continue to fallback for binary data
+            }
+          }
+
+          console.log('[VoicePilot] Received binary data, playing as audio');
+          playAudioBuffer(blob);
         };
 
         websocket.onerror = (error) => {
@@ -1191,6 +1389,92 @@ When you mention UI elements like buttons, forms, or links, they will be automat
       }
     }
 
+    // Audio playback function
+    async function playAudioBuffer(pcmBlob) {
+      try {
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.start(0);
+        
+        console.log('[VoicePilot] Audio buffer played successfully');
+      } catch (err) {
+        console.error('[VoicePilot] Audio playback error:', err);
+      }
+    }
+
+    // Microphone function
+    async function startMicrophone() {
+      try {
+        console.log('[VoicePilot] Starting microphone...');
+        
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const sourceNode = audioCtx.createMediaStreamSource(micStream);
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+        sourceNode.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          const float32Data = event.inputBuffer.getChannelData(0);
+          const inRate = audioCtx.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(float32Data.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = float32Data[idx];
+            sample = Math.max(-1, Math.min(1, sample));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          const payload = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000',
+              },
+            },
+          };
+
+          if (websocket?.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify(payload));
+          }
+        };
+
+        console.log('[VoicePilot] Microphone started successfully');
+      } catch (err) {
+        console.error('[VoicePilot] Microphone error:', err);
+        statusText.textContent = 'Microphone failed';
+        statusIndicator.textContent = '❌';
+      }
+    }
+
     // End call function
     function endCall() {
       if (!isCallActive) return;
@@ -1212,6 +1496,10 @@ When you mention UI elements like buttons, forms, or links, they will be automat
         if (window.voicePilotClearHighlights) {
           window.voicePilotClearHighlights();
         }
+
+        // Clear transcript buffers
+        committedTextRef = '';
+        partialTextRef = '';
 
         setTimeout(() => {
           statusText.textContent = 'Ready to help';
