@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AgentWidget } from '../components/widget/AgentWidget';
 import { LiveCallProvider } from '../context/LiveCallContext';
-import { AgentProvider } from '../context/AgentProvider';
+import { AgentProvider } from '../context/AgentContext';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
