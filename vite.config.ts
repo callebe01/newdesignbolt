@@ -13,7 +13,6 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['/embed-widget.js'],
       input: {
         main: path.resolve(__dirname, 'index.html'),
         'embed-widget': path.resolve(__dirname, 'src/embed/index.tsx'),
