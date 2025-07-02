@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Monitor, Video, VideoOff, PhoneOff, BoxSelect } from 'lucide-react';
+import { Mic, MicOff, Monitor, Video, VideoOff, PhoneOff } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { formatTime } from '../../utils/format';
 import { useLiveCall } from '../../context/LiveCallContext';
@@ -14,11 +14,9 @@ export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }
     isMicrophoneActive, 
     isVideoActive, 
     isScreenSharing,
-    highlightObjects,
     toggleMicrophone,
     toggleVideo,
     toggleScreenShare,
-    toggleHighlightObjects,
     endCall,
   } = useLiveCall();
   
@@ -38,7 +36,7 @@ export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Button
           variant={isMicrophoneActive ? 'primary' : 'outline'}
           size="lg"
@@ -64,18 +62,6 @@ export const SessionControls: React.FC<SessionControlsProps> = ({ onEndSession }
           <Monitor className="h-6 w-6 mb-1" />
           <span className="text-xs mt-1">
             {isScreenSharing ? 'Stop Share' : 'Share Screen'}
-          </span>
-        </Button>
-
-        <Button
-          variant={highlightObjects ? 'primary' : 'outline'}
-          size="lg"
-          onClick={toggleHighlightObjects}
-          className="flex flex-col items-center py-4 h-auto"
-        >
-          <BoxSelect className="h-6 w-6 mb-1" />
-          <span className="text-xs mt-1">
-            {highlightObjects ? 'Hide Boxes' : 'Show Boxes'}
           </span>
         </Button>
 

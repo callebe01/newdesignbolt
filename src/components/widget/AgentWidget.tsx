@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Monitor, X, MessageCircle, BoxSelect } from 'lucide-react';
+import { Mic, MicOff, Monitor, X, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLiveCall } from '../../context/LiveCallContext';
 import { useAgents } from '../../context/AgentContext';
@@ -30,8 +30,6 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
     toggleMicrophone,
     toggleScreenShare,
     isScreenSharing,
-    highlightObjects,
-    toggleHighlightObjects,
     isMicrophoneActive,
     duration,
     errorMessage
@@ -162,18 +160,6 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
                               {isScreenSharing ? 'Stop Share' : 'Share'}
                             </button>
                           )}
-
-                          <button
-                            onClick={toggleHighlightObjects}
-                            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-lg transition-colors ${
-                              highlightObjects
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted hover:bg-muted/80'
-                            }`}
-                          >
-                            <BoxSelect className="w-4 h-4" />
-                            {highlightObjects ? 'Hide Boxes' : 'Show Boxes'}
-                          </button>
                         </div>
                       </>
                     )}
