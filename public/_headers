@@ -5,6 +5,13 @@
   Access-Control-Allow-Headers: Content-Type
   Cache-Control: public, max-age=3600
 
+# CORS headers for dynamically loaded assets
+/assets/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, OPTIONS
+  Access-Control-Allow-Headers: Content-Type
+  Cache-Control: public, max-age=31536000
+
 # Additional CORS for any API endpoints that might be called by the widget
 /api/*
   Access-Control-Allow-Origin: *

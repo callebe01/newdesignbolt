@@ -10,17 +10,4 @@ export default defineConfig({
     // Handle client-side routing in development
     historyApiFallback: true,
   },
-  build: {
-    rollupOptions: {
-      input: {
-        main: './index.html',
-        embed: './src/embed/index.tsx'
-      },
-      output: {
-        entryFileNames: (chunkInfo) => {
-          return chunkInfo.name === 'embed' ? 'embed.js' : 'assets/[name]-[hash].js';
-        }
-      }
-    }
-  }
 });
