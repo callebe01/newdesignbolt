@@ -5,9 +5,15 @@
   const currentScript = document.currentScript;
   const agentId = currentScript?.getAttribute('data-agent');
   const position = currentScript?.getAttribute('data-position') || 'bottom-right';
+  const supabaseUrl = currentScript?.getAttribute('data-supabase-url');
 
   if (!agentId) {
     console.error('VoicePilot: data-agent attribute is required');
+    return;
+  }
+
+  if (!supabaseUrl) {
+    console.error('VoicePilot: data-supabase-url attribute is required');
     return;
   }
 
@@ -1055,7 +1061,7 @@
       widget.style.display = 'none';
     });
 
-    // Start call function - REMOVED API KEY REQUIREMENT
+    // Start call function - USES ABSOLUTE URL
     async function startCall() {
       if (isCallActive) return;
 
@@ -1065,9 +1071,8 @@
 
         console.log('[VoicePilot] Starting call for agent:', agentId);
 
-        // Call the start-call edge function to get the relay URL
-        // The API key is handled server-side, so we don't need it here
-        const response = await fetch('/functions/v1/start-call', {
+        // Call the start-call edge function using absolute URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

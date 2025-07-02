@@ -2,18 +2,24 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AgentWidget } from '../components/widget/AgentWidget';
 import { LiveCallProvider } from '../context/LiveCallContext';
-import { AgentProvider } from '../context/AgentContext';
+import { AgentProvider } from '../context/AgentProvider';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
 export interface EmbedOptions {
   agent: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  supabaseUrl?: string;
 }
 
 function mount(options: EmbedOptions) {
-  const { agent, position = 'bottom-right' } = options;
+  const { agent, position = 'bottom-right', supabaseUrl } = options;
   if (!agent) return null;
+
+  // Set global Supabase URL if provided
+  if (supabaseUrl) {
+    (window as any).voicepilotSupabaseUrl = supabaseUrl;
+  }
 
   const container = document.createElement('div');
   container.id = 'voicepilot-widget';
@@ -115,10 +121,12 @@ if (typeof document !== 'undefined') {
   if (cur && !(window as any).voicepilot) {
     const agent = cur.getAttribute('data-agent');
     const position = (cur.getAttribute('data-position') || undefined) as any;
+    const supabaseUrl = cur.getAttribute('data-supabase-url') || undefined;
     if (agent) {
       (window as any).voicepilot = mount({
         agent,
-        position
+        position,
+        supabaseUrl
       });
     }
   }
