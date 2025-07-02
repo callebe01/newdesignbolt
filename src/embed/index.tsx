@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AgentWidget } from '../components/widget/AgentWidget';
 import { LiveCallProvider } from '../context/LiveCallContext';
-import { AgentProvider } from '../context/AgentProvider';
+import { AgentProvider } from '../context/AgentContext';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
@@ -10,15 +10,19 @@ export interface EmbedOptions {
   agent: string;
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 function mount(options: EmbedOptions) {
-  const { agent, position = 'bottom-right', supabaseUrl } = options;
+  const { agent, position = 'bottom-right', supabaseUrl, supabaseAnonKey } = options;
   if (!agent) return null;
 
-  // Set global Supabase URL if provided
+  // Set global Supabase configuration if provided
   if (supabaseUrl) {
     (window as any).voicepilotSupabaseUrl = supabaseUrl;
+  }
+  if (supabaseAnonKey) {
+    (window as any).voicepilotSupabaseKey = supabaseAnonKey;
   }
 
   const container = document.createElement('div');
@@ -122,11 +126,13 @@ if (typeof document !== 'undefined') {
     const agent = cur.getAttribute('data-agent');
     const position = (cur.getAttribute('data-position') || undefined) as any;
     const supabaseUrl = cur.getAttribute('data-supabase-url') || undefined;
+    const supabaseAnonKey = cur.getAttribute('data-supabase-anon-key') || undefined;
     if (agent) {
       (window as any).voicepilot = mount({
         agent,
         position,
-        supabaseUrl
+        supabaseUrl,
+        supabaseAnonKey
       });
     }
   }
