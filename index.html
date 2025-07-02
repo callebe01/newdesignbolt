@@ -35,7 +35,6 @@
       // Access the environment variables from the module context
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const googleApiKey = import.meta.env.VITE_GOOGLE_API_KEY;
       
       // Create and configure the embed script
       const script = document.createElement('script');
@@ -43,15 +42,12 @@
       script.setAttribute('data-agent', '2d85d376-15e2-4eb6-8495-7023559b886a');
       script.setAttribute('data-position', 'bottom-right');
       
-      // Set both Supabase and Google API key for maximum compatibility
+      // Set Supabase configuration for secure relay connection
       if (supabaseUrl) {
         script.setAttribute('data-supabase-url', supabaseUrl);
       }
       if (supabaseAnonKey) {
         script.setAttribute('data-supabase-anon-key', supabaseAnonKey);
-      }
-      if (googleApiKey) {
-        script.setAttribute('data-google-api-key', googleApiKey);
       }
       
       script.async = true;
