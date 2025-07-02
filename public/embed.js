@@ -1,4 +1,1220 @@
-(function() {
+/\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = this.streamBuffer.match(pattern);
+        if (match && match[2] && match[2].length > 2) {
+          this.processStream(match[2]);
+          return;
+        }
+      }
+      
+      // Fallback: process with short delay for any other potential matches
+      this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
+    }
+
+    processStream(elementText) {
+      const now = Date.now();
+      if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
+      
+      console.log('[VoicePilot] Real-time highlight attempt:', elementText);
+      if (domHighlighter.highlightElement(elementText)) {
+        this.lastStreamHighlight = now;
+        this.streamBuffer = ''; // Clear buffer on successful highlight
+      }
+    }
+
+    processStreamBuffer() {
+      // Extract the most recent potential element name
+      const words = this.streamBuffer.trim().split(/\s+/);
+      if (words.length >= 2) {
+        // Try last 2-4 words as potential element names
+        for (let i = Math.min(4, words.length); i >= 2; i--) {
+          const phrase = words.slice(-i).join(' ');
+          if (phrase.length > 3 && phrase.length < 30) {
+            this.processStream(phrase);
+            break;
+          }
+        }
+      }
+    }
+
+    // Original method for backward compatibility
+    addText(txt) {
+      if (!txt || !txt.trim()) return;
+      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+      this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+      this.bufferTimeout = setTimeout(() => this.process(), this.delay);
+    }
+
+    process() {
+      const now = Date.now();
+      if (now - this.lastHighlightTime < this.cooldown) {
+        this.textBuffer = '';
+        return;
+      }
+      const phrase = this.textBuffer.trim();
+      this.textBuffer = '';
+      if (!phrase || phrase.length < 3) return;
+      // simple filter to skip greetings
+      if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
+      console.log('[VoicePilot] Trying to highlight:', phrase);
+      if (domHighlighter.highlightElement(phrase)) {
+        this.lastHighlightTime = now;
+      }
+    }
+
+    clear() {
+      this.textBuffer = '';
+      this.streamBuffer = '';
+      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+      if (this.streamTimeout) clearTimeout(this.streamTimeout);
+    }
+  }
+
+  const smartHighlighter = new SmartHighlighter();
+
+  // Expose global functions
+  window.voicePilotHighlight = text => { 
+    if (text && text.trim()) {
+      smartHighlighter.addText(text); 
+    }
+    return true; 
+  };
+
+  // 🆕 NEW: Expose real-time streaming highlight function
+  window.voicePilotHighlightStream = text => {
+    if (text && text.trim()) {
+      smartHighlighter.addStreamingText(text);
+    }
+    return true;
+  };
+  
+  window.voicePilotClearHighlights = () => {
+    domHighlighter.clearHighlights();
+    smartHighlighter.clear();
+  };
+
+  // ✅ NEW: Expose page context function
+  window.voicePilotGetPageContext = () => {
+    return pageContextCapture.getContextSummary();
+  };
+
+  // ────────────────────────────────────────────────────
+  // Widget creation with NEW SLEEK UI
+  // ────────────────────────────────────────────────────
+  function createWidget() {
+    // Create widget container
+    const widget = document.createElement('div');
+    widget.id = 'voicepilot-widget';
+    
+    // Position mapping
+    const positions = {
+      'bottom-right': { bottom: '24px', right: '24px' },
+      'bottom-left': { bottom: '24px', left: '24px' },
+      'top-right': { top: '24px', right: '24px' },
+      'top-left': { top: '24px', left: '24px' }
+    };
+    
+    const pos = positions[position] || positions['bottom-right'];
+    
+    // Apply styles
+    Object.assign(widget.style, {
+      position: 'fixed',
+      zIndex: '10000',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      ...pos
+    });
+
+    // Inject CSS for the new design
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'voicepilot-widget-styles';
+    styleSheet.textContent = `
+      #voicepilot-widget * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* Minimized State */
+      .vp-minimized {
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        padding: 8px 16px;
+        gap: 12px;
+        min-width: 140px;
+        height: 48px;
+        border: none;
+        font-family: inherit;
+      }
+
+      .vp-minimized:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+      }
+
+      /* Logo */
+      .vp-logo {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
+        border-radius: 50%;
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .vp-logo::before {
+        content: '';
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #0099cc 0%, #003d7a 100%);
+        border-radius: 50% 0 50% 50%;
+        transform: rotate(-45deg);
+      }
+
+      /* Brand Text */
+      .vp-brand {
+        font-weight: 600;
+        font-size: 14px;
+        color: #333;
+        white-space: nowrap;
+      }
+
+      /* Connected State Actions */
+      .vp-actions {
+        display: none;
+        gap: 8px;
+        margin-left: auto;
+      }
+
+      .vp-minimized.connected .vp-actions {
+        display: flex;
+      }
+
+      .vp-minimized.connected .vp-brand {
+        display: none;
+      }
+
+      .vp-minimized.connected {
+        animation: connectedGlow 2s infinite;
+      }
+
+      @keyframes connectedGlow {
+        0%, 100% { box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2); }
+        50% { box-shadow: 0 4px 30px rgba(0, 212, 255, 0.4); }
+      }
+
+      .vp-action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: bold;
+        font-size: 14px;
+        font-family: inherit;
+      }
+
+      .vp-end-call {
+        background: #ff4444;
+        color: white;
+      }
+
+      .vp-end-call:hover {
+        background: #cc3333;
+        transform: scale(1.1);
+      }
+
+      .vp-expand {
+        background: #f0f0f0;
+        color: #666;
+      }
+
+      .vp-expand:hover {
+        background: #e0e0e0;
+        transform: scale(1.1);
+      }
+
+      /* Expanded Widget */
+      .vp-expanded {
+        position: absolute;
+        bottom: 56px;
+        right: 0;
+        width: 300px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        transform: translateY(20px) scale(0.9);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .vp-expanded.show {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .vp-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .vp-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        color: #1a1a1a;
+        font-size: 16px;
+      }
+
+      .vp-title .vp-logo {
+        width: 24px;
+        height: 24px;
+      }
+
+      .vp-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #f5f5f5;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+        font-family: inherit;
+      }
+
+      .vp-close:hover {
+        background: #e5e5e5;
+      }
+
+      .vp-content {
+        padding: 16px 20px;
+      }
+
+      /* States */
+      .vp-status {
+        text-align: center;
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+
+      .vp-status.ready {
+        color: #666;
+      }
+
+      .vp-status.connecting {
+        color: #ff6b35;
+      }
+
+      .vp-status.connected {
+        color: #00c853;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .vp-indicator {
+        width: 8px;
+        height: 8px;
+        background: #00c853;
+        border-radius: 50%;
+        animation: blink 1.5s infinite;
+      }
+
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0.3; }
+      }
+
+      .vp-btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+
+      .vp-btn.primary {
+        background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
+        color: white;
+      }
+
+      .vp-btn.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0, 212, 255, 0.3);
+      }
+
+      .vp-btn.danger {
+        background: #ff4444;
+        color: white;
+      }
+
+      .vp-btn.danger:hover {
+        background: #cc3333;
+      }
+
+      /* Loading spinner */
+      .vp-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #00d4ff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .vp-hidden {
+        display: none;
+      }
+
+      /* Consent Modal */
+      .vp-consent-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+      }
+
+      .vp-consent-overlay.show {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .vp-consent-modal {
+        background: white;
+        padding: 32px;
+        border-radius: 16px;
+        max-width: 400px;
+        margin: 20px;
+        transform: scale(0.9);
+        transition: transform 0.3s;
+      }
+
+      .vp-consent-overlay.show .vp-consent-modal {
+        transform: scale(1);
+      }
+
+      .vp-consent-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #1a1a1a;
+      }
+
+      .vp-consent-text {
+        font-size: 14px;
+        color: #666;
+        line-height: 1.5;
+        margin-bottom: 24px;
+      }
+
+      .vp-consent-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .vp-consent-actions button {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+    `;
+    document.head.appendChild(styleSheet);
+
+    // Widget HTML with new design
+    widget.innerHTML = `
+      <!-- Minimized State -->
+      <button class="vp-minimized" id="vp-minimized">
+        <div class="vp-logo"></div>
+        <span class="vp-brand">Voice Pilot</span>
+        
+        <!-- Actions when connected -->
+        <div class="vp-actions">
+          <button class="vp-action-btn vp-end-call" id="vp-end-call" title="End Call">✕</button>
+          <button class="vp-action-btn vp-expand" id="vp-expand" title="Expand">↑</button>
+        </div>
+      </button>
+
+      <!-- Expanded Widget -->
+      <div class="vp-expanded" id="vp-expanded">
+        <div class="vp-header">
+          <div class="vp-title">
+            <div class="vp-logo"></div>
+            Voice Pilot
+          </div>
+          <button class="vp-close" id="vp-close">
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="vp-content">
+          <!-- Ready State -->
+          <div id="vp-ready-state">
+            <div class="vp-status ready">Ready to help you navigate</div>
+            <button class="vp-btn primary" id="vp-start-call">Start Call</button>
+          </div>
+
+          <!-- Connecting State -->
+          <div id="vp-connecting-state" class="vp-hidden">
+            <div class="vp-status connecting">Connecting...</div>
+            <div class="vp-spinner"></div>
+          </div>
+
+          <!-- Connected State -->
+          <div id="vp-connected-state" class="vp-hidden">
+            <div class="vp-status connected">
+              <span class="vp-indicator"></span>
+              Connected - Speak now
+            </div>
+            <button class="vp-btn danger" id="vp-end-call-2">End Call</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Consent Modal -->
+      <div class="vp-consent-overlay" id="vp-consent-overlay">
+        <div class="vp-consent-modal">
+          <h3 class="vp-consent-title">Start Voice Session</h3>
+          <p class="vp-consent-text">
+            Your conversation will be recorded to help us provide better support. 
+            You can end the session at any time.
+          </p>
+          <div class="vp-consent-actions">
+            <button id="vp-consent-cancel" style="background: #f5f5f5; color: #666;">Cancel</button>
+            <button id="vp-consent-accept" style="background: #00d4ff; color: white;">Start Session</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(widget);
+
+    // Get elements
+    const minimized = widget.querySelector('#vp-minimized');
+    const expanded = widget.querySelector('#vp-expanded');
+    const expandBtn = widget.querySelector('#vp-expand');
+    const endCallBtn = widget.querySelector('#vp-end-call');
+    const endCallBtn2 = widget.querySelector('#vp-end-call-2');
+    const closeBtn = widget.querySelector('#vp-close');
+    const startCallBtn = widget.querySelector('#vp-start-call');
+    const consentOverlay = widget.querySelector('#vp-consent-overlay');
+    const consentAccept = widget.querySelector('#vp-consent-accept');
+    const consentCancel = widget.querySelector('#vp-consent-cancel');
+    
+    const readyState = widget.querySelector('#vp-ready-state');
+    const connectingState = widget.querySelector('#vp-connecting-state');
+    const connectedState = widget.querySelector('#vp-connected-state');
+
+    let currentState = 'ready';
+    let isExpanded = false;
+    let isCallActive = false;
+    let websocket = null;
+
+    // Audio processing refs (mirroring original code)
+    let audioContextRef = { current: null };
+    let audioQueueTimeRef = { current: 0 };
+    let committedTextRef = { current: '' };
+    let partialTextRef = { current: '' };
+    let greetingSentRef = { current: false };
+    let pageContextIntervalRef = { current: null };
+    let currentPageContextRef = { current: '' };
+    let lastSentPageContextRef = { current: '' };
+
+    // Initialize Supabase client
+    let supabaseClient = null;
+    if (window.voicepilotSupabaseUrl && window.voicepilotSupabaseKey) {
+      // Dynamically import Supabase client
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+      document.head.appendChild(script);
+      
+      script.onload = () => {
+        supabaseClient = window.supabase.createClient(
+          window.voicepilotSupabaseUrl,
+          window.voicepilotSupabaseKey
+        );
+      };
+    }
+
+    // Helper functions
+    function showState(state) {
+      // Hide all states
+      readyState.classList.add('vp-hidden');
+      connectingState.classList.add('vp-hidden');
+      connectedState.classList.add('vp-hidden');
+      
+      // Show target state
+      if (state === 'ready') readyState.classList.remove('vp-hidden');
+      if (state === 'connecting') connectingState.classList.remove('vp-hidden');
+      if (state === 'connected') connectedState.classList.remove('vp-hidden');
+      
+      currentState = state;
+      
+      // Update minimized appearance
+      minimized.classList.remove('connected');
+      if (state === 'connected') {
+        minimized.classList.add('connected');
+      }
+    }
+
+    function toggleWidget() {
+      isExpanded = !isExpanded;
+      if (isExpanded) {
+        expanded.classList.add('show');
+      } else {
+        expanded.classList.remove('show');
+      }
+    }
+
+    function handleMinimizedClick(e) {
+      // Only expand if not clicking on action buttons and not connected
+      if (!e.target.closest('.vp-actions') && currentState !== 'connected') {
+        toggleWidget();
+      }
+    }
+
+    function expandWidget(e) {
+      e.stopPropagation();
+      toggleWidget();
+    }
+
+    // Audio processing functions (copied from original)
+    const playAudioBuffer = async (pcmBlob) => {
+      try {
+        console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+
+        let startAt = audioCtx.currentTime;
+        if (audioQueueTimeRef.current > audioCtx.currentTime) {
+          startAt = audioQueueTimeRef.current;
+        }
+        source.start(startAt);
+        audioQueueTimeRef.current = startAt + buffer.duration;
+        
+        console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
+      } catch (err) {
+        console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
+      }
+    };
+
+    const getPageContext = () => {
+      try {
+        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+          return window.voicePilotGetPageContext();
+        }
+      } catch (error) {
+        console.warn('[VoicePilot] Error getting page context:', error);
+      }
+      
+      // Fallback context
+      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+    };
+
+    const startPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+      }
+
+      pageContextIntervalRef.current = setInterval(() => {
+        if (!isCallActive || !websocket || websocket.readyState !== WebSocket.OPEN) {
+          return;
+        }
+
+        try {
+          const newContext = getPageContext();
+          currentPageContextRef.current = newContext;
+
+          // Check if context has changed significantly
+          if (newContext !== lastSentPageContextRef.current) {
+            console.log('[VoicePilot] Page context changed, updating AI:', newContext);
+            
+            // Send page context update to AI
+            const contextUpdateMessage = {
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [{ 
+                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                    }],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+
+            websocket.send(JSON.stringify(contextUpdateMessage));
+            lastSentPageContextRef.current = newContext;
+            
+            console.log('[VoicePilot] Sent page context update to AI');
+          }
+        } catch (error) {
+          console.warn('[VoicePilot] Error monitoring page context:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    const stopPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+        pageContextIntervalRef.current = null;
+      }
+    };
+
+    const startMicStreaming = async () => {
+      try {
+        console.log('[VoicePilot][Audio] Requesting microphone access...');
+        
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        
+        console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const sourceNode = audioCtx.createMediaStreamSource(micStream);
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+        sourceNode.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          const float32Data = event.inputBuffer.getChannelData(0);
+          const inRate = audioCtx.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(float32Data.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = float32Data[idx];
+            sample = Math.max(-1, Math.min(1, sample));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          const payload = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000',
+              },
+            },
+          };
+
+          if (websocket?.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify(payload));
+            // Log audio data transmission (throttled to avoid spam)
+            if (Math.random() < 0.01) { // Log ~1% of audio chunks
+              console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+            }
+          }
+        };
+
+        console.log('[VoicePilot][Audio] Microphone streaming started successfully');
+      } catch (err) {
+        console.error('[VoicePilot] Mic streaming error:', err);
+        // Could show error in UI here
+      }
+    };
+
+    // Start call function
+    async function startCall() {
+      if (isCallActive) return;
+
+      try {
+        showState('connecting');
+
+        // Reset state
+        committedTextRef.current = '';
+        partialTextRef.current = '';
+        greetingSentRef.current = false;
+
+        console.log('[VoicePilot] Configuration check:', {
+          hasSupabaseUrl: !!window.voicepilotSupabaseUrl,
+          hasSupabaseKey: !!window.voicepilotSupabaseKey,
+          hasSupabaseClient: !!supabaseClient
+        });
+
+        // Fetch agent details from Supabase
+        let agentInstructions = 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.';
+        let documentationUrls = [];
+
+        if (supabaseClient && agentId) {
+          try {
+            console.log('[VoicePilot] Fetching agent details for ID:', agentId);
+            const { data: agent, error } = await supabaseClient
+              .from('agents')
+              .select('instructions, documentation_urls, status')
+              .eq('id', agentId)
+              .single();
+
+            if (error) {
+              console.error('[VoicePilot] Error fetching agent:', error);
+            } else if (agent) {
+              if (agent.status !== 'active') {
+                throw new Error('This agent is not currently active');
+              }
+              agentInstructions = agent.instructions || agentInstructions;
+              documentationUrls = agent.documentation_urls || [];
+              console.log('[VoicePilot] Using agent instructions:', agentInstructions.substring(0, 100) + '...');
+            } else {
+              console.warn('[VoicePilot] Agent not found, using default instructions');
+            }
+          } catch (err) {
+            console.error('[VoicePilot] Failed to fetch agent details:', err);
+            throw new Error('Failed to load agent configuration: ' + err.message);
+          }
+        } else {
+          console.warn('[VoicePilot] No Supabase client or agent ID, using default instructions');
+        }
+
+        // Use relay through Supabase
+        console.log('[VoicePilot] Using Supabase relay connection');
+
+        const response = await fetch(`${window.voicepilotSupabaseUrl}/functions/v1/start-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${window.voicepilotSupabaseKey}`,
+          },
+          body: JSON.stringify({
+            agentId: agentId,
+            instructions: agentInstructions,
+            documentationUrls: documentationUrls
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start call');
+        }
+
+        const { relayUrl } = await response.json();
+        console.log('[VoicePilot] Got relay URL:', relayUrl);
+
+        // Connect to WebSocket
+        websocket = new WebSocket(relayUrl);
+
+        websocket.onopen = () => {
+          console.log('[VoicePilot] WebSocket connected');
+          
+          // Get current page context and initialize monitoring
+          const pageContext = getPageContext();
+          currentPageContextRef.current = pageContext;
+          lastSentPageContextRef.current = pageContext;
+          console.log('[VoicePilot] Initial page context:', pageContext);
+
+          // Create URL context tools if documentation URLs are provided
+          const tools = [];
+          
+          if (documentationUrls?.length) {
+            tools.push({
+              url_context: {
+                urls: documentationUrls
+              }
+            });
+          }
+
+          // Enhanced system instruction with page context
+          const enhancedSystemInstruction = `${agentInstructions} 
+
+CURRENT PAGE CONTEXT: ${pageContext}
+
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
+
+          // Send setup message
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
+                    }
+                  }
+                }
+              },
+              tools: tools.length > 0 ? tools : undefined,
+              outputAudioTranscription: {},
+              inputAudioTranscription: {},
+              systemInstruction: {
+                parts: [{
+                  text: enhancedSystemInstruction,
+                }]
+              }
+            }
+          };
+
+          console.log('[VoicePilot] Sending setup:', setupMsg);
+          websocket.send(JSON.stringify(setupMsg));
+        };
+
+        websocket.onmessage = async (ev) => {
+          let blob;
+
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (ev.data instanceof Blob) {
+            blob = ev.data;
+          } else if (ev.data instanceof ArrayBuffer) {
+            blob = new Blob([ev.data]);
+          } else {
+            return;
+          }
+
+          let maybeText = null;
+          try {
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
+
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
+
+              if (parsed.setupComplete) {
+                console.log('[VoicePilot] Received setupComplete ✅');
+                isCallActive = true;
+                showState('connected');
+
+                // Start page context monitoring when call becomes active
+                startPageContextMonitoring();
+
+                if (websocket.readyState === WebSocket.OPEN && !greetingSentRef.current) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  websocket.send(JSON.stringify(greeting));
+                  greetingSentRef.current = true;
+                  console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
+                }
+
+                startMicStreaming();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // Handle AI speech transcription with two-buffer system
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  
+                  if (text) {
+                    // Accumulate fragments in the partial buffer
+                    partialTextRef.current += text;
+                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                  }
+
+                  // When finished, move partial to committed and clear partial
+                  if (finished && partialTextRef.current) {
+                    const partialText = partialTextRef.current.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (committedTextRef.current && partialText) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      committedTextRef.current = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    partialTextRef.current = '';
+                    
+                    // Highlight the complete phrase
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // Handle user speech transcription
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (committedTextRef.current) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      committedTextRef.current = userText;
+                    }
+                    
+                    console.log('[VoicePilot] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
+                        playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding inlineData audio:', err);
+                      }
+                    }
+                  }
+                  return; // Bail out after handling audio
+                }
+
+                // Check for turn complete to force commit partial buffer
+                if (sc.turnComplete && partialTextRef.current) {
+                  console.log('[VoicePilot] Turn complete - committing partial buffer');
+                  const partialText = partialTextRef.current.trim();
+                  
+                  // Move partial to committed
+                  if (committedTextRef.current && partialText) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    committedTextRef.current = partialText;
+                  }
+                  
+                  // Clear partial buffer
+                  partialTextRef.current = '';
+                  
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
+                  }
+                  
+                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
+                }
+              }
+
+              return;
+            } catch (parseError) {
+              console.error('[VoicePilot] JSON parse error:', parseError);
+              // Continue to fallback for binary data
+            }
+          }
+
+          console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
+          playAudioBuffer(blob);
+        };
+
+        websocket.onerror = (err) => {
+          console.error('[VoicePilot] WebSocket error:', err);
+          showState('ready');
+        };
+
+        websocket.onclose = (ev) => {
+          console.log(`[VoicePilot] WebSocket closed: code=${ev.code}, reason="${ev.reason}"`);
+          isCallActive = false;
+          showState('ready');
+          websocket = null;
+          
+          // Stop page context monitoring when call ends
+          stopPageContextMonitoring();
+        };
+
+      } catch (error) {
+        console.error('[VoicePilot] Failed to start call:', error);
+        showState('ready');
+      }
+    }
+
+    // End call function
+    function endCall() {
+      if (!isCallActive) return;
+
+      try {
+        if (websocket) {
+          websocket.close();
+          websocket = null;
+        }
+
+        isCallActive = false;
+        showState('ready');
+        
+        // Clear any highlights
+        if (window.voicePilotClearHighlights) {
+          window.voicePilotClearHighlights();
+        }
+
+        // Stop page context monitoring
+        stopPageContextMonitoring();
+
+        // Close expanded view
+        if (isExpanded) {
+          toggleWidget();
+        }
+
+        console.log('[VoicePilot] Call ended');
+
+      } catch (error) {
+        console.error('[VoicePilot] Error ending call:', error);
+      }
+    }
+
+    function showConsent() {
+      consentOverlay.classList.add('show');
+    }
+
+    function hideConsent() {
+      consentOverlay.classList.remove('show');
+    }
+
+    function acceptConsent() {
+      hideConsent();
+      startCall();
+    }
+
+    function cancelConsent() {
+      hideConsent();
+    }
+
+    // Event listeners
+    minimized.addEventListener('click', handleMinimizedClick);
+    expandBtn.addEventListener('click', expandWidget);
+    endCallBtn.addEventListener('click', endCall);
+    endCallBtn2.addEventListener('click', endCall);
+    closeBtn.addEventListener('click', toggleWidget);
+    startCallBtn.addEventListener('click', showConsent);
+    consentAccept.addEventListener('click', acceptConsent);
+    consentCancel.addEventListener('click', cancelConsent);
+
+    // Close widget when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!widget.contains(e.target) && isExpanded) {
+        toggleWidget();
+      }
+    });
+
+    // Return widget API
+    return {
+      show: () => widget.style.display = 'block',
+      hide: () => widget.style.display = 'none',
+      startCall: () => showConsent(),
+      endCall,
+      isActive: () => isCallActive
+    };
+  }
+
+  // Initialize widget
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.voicepilot = createWidget();
+    });
+  } else {
+    window.voicepilot = createWidget();
+  }
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    pageContextCapture.destroy();
+    domHighlighter.destroy();
+  });
+
+})();(function() {
   'use strict';
 
   // Get script attributes
@@ -818,902 +2034,4 @@
       const patterns = [
         /\b(click|tap|press)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:button|link|tab|field|input|dropdown|menu))/i,
         /\b(go\s+to|open|select)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:tab|section|page|menu))/i,
-        /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
-      ];
-      
-      for (const pattern of patterns) {
-        const match = this.streamBuffer.match(pattern);
-        if (match && match[2] && match[2].length > 2) {
-          this.processStream(match[2]);
-          return;
-        }
-      }
-      
-      // Fallback: process with short delay for any other potential matches
-      this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
-    }
-
-    processStream(elementText) {
-      const now = Date.now();
-      if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
-      
-      console.log('[VoicePilot] Real-time highlight attempt:', elementText);
-      if (domHighlighter.highlightElement(elementText)) {
-        this.lastStreamHighlight = now;
-        this.streamBuffer = ''; // Clear buffer on successful highlight
-      }
-    }
-
-    processStreamBuffer() {
-      // Extract the most recent potential element name
-      const words = this.streamBuffer.trim().split(/\s+/);
-      if (words.length >= 2) {
-        // Try last 2-4 words as potential element names
-        for (let i = Math.min(4, words.length); i >= 2; i--) {
-          const phrase = words.slice(-i).join(' ');
-          if (phrase.length > 3 && phrase.length < 30) {
-            this.processStream(phrase);
-            break;
-          }
-        }
-      }
-    }
-
-    // Original method for backward compatibility
-    addText(txt) {
-      if (!txt || !txt.trim()) return;
-      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-      this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
-      this.bufferTimeout = setTimeout(() => this.process(), this.delay);
-    }
-
-    process() {
-      const now = Date.now();
-      if (now - this.lastHighlightTime < this.cooldown) {
-        this.textBuffer = '';
-        return;
-      }
-      const phrase = this.textBuffer.trim();
-      this.textBuffer = '';
-      if (!phrase || phrase.length < 3) return;
-      // simple filter to skip greetings
-      if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
-      console.log('[VoicePilot] Trying to highlight:', phrase);
-      if (domHighlighter.highlightElement(phrase)) {
-        this.lastHighlightTime = now;
-      }
-    }
-
-    clear() {
-      this.textBuffer = '';
-      this.streamBuffer = '';
-      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-      if (this.streamTimeout) clearTimeout(this.streamTimeout);
-    }
-  }
-
-  const smartHighlighter = new SmartHighlighter();
-
-  // Expose global functions
-  window.voicePilotHighlight = text => { 
-    if (text && text.trim()) {
-      smartHighlighter.addText(text); 
-    }
-    return true; 
-  };
-
-  // 🆕 NEW: Expose real-time streaming highlight function
-  window.voicePilotHighlightStream = text => {
-    if (text && text.trim()) {
-      smartHighlighter.addStreamingText(text);
-    }
-    return true;
-  };
-  
-  window.voicePilotClearHighlights = () => {
-    domHighlighter.clearHighlights();
-    smartHighlighter.clear();
-  };
-
-  // ✅ NEW: Expose page context function
-  window.voicePilotGetPageContext = () => {
-    return pageContextCapture.getContextSummary();
-  };
-
-  // ────────────────────────────────────────────────────
-  // Widget creation
-  // ────────────────────────────────────────────────────
-  function createWidget() {
-    // Create widget container
-    const widget = document.createElement('div');
-    widget.id = 'voicepilot-widget';
-    
-    // Position mapping
-    const positions = {
-      'bottom-right': { bottom: '20px', right: '20px' },
-      'bottom-left': { bottom: '20px', left: '20px' },
-      'top-right': { top: '20px', right: '20px' },
-      'top-left': { top: '20px', left: '20px' }
-    };
-    
-    const pos = positions[position] || positions['bottom-right'];
-    
-    // Apply styles
-    Object.assign(widget.style, {
-      position: 'fixed',
-      zIndex: '10000',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      ...pos
-    });
-
-    // Widget HTML
-    widget.innerHTML = `
-      <div id="voicepilot-container" style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 25px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        padding: 20px;
-        min-width: 320px;
-        max-width: 400px;
-        color: white;
-        transition: all 0.3s ease;
-      ">
-        <div id="voicepilot-header" style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 15px;
-        ">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
-            🎯 Voice Guide
-          </h3>
-          <button id="voicepilot-close" style="
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            color: white;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">×</button>
-        </div>
-        
-        <div id="voicepilot-status" style="
-          text-align: center;
-          margin-bottom: 20px;
-        ">
-          <div id="voicepilot-status-indicator" style="
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            margin: 0 auto 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-          ">🎤</div>
-          <div id="voicepilot-status-text" style="
-            font-size: 14px;
-            opacity: 0.9;
-          ">Ready to help</div>
-        </div>
-        
-        <div id="voicepilot-controls" style="
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-        ">
-          <button id="voicepilot-start" style="
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 20px;
-            padding: 12px 24px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-          ">Start Call</button>
-          <button id="voicepilot-end" style="
-            background: rgba(255,255,255,0.1);
-            border: none;
-            border-radius: 20px;
-            padding: 12px 24px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            display: none;
-          ">End Call</button>
-        </div>
-        
-        <div id="voicepilot-transcript" style="
-          margin-top: 15px;
-          padding: 10px;
-          background: rgba(255,255,255,0.1);
-          border-radius: 10px;
-          font-size: 12px;
-          max-height: 100px;
-          overflow-y: auto;
-          display: none;
-        "></div>
-      </div>
-    `;
-
-    document.body.appendChild(widget);
-
-    // Get elements
-    const container = widget.querySelector('#voicepilot-container');
-    const closeBtn = widget.querySelector('#voicepilot-close');
-    const startBtn = widget.querySelector('#voicepilot-start');
-    const endBtn = widget.querySelector('#voicepilot-end');
-    const statusIndicator = widget.querySelector('#voicepilot-status-indicator');
-    const statusText = widget.querySelector('#voicepilot-status-text');
-    const transcript = widget.querySelector('#voicepilot-transcript');
-
-    let isCallActive = false;
-    let websocket = null;
-
-    // Audio processing refs (mirroring LiveCallContext)
-    let audioContextRef = { current: null };
-    let audioQueueTimeRef = { current: 0 };
-    let committedTextRef = { current: '' };
-    let partialTextRef = { current: '' };
-    let greetingSentRef = { current: false };
-    let pageContextIntervalRef = { current: null };
-    let currentPageContextRef = { current: '' };
-    let lastSentPageContextRef = { current: '' };
-
-    // Initialize Supabase client
-    let supabaseClient = null;
-    if (window.voicepilotSupabaseUrl && window.voicepilotSupabaseKey) {
-      // Dynamically import Supabase client
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-      document.head.appendChild(script);
-      
-      script.onload = () => {
-        supabaseClient = window.supabase.createClient(
-          window.voicepilotSupabaseUrl,
-          window.voicepilotSupabaseKey
-        );
-      };
-    }
-
-    // Audio processing functions (copied from LiveCallContext)
-    const playAudioBuffer = async (pcmBlob) => {
-      try {
-        console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
-        
-        const arrayBuffer = await pcmBlob.arrayBuffer();
-        const pcm16 = new Int16Array(arrayBuffer);
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-          float32[i] = pcm16[i] / 32768;
-        }
-
-        if (!audioContextRef.current) {
-          audioContextRef.current =
-            new (window.AudioContext || window.webkitAudioContext)();
-        }
-        const audioCtx = audioContextRef.current;
-
-        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
-        buffer.copyToChannel(float32, 0, 0);
-
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-
-        let startAt = audioCtx.currentTime;
-        if (audioQueueTimeRef.current > audioCtx.currentTime) {
-          startAt = audioQueueTimeRef.current;
-        }
-        source.start(startAt);
-        audioQueueTimeRef.current = startAt + buffer.duration;
-        
-        console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
-      } catch (err) {
-        console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
-      }
-    };
-
-    const updateTranscriptDisplay = () => {
-      const committed = committedTextRef.current;
-      const partial = partialTextRef.current;
-      
-      // Smart spacing: add space between committed and partial if needed
-      let fullText = committed;
-      if (committed && partial) {
-        const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
-        fullText = committed + (needsSpace ? ' ' : '') + partial;
-      } else if (partial) {
-        fullText = partial;
-      }
-      
-      transcript.textContent = fullText;
-    };
-
-    const getPageContext = () => {
-      try {
-        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
-          return window.voicePilotGetPageContext();
-        }
-      } catch (error) {
-        console.warn('[VoicePilot] Error getting page context:', error);
-      }
-      
-      // Fallback context
-      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
-    };
-
-    const startPageContextMonitoring = () => {
-      if (pageContextIntervalRef.current) {
-        clearInterval(pageContextIntervalRef.current);
-      }
-
-      pageContextIntervalRef.current = setInterval(() => {
-        if (!isCallActive || !websocket || websocket.readyState !== WebSocket.OPEN) {
-          return;
-        }
-
-        try {
-          const newContext = getPageContext();
-          currentPageContextRef.current = newContext;
-
-          // Check if context has changed significantly
-          if (newContext !== lastSentPageContextRef.current) {
-            console.log('[VoicePilot] Page context changed, updating AI:', newContext);
-            
-            // Send page context update to AI
-            const contextUpdateMessage = {
-              clientContent: {
-                turns: [
-                  {
-                    role: 'user',
-                    parts: [{ 
-                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
-                    }],
-                  },
-                ],
-                turnComplete: true,
-              },
-            };
-
-            websocket.send(JSON.stringify(contextUpdateMessage));
-            lastSentPageContextRef.current = newContext;
-            
-            console.log('[VoicePilot] Sent page context update to AI');
-          }
-        } catch (error) {
-          console.warn('[VoicePilot] Error monitoring page context:', error);
-        }
-      }, 2000); // Check every 2 seconds
-    };
-
-    const stopPageContextMonitoring = () => {
-      if (pageContextIntervalRef.current) {
-        clearInterval(pageContextIntervalRef.current);
-        pageContextIntervalRef.current = null;
-      }
-    };
-
-    const startMicStreaming = async () => {
-      try {
-        console.log('[VoicePilot][Audio] Requesting microphone access...');
-        
-        const micStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        
-        console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
-
-        if (!audioContextRef.current) {
-          audioContextRef.current =
-            new (window.AudioContext || window.webkitAudioContext)();
-        }
-        const audioCtx = audioContextRef.current;
-
-        const sourceNode = audioCtx.createMediaStreamSource(micStream);
-        const bufferSize = 4096;
-        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
-
-        sourceNode.connect(processor);
-        processor.connect(audioCtx.destination);
-
-        processor.onaudioprocess = (event) => {
-          const float32Data = event.inputBuffer.getChannelData(0);
-          const inRate = audioCtx.sampleRate;
-          const outRate = 16000;
-          const ratio = inRate / outRate;
-          const outLength = Math.floor(float32Data.length / ratio);
-
-          const pcm16 = new Int16Array(outLength);
-          for (let i = 0; i < outLength; i++) {
-            const idx = Math.floor(i * ratio);
-            let sample = float32Data[idx];
-            sample = Math.max(-1, Math.min(1, sample));
-            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-          }
-
-          const u8 = new Uint8Array(pcm16.buffer);
-          let binary = '';
-          for (let i = 0; i < u8.byteLength; i++) {
-            binary += String.fromCharCode(u8[i]);
-          }
-          const base64Audio = btoa(binary);
-
-          const payload = {
-            realtime_input: {
-              audio: {
-                data: base64Audio,
-                mime_type: 'audio/pcm;rate=16000',
-              },
-            },
-          };
-
-          if (websocket?.readyState === WebSocket.OPEN) {
-            websocket.send(JSON.stringify(payload));
-            // Log audio data transmission (throttled to avoid spam)
-            if (Math.random() < 0.01) { // Log ~1% of audio chunks
-              console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
-            }
-          }
-        };
-
-        console.log('[VoicePilot][Audio] Microphone streaming started successfully');
-      } catch (err) {
-        console.error('[VoicePilot] Mic streaming error:', err);
-        statusText.textContent = 'Failed to capture microphone';
-      }
-    };
-
-    // Close widget
-    closeBtn.addEventListener('click', () => {
-      widget.style.display = 'none';
-    });
-
-    // Start call function
-    async function startCall() {
-      if (isCallActive) return;
-
-      try {
-        statusText.textContent = 'Connecting...';
-        statusIndicator.textContent = '⏳';
-
-        // Reset state
-        committedTextRef.current = '';
-        partialTextRef.current = '';
-        transcript.textContent = '';
-        greetingSentRef.current = false;
-
-        console.log('[VoicePilot] Configuration check:', {
-          hasSupabaseUrl: !!window.voicepilotSupabaseUrl,
-          hasSupabaseKey: !!window.voicepilotSupabaseKey,
-          hasSupabaseClient: !!supabaseClient
-        });
-
-        // Fetch agent details from Supabase
-        let agentInstructions = 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.';
-        let documentationUrls = [];
-
-        if (supabaseClient && agentId) {
-          try {
-            console.log('[VoicePilot] Fetching agent details for ID:', agentId);
-            const { data: agent, error } = await supabaseClient
-              .from('agents')
-              .select('instructions, documentation_urls, status')
-              .eq('id', agentId)
-              .single();
-
-            if (error) {
-              console.error('[VoicePilot] Error fetching agent:', error);
-            } else if (agent) {
-              if (agent.status !== 'active') {
-                throw new Error('This agent is not currently active');
-              }
-              agentInstructions = agent.instructions || agentInstructions;
-              documentationUrls = agent.documentation_urls || [];
-              console.log('[VoicePilot] Using agent instructions:', agentInstructions.substring(0, 100) + '...');
-            } else {
-              console.warn('[VoicePilot] Agent not found, using default instructions');
-            }
-          } catch (err) {
-            console.error('[VoicePilot] Failed to fetch agent details:', err);
-            throw new Error('Failed to load agent configuration: ' + err.message);
-          }
-        } else {
-          console.warn('[VoicePilot] No Supabase client or agent ID, using default instructions');
-        }
-
-        // Use relay through Supabase
-        console.log('[VoicePilot] Using Supabase relay connection');
-
-        const response = await fetch(`${window.voicepilotSupabaseUrl}/functions/v1/start-call`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${window.voicepilotSupabaseKey}`,
-          },
-          body: JSON.stringify({
-            agentId: agentId,
-            instructions: agentInstructions,
-            documentationUrls: documentationUrls
-          })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to start call');
-        }
-
-        const { relayUrl } = await response.json();
-        console.log('[VoicePilot] Got relay URL:', relayUrl);
-
-        // Connect to WebSocket
-        websocket = new WebSocket(relayUrl);
-
-        websocket.onopen = () => {
-          console.log('[VoicePilot] WebSocket connected');
-          
-          // Get current page context and initialize monitoring
-          const pageContext = getPageContext();
-          currentPageContextRef.current = pageContext;
-          lastSentPageContextRef.current = pageContext;
-          console.log('[VoicePilot] Initial page context:', pageContext);
-
-          // Create URL context tools if documentation URLs are provided
-          const tools = [];
-          
-          if (documentationUrls?.length) {
-            tools.push({
-              url_context: {
-                urls: documentationUrls
-              }
-            });
-          }
-
-          // Enhanced system instruction with page context
-          const enhancedSystemInstruction = `${agentInstructions} 
-
-CURRENT PAGE CONTEXT: ${pageContext}
-
-When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
-
-          // Send setup message
-          const setupMsg = {
-            setup: {
-              model: 'models/gemini-2.0-flash-live-001',
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: 'Kore'
-                    }
-                  }
-                }
-              },
-              tools: tools.length > 0 ? tools : undefined,
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
-              systemInstruction: {
-                parts: [{
-                  text: enhancedSystemInstruction,
-                }]
-              }
-            }
-          };
-
-          console.log('[VoicePilot] Sending setup:', setupMsg);
-          websocket.send(JSON.stringify(setupMsg));
-        };
-
-        websocket.onmessage = async (ev) => {
-          let blob;
-
-          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
-          if (ev.data instanceof Blob) {
-            blob = ev.data;
-          } else if (ev.data instanceof ArrayBuffer) {
-            blob = new Blob([ev.data]);
-          } else {
-            return;
-          }
-
-          let maybeText = null;
-          try {
-            maybeText = await blob.text();
-          } catch {
-            maybeText = null;
-          }
-
-          if (maybeText) {
-            try {
-              const parsed = JSON.parse(maybeText);
-              console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
-
-              if (parsed.setupComplete) {
-                console.log('[VoicePilot] Received setupComplete ✅');
-                isCallActive = true;
-                statusText.textContent = 'Connected - Speak now';
-                statusIndicator.textContent = '🎯';
-                startBtn.style.display = 'none';
-                endBtn.style.display = 'block';
-                transcript.style.display = 'block';
-
-                // Start page context monitoring when call becomes active
-                startPageContextMonitoring();
-
-                if (websocket.readyState === WebSocket.OPEN && !greetingSentRef.current) {
-                  const greeting = {
-                    clientContent: {
-                      turns: [
-                        {
-                          role: 'user',
-                          parts: [{ text: 'Hello!' }],
-                        },
-                      ],
-                      turnComplete: true,
-                    },
-                  };
-                  websocket.send(JSON.stringify(greeting));
-                  greetingSentRef.current = true;
-                  console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
-                }
-
-                startMicStreaming();
-                return;
-              }
-
-              if (parsed.serverContent) {
-                const sc = parsed.serverContent;
-
-                // Handle AI speech transcription with two-buffer system
-                if (sc.outputTranscription) {
-                  const { text, finished } = sc.outputTranscription;
-                  
-                  if (text) {
-                    // Accumulate fragments in the partial buffer
-                    partialTextRef.current += text;
-                    
-                    // Update the display immediately with committed + partial
-                    updateTranscriptDisplay();
-                    
-                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
-                  }
-
-                  // When finished, move partial to committed and clear partial
-                  if (finished && partialTextRef.current) {
-                    const partialText = partialTextRef.current.trim();
-                    
-                    // Add to committed with smart spacing
-                    if (committedTextRef.current && partialText) {
-                      const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
-                      committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
-                    } else if (partialText) {
-                      committedTextRef.current = partialText;
-                    }
-                    
-                    // Clear partial buffer
-                    partialTextRef.current = '';
-                    
-                    // Update display with committed text only
-                    updateTranscriptDisplay();
-                    
-                    // Highlight the complete phrase
-                    if (window.voicePilotHighlight && partialText) {
-                      window.voicePilotHighlight(partialText);
-                    }
-                    
-                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
-                  }
-                }
-
-                // Handle user speech transcription
-                if (sc.inputTranscription?.text) {
-                  const userText = sc.inputTranscription.text.trim();
-                  if (userText) {
-                    // Add to committed text with smart spacing
-                    if (committedTextRef.current) {
-                      const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
-                      committedTextRef.current += (needsSpace ? ' ' : '') + userText;
-                    } else {
-                      committedTextRef.current = userText;
-                    }
-                    
-                    updateTranscriptDisplay();
-                    console.log('[VoicePilot] User transcription:', userText);
-                  }
-                }
-
-                // Handle audio data from modelTurn.parts
-                const mt = sc.modelTurn;
-                if (mt?.parts) {
-                  for (const part of mt.parts) {
-                    // Handle audio data
-                    if (part.inlineData && typeof part.inlineData.data === 'string') {
-                      try {
-                        const base64str = part.inlineData.data;
-                        const binaryStr = atob(base64str);
-                        const len = binaryStr.length;
-                        const rawBuffer = new Uint8Array(len);
-                        for (let i = 0; i < len; i++) {
-                          rawBuffer[i] = binaryStr.charCodeAt(i);
-                        }
-                        const pcmBlob = new Blob([rawBuffer.buffer], {
-                          type: 'audio/pcm;rate=24000',
-                        });
-                        console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
-                        playAudioBuffer(pcmBlob);
-                      } catch (err) {
-                        console.error('[VoicePilot] Error decoding inlineData audio:', err);
-                      }
-                    }
-                  }
-                  return; // Bail out after handling audio
-                }
-
-                // Check for turn complete to force commit partial buffer
-                if (sc.turnComplete && partialTextRef.current) {
-                  console.log('[VoicePilot] Turn complete - committing partial buffer');
-                  const partialText = partialTextRef.current.trim();
-                  
-                  // Move partial to committed
-                  if (committedTextRef.current && partialText) {
-                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
-                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
-                  } else if (partialText) {
-                    committedTextRef.current = partialText;
-                  }
-                  
-                  // Clear partial buffer
-                  partialTextRef.current = '';
-                  
-                  updateTranscriptDisplay();
-                  
-                  if (window.voicePilotHighlight && partialText) {
-                    window.voicePilotHighlight(partialText);
-                  }
-                  
-                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
-                }
-              }
-
-              return;
-            } catch (parseError) {
-              console.error('[VoicePilot] JSON parse error:', parseError);
-              // Continue to fallback for binary data
-            }
-          }
-
-          console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
-          playAudioBuffer(blob);
-        };
-
-        websocket.onerror = (err) => {
-          console.error('[VoicePilot] WebSocket error:', err);
-          statusText.textContent = 'Connection failed';
-          statusIndicator.textContent = '❌';
-        };
-
-        websocket.onclose = (ev) => {
-          console.log(`[VoicePilot] WebSocket closed: code=${ev.code}, reason="${ev.reason}"`);
-          isCallActive = false;
-          statusText.textContent = 'Call ended';
-          statusIndicator.textContent = '📞';
-          startBtn.style.display = 'block';
-          endBtn.style.display = 'none';
-          transcript.style.display = 'none';
-          websocket = null;
-          
-          // Stop page context monitoring when call ends
-          stopPageContextMonitoring();
-        };
-
-      } catch (error) {
-        console.error('[VoicePilot] Failed to start call:', error);
-        statusText.textContent = 'Connection failed';
-        statusIndicator.textContent = '❌';
-        setTimeout(() => {
-          statusText.textContent = 'Ready to help';
-          statusIndicator.textContent = '🎤';
-        }, 3000);
-      }
-    }
-
-    // End call function
-    function endCall() {
-      if (!isCallActive) return;
-
-      try {
-        if (websocket) {
-          websocket.close();
-          websocket = null;
-        }
-
-        isCallActive = false;
-        statusText.textContent = 'Call ended';
-        statusIndicator.textContent = '📞';
-        startBtn.style.display = 'block';
-        endBtn.style.display = 'none';
-        transcript.style.display = 'none';
-        
-        // Clear any highlights
-        if (window.voicePilotClearHighlights) {
-          window.voicePilotClearHighlights();
-        }
-
-        // Stop page context monitoring
-        stopPageContextMonitoring();
-
-        setTimeout(() => {
-          statusText.textContent = 'Ready to help';
-          statusIndicator.textContent = '🎤';
-        }, 2000);
-
-        console.log('[VoicePilot] Call ended');
-
-      } catch (error) {
-        console.error('[VoicePilot] Error ending call:', error);
-      }
-    }
-
-    // Event listeners
-    startBtn.addEventListener('click', startCall);
-    endBtn.addEventListener('click', endCall);
-
-    // Hover effects
-    startBtn.addEventListener('mouseenter', () => {
-      startBtn.style.background = 'rgba(255,255,255,0.3)';
-    });
-    startBtn.addEventListener('mouseleave', () => {
-      startBtn.style.background = 'rgba(255,255,255,0.2)';
-    });
-
-    endBtn.addEventListener('mouseenter', () => {
-      endBtn.style.background = 'rgba(255,255,255,0.2)';
-    });
-    endBtn.addEventListener('mouseleave', () => {
-      endBtn.style.background = 'rgba(255,255,255,0.1)';
-    });
-
-    closeBtn.addEventListener('mouseenter', () => {
-      closeBtn.style.background = 'rgba(255,255,255,0.3)';
-    });
-    closeBtn.addEventListener('mouseleave', () => {
-      closeBtn.style.background = 'rgba(255,255,255,0.2)';
-    });
-
-    // Return widget API
-    return {
-      show: () => widget.style.display = 'block',
-      hide: () => widget.style.display = 'none',
-      startCall,
-      endCall,
-      isActive: () => isCallActive
-    };
-  }
-
-  // Initialize widget
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.voicepilot = createWidget();
-    });
-  } else {
-    window.voicepilot = createWidget();
-  }
-
-  // Cleanup on page unload
-  window.addEventListener('beforeunload', () => {
-    pageContextCapture.destroy();
-    domHighlighter.destroy();
-  });
-
-})();
+        /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'"
