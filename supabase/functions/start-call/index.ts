@@ -66,13 +66,14 @@ serve(async (req) => {
       }
     }
 
-    // Get the API key for the relay
+    // Verify that the API key is configured on the server
     const apiKey = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
-      throw new Error("API key not configured");
+      throw new Error("API key not configured on server");
     }
 
-    // Build the relay URL with proper protocol detection and include the API key
+    // Build the relay URL without passing the API key as a query parameter
+    // The relay function will access the API key directly from environment variables
     const url = new URL(req.url);
     
     // Check x-forwarded-proto header to determine if the original request was HTTPS
@@ -80,7 +81,10 @@ serve(async (req) => {
     const isSecure = forwardedProto === 'https' || url.protocol === 'https:';
     const wsProtocol = isSecure ? 'wss:' : 'ws:';
     
-    const relayUrl = `${wsProtocol}//${url.host}/functions/v1/relay?apikey=${encodeURIComponent(apiKey)}`;
+    // Remove the API key from the relay URL since it will be accessed from environment variables
+    const relayUrl = `${wsProtocol}//${url.host}/functions/v1/relay`;
+
+    console.log("[Start-Call] Returning relay URL:", relayUrl);
 
     return new Response(
       JSON.stringify({ relayUrl }),

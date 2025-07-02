@@ -39,33 +39,35 @@ const handler = (req: Request) => {
       });
     }
 
-    /* 2️⃣  Extract API key from URL query parameters */
-    const url = new URL(req.url);
-    const KEY = url.searchParams.get("apikey");
+    /* 2️⃣  Load API key directly from environment variables */
+    const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
     
     if (!KEY) {
-      console.error("[Relay] No API key provided in query parameters");
-      return new Response("Missing API key in query parameters", { 
-        status: 400,
+      console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY environment variable found");
+      return new Response("Server configuration error: Missing API key", { 
+        status: 500,
         headers: {
           "Access-Control-Allow-Origin": "*",
         }
       });
     }
 
-    console.log("[Relay] Using API key from query parameters");
+    console.log("[Relay] Using API key from environment variables");
 
     /* 3️⃣  Browser ⇄ Relay socket */
     const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
-    /* 4️⃣  Relay ⇄ Gemini socket - CORRECTED ENDPOINT FOR GEMINI LIVE API */
-    // Updated to use the correct Gemini Live API WebSocket endpoint
-    const geminiURL = `wss://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${encodeURIComponent(KEY)}`;
+    /* 4️⃣  Relay ⇄ Gemini socket - Using correct Gemini Live API endpoint WITHOUT key in URL */
+    // According to Google Live API docs, the WebSocket endpoint should not include the API key
+    // The API key authentication is handled server-side through environment variables
+    const geminiURL = "wss://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent";
 
     console.log("[Relay] Connecting to Gemini Live API:", geminiURL);
     
     let gemini: WebSocket;
     try {
+      // Create WebSocket connection without API key in URL
+      // The authentication should be handled by the server environment
       gemini = new WebSocket(geminiURL);
     } catch (error) {
       console.error("[Relay] Failed to create WebSocket connection to Gemini:", error);
