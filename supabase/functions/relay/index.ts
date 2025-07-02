@@ -37,21 +37,24 @@ const handler = (req: Request) => {
     });
   }
 
-  /* 2️⃣  Browser ⇄ Relay socket */
-  const { socket: browser, response } = Deno.upgradeWebSocket(req);
-
-  /* 3️⃣  Load API key (GOOGLE_API_KEY preferred, fallback GEMINI_API_KEY) */
-  const KEY = Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
+  /* 2️⃣  Extract API key from URL query parameters */
+  const url = new URL(req.url);
+  const KEY = url.searchParams.get("apikey");
+  
   if (!KEY) {
-    console.error("[Relay] No GOOGLE_API_KEY or GEMINI_API_KEY set");
-    browser.close(1011, "Server mis-config");
-    return new Response("Server mis-config", { 
-      status: 500,
+    console.error("[Relay] No API key provided in query parameters");
+    return new Response("Missing API key in query parameters", { 
+      status: 400,
       headers: {
         "Access-Control-Allow-Origin": "*",
       }
     });
   }
+
+  console.log("[Relay] Using API key from query parameters");
+
+  /* 3️⃣  Browser ⇄ Relay socket */
+  const { socket: browser, response } = Deno.upgradeWebSocket(req);
 
   /* 4️⃣  Relay ⇄ Gemini socket */
   const geminiURL =
