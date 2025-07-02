@@ -491,13 +491,22 @@ When responding, consider the user's current location and what they can see on t
       };
 
       ws.onmessage = async (ev) => {
-        if (!(ev.data instanceof Blob)) {
+        let blob: Blob;
+
+        // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+        if (ev.data instanceof Blob) {
+          blob = ev.data;                     // unchanged
+        } else if (ev.data instanceof ArrayBuffer) {
+          blob = new Blob([ev.data]);         // wrap the buffer
+        } else {
+          // unknown type – ignore
           return;
         }
 
+        // ↓ everything that previously used ev.data continues to use `blob`
         let maybeText: string | null = null;
         try {
-          maybeText = await ev.data.text();
+          maybeText = await blob.text();
         } catch {
           maybeText = null;
         }
@@ -657,7 +666,7 @@ When responding, consider the user's current location and what they can see on t
         }
 
         console.log('[Live][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
-        playAudioBuffer(ev.data);
+        playAudioBuffer(blob);
       };
 
       ws.onerror = (err) => {
