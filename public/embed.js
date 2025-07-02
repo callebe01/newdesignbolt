@@ -13,14 +13,12 @@
     return;
   }
 
-  if (!supabaseUrl) {
-    console.error('VoicePilot: data-supabase-url attribute is required');
-    return;
+  // Set global Supabase configuration if provided
+  if (supabaseUrl) {
+    window.voicepilotSupabaseUrl = supabaseUrl;
   }
-
-  if (!supabaseAnonKey) {
-    console.error('VoicePilot: data-supabase-anon-key attribute is required');
-    return;
+  if (supabaseAnonKey) {
+    window.voicepilotSupabaseAnonKey = supabaseAnonKey;
   }
 
   // ═══════════════════════════════════════════════
@@ -1061,16 +1059,155 @@
 
     let isCallActive = false;
     let websocket = null;
+    let microphoneStream = null;
     let audioContext = null;
-    let audioQueueTime = 0; // Track when the next audio should start
-    let microphoneStream = null; // Track microphone stream
+    let audioProcessor = null;
+
+    // ✅ FIXED: Proper microphone capture implementation
+    async function startMicrophoneCapture() {
+      try {
+        console.log('[VoicePilot] Starting microphone capture...');
+        
+        // Request microphone access
+        microphoneStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        console.log('[VoicePilot] Microphone access granted');
+
+        // Create audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 16000
+        });
+
+        // Create audio processing pipeline
+        const source = audioContext.createMediaStreamSource(microphoneStream);
+        const bufferSize = 4096;
+        audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+
+        // Connect the audio processing pipeline
+        source.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
+
+        // Process audio data and send to WebSocket
+        audioProcessor.onaudioprocess = (event) => {
+          if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            return;
+          }
+
+          const inputBuffer = event.inputBuffer;
+          const inputData = inputBuffer.getChannelData(0);
+          
+          // Convert float32 to int16
+          const pcm16 = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          // Convert to base64
+          const uint8Array = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < uint8Array.byteLength; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          // Send audio data to Gemini Live API
+          const audioMessage = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000'
+              }
+            }
+          };
+
+          try {
+            websocket.send(JSON.stringify(audioMessage));
+          } catch (error) {
+            console.error('[VoicePilot] Error sending audio data:', error);
+          }
+        };
+
+        console.log('[VoicePilot] Microphone capture setup complete');
+        return true;
+      } catch (error) {
+        console.error('[VoicePilot] Microphone capture failed:', error);
+        statusText.textContent = 'Microphone access denied';
+        statusIndicator.textContent = '❌';
+        return false;
+      }
+    }
+
+    function stopMicrophoneCapture() {
+      console.log('[VoicePilot] Stopping microphone capture...');
+      
+      if (audioProcessor) {
+        audioProcessor.disconnect();
+        audioProcessor = null;
+      }
+      
+      if (audioContext) {
+        audioContext.close().catch(console.error);
+        audioContext = null;
+      }
+      
+      if (microphoneStream) {
+        microphoneStream.getTracks().forEach(track => track.stop());
+        microphoneStream = null;
+      }
+      
+      console.log('[VoicePilot] Microphone capture stopped');
+    }
+
+    // ✅ FIXED: Proper audio playback implementation
+    async function playAudioBuffer(pcmBlob) {
+      try {
+        console.log('[VoicePilot] Playing audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        
+        // Convert PCM16 to Float32
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        // Create audio context if needed
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // Create audio buffer
+        const audioBuffer = audioContext.createBuffer(1, float32.length, 24000);
+        audioBuffer.copyToChannel(float32, 0, 0);
+
+        // Create and play audio source
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.start();
+        
+        console.log('[VoicePilot] Audio buffer played successfully');
+      } catch (error) {
+        console.error('[VoicePilot] Error playing audio buffer:', error);
+      }
+    }
 
     // Close widget
     closeBtn.addEventListener('click', () => {
       widget.style.display = 'none';
     });
 
-    // Start call function - ENHANCED ERROR HANDLING
+    // Start call function
     async function startCall() {
       if (isCallActive) return;
 
@@ -1080,7 +1217,13 @@
 
         console.log('[VoicePilot] Starting call for agent:', agentId);
 
-        // Call the start-call edge function using absolute URL with Authorization header
+        // Get Supabase configuration
+        const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
+        const supabaseAnonKey = window.voicepilotSupabaseAnonKey || '';
+
+        console.log('[VoicePilot] Using Supabase URL:', supabaseUrl);
+
+        // Get relay URL from start-call function
         const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
           method: 'POST',
           headers: {
@@ -1089,82 +1232,30 @@
           },
           body: JSON.stringify({
             agentId: agentId,
-            instructions: 'You are a helpful AI assistant.',
+            instructions: 'You are a helpful AI assistant embedded in a web application.',
             documentationUrls: []
           })
         });
 
-        // Enhanced error handling for non-JSON responses
-        let errorData;
-        const contentType = response.headers.get('content-type');
-        
         if (!response.ok) {
-          try {
-            if (contentType && contentType.includes('application/json')) {
-              errorData = await response.json();
-            } else {
-              // Handle non-JSON error responses (like HTML error pages)
-              const errorText = await response.text();
-              console.error('[VoicePilot] Non-JSON error response:', errorText);
-              
-              // Check for common error patterns
-              if (response.status === 500) {
-                throw new Error('Server configuration error. Please ensure the start-call function is properly deployed with required environment variables.');
-              } else if (response.status === 404) {
-                throw new Error('Start-call function not found. Please ensure it is deployed.');
-              } else {
-                throw new Error(`Server error (${response.status}). Please check the server configuration.`);
-              }
-            }
-          } catch (parseError) {
-            console.error('[VoicePilot] Error parsing response:', parseError);
-            throw new Error(`Failed to start call (${response.status}). Please check server configuration.`);
-          }
-          
-          throw new Error(errorData?.error || `Failed to start call (${response.status})`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
-        // Parse successful response
-        let responseData;
-        try {
-          if (contentType && contentType.includes('application/json')) {
-            responseData = await response.json();
-          } else {
-            throw new Error('Expected JSON response but received different content type');
-          }
-        } catch (parseError) {
-          console.error('[VoicePilot] Error parsing successful response:', parseError);
-          throw new Error('Invalid response format from server');
-        }
-
-        const { relayUrl } = responseData;
-        if (!relayUrl) {
-          throw new Error('No relay URL received from server');
-        }
-
+        const { relayUrl } = await response.json();
         console.log('[VoicePilot] Got relay URL:', relayUrl);
 
-        // Initialize audio context
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        audioQueueTime = audioContext.currentTime;
-
-        // Connect to the relay WebSocket
+        // Connect to WebSocket relay
         websocket = new WebSocket(relayUrl);
 
-        websocket.onopen = () => {
+        websocket.onopen = async () => {
           console.log('[VoicePilot] WebSocket connected');
-          isCallActive = true;
-          statusText.textContent = 'Connected - Speak now';
-          statusIndicator.textContent = '🎯';
-          startBtn.style.display = 'none';
-          endBtn.style.display = 'block';
-          transcript.style.display = 'block';
-
-          // Get current page context and send setup message
-          const pageContext = window.voicePilotGetPageContext();
-          console.log('[VoicePilot] Page context:', pageContext);
-
-          const setupMsg = {
+          
+          // Get current page context
+          const pageContext = window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Web page';
+          
+          // Send setup message
+          const setupMessage = {
             setup: {
               model: 'models/gemini-2.0-flash-live-001',
               generationConfig: {
@@ -1181,7 +1272,7 @@
               inputAudioTranscription: {},
               systemInstruction: {
                 parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
+                  text: `You are VoicePilot, an AI assistant embedded in a web application to help users navigate and use the app effectively.
 
 Your role:
 - Help users complete tasks step-by-step
@@ -1206,73 +1297,100 @@ Current page context: ${pageContext}`
             }
           };
 
-          websocket.send(JSON.stringify(setupMsg));
-          
-          // Start microphone capture after setup
-          startMicrophoneCapture();
+          websocket.send(JSON.stringify(setupMessage));
+          console.log('[VoicePilot] Setup message sent');
         };
 
         websocket.onmessage = async (event) => {
           try {
-            // Handle both text and binary messages
             let data;
-            if (event.data instanceof Blob) {
-              const text = await event.data.text();
-              if (text) {
-                data = JSON.parse(text);
-              } else {
-                // Binary audio data - play it
-                playAudioBlob(event.data);
+            
+            // Handle both text and binary messages
+            if (typeof event.data === 'string') {
+              data = JSON.parse(event.data);
+              console.log('[VoicePilot] Received JSON message:', data);
+              
+              if (data.setupComplete) {
+                console.log('[VoicePilot] Setup complete, starting microphone');
+                isCallActive = true;
+                statusText.textContent = 'Connected - Speak now';
+                statusIndicator.textContent = '🎯';
+                startBtn.style.display = 'none';
+                endBtn.style.display = 'block';
+                transcript.style.display = 'block';
+                
+                // Start microphone capture
+                await startMicrophoneCapture();
+                
+                // Send initial greeting
+                const greeting = {
+                  clientContent: {
+                    turns: [{
+                      role: 'user',
+                      parts: [{ text: 'Hello!' }]
+                    }],
+                    turnComplete: true
+                  }
+                };
+                websocket.send(JSON.stringify(greeting));
                 return;
               }
-            } else if (typeof event.data === 'string') {
-              data = JSON.parse(event.data);
-            } else {
-              // ArrayBuffer or other binary data
-              playAudioBuffer(event.data);
-              return;
-            }
 
-            console.log('[VoicePilot] Received message:', data);
-
-            if (data.setupComplete) {
-              console.log('[VoicePilot] Setup complete');
-              // Send initial greeting
-              const greeting = {
-                clientContent: {
-                  turns: [{
-                    role: 'user',
-                    parts: [{ text: 'Hello!' }]
-                  }],
-                  turnComplete: true
-                }
-              };
-              websocket.send(JSON.stringify(greeting));
-            }
-
-            // Handle transcription
-            if (data.serverContent?.outputTranscription) {
-              const { text, finished } = data.serverContent.outputTranscription;
-              if (text) {
-                transcript.textContent += text;
-                transcript.scrollTop = transcript.scrollHeight;
+              if (data.serverContent) {
+                const sc = data.serverContent;
                 
-                // Real-time highlighting
-                if (window.voicePilotHighlightStream) {
-                  window.voicePilotHighlightStream(text);
+                // Handle AI speech transcription
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  if (text) {
+                    transcript.textContent += text;
+                    transcript.scrollTop = transcript.scrollHeight;
+                    
+                    // Real-time highlighting
+                    if (window.voicePilotHighlightStream) {
+                      window.voicePilotHighlightStream(text);
+                    }
+                  }
+                }
+
+                // Handle user speech transcription
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    transcript.textContent += `\nUser: ${userText}\n`;
+                    transcript.scrollTop = transcript.scrollHeight;
+                  }
+                }
+
+                // Handle audio data
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000'
+                        });
+                        await playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding audio:', err);
+                      }
+                    }
+                  }
                 }
               }
+            } else {
+              // Handle binary audio data
+              console.log('[VoicePilot] Received binary audio data');
+              await playAudioBuffer(event.data);
             }
-
-            // Handle audio in modelTurn
-            if (data.serverContent?.modelTurn?.parts) {
-              for (const part of data.serverContent.modelTurn.parts) {
-                if (part.inlineData && part.inlineData.data) {
-                  playBase64Audio(part.inlineData.data);
-                }
-              }
-            }
-
           } catch (error) {
             console.error('[VoicePilot] Error processing message:', error);
           }
@@ -1284,255 +1402,53 @@ Current page context: ${pageContext}`
           statusIndicator.textContent = '❌';
         };
 
-        websocket.onclose = () => {
-          console.log('[VoicePilot] WebSocket closed');
-          isCallActive = false;
-          statusText.textContent = 'Call ended';
-          statusIndicator.textContent = '📞';
-          startBtn.style.display = 'block';
-          endBtn.style.display = 'none';
-          transcript.style.display = 'none';
-          
-          // Stop microphone capture
-          stopMicrophoneCapture();
-          
-          setTimeout(() => {
-            statusText.textContent = 'Ready to help';
-            statusIndicator.textContent = '🎤';
-          }, 2000);
+        websocket.onclose = (event) => {
+          console.log('[VoicePilot] WebSocket closed:', event.code, event.reason);
+          endCall();
         };
 
       } catch (error) {
         console.error('[VoicePilot] Failed to start call:', error);
-        
-        // Enhanced error display with specific messages
-        let userMessage = 'Connection failed';
-        if (error.message.includes('configuration error') || error.message.includes('environment variables')) {
-          userMessage = 'Server setup required';
-        } else if (error.message.includes('not found')) {
-          userMessage = 'Service unavailable';
-        } else if (error.message.includes('Invalid response')) {
-          userMessage = 'Server error';
-        }
-        
-        statusText.textContent = userMessage;
+        statusText.textContent = 'Connection failed';
         statusIndicator.textContent = '❌';
-        
-        // Show detailed error in console for debugging
-        console.error('[VoicePilot] Detailed error:', {
-          message: error.message,
-          stack: error.stack
-        });
-        
         setTimeout(() => {
           statusText.textContent = 'Ready to help';
           statusIndicator.textContent = '🎤';
         }, 3000);
-      }
-    }
-
-    // ✅ NEW: Microphone capture functions
-    async function startMicrophoneCapture() {
-      try {
-        console.log('[VoicePilot] Starting microphone capture...');
-        
-        // Request microphone access
-        microphoneStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            sampleRate: 16000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        console.log('[VoicePilot] Microphone access granted');
-
-        // Create audio processing pipeline
-        const audioCtx = audioContext;
-        const source = audioCtx.createMediaStreamSource(microphoneStream);
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
-
-        processor.onaudioprocess = (event) => {
-          if (!websocket || websocket.readyState !== WebSocket.OPEN) {
-            return;
-          }
-
-          const inputBuffer = event.inputBuffer;
-          const inputData = inputBuffer.getChannelData(0);
-          
-          // Convert float32 to int16 for transmission
-          const outputBuffer = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            const sample = Math.max(-1, Math.min(1, inputData[i]));
-            outputBuffer[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-          }
-
-          // Convert to base64 for transmission
-          const uint8Array = new Uint8Array(outputBuffer.buffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.byteLength; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64Audio = btoa(binary);
-
-          // Send audio data to Gemini
-          const audioMessage = {
-            realtime_input: {
-              audio: {
-                data: base64Audio,
-                mime_type: 'audio/pcm;rate=16000'
-              }
-            }
-          };
-
-          try {
-            websocket.send(JSON.stringify(audioMessage));
-          } catch (error) {
-            console.error('[VoicePilot] Error sending audio data:', error);
-          }
-        };
-
-        // Store processor reference for cleanup
-        microphoneStream.processor = processor;
-        
-        console.log('[VoicePilot] Microphone capture pipeline established');
-
-      } catch (error) {
-        console.error('[VoicePilot] Failed to start microphone capture:', error);
-        statusText.textContent = 'Microphone access denied';
-        statusIndicator.textContent = '🚫';
-        
-        setTimeout(() => {
-          statusText.textContent = 'Ready to help';
-          statusIndicator.textContent = '🎤';
-        }, 3000);
-      }
-    }
-
-    function stopMicrophoneCapture() {
-      if (microphoneStream) {
-        console.log('[VoicePilot] Stopping microphone capture...');
-        
-        // Disconnect audio processor
-        if (microphoneStream.processor) {
-          microphoneStream.processor.disconnect();
-        }
-        
-        // Stop all tracks
-        microphoneStream.getTracks().forEach(track => {
-          track.stop();
-        });
-        
-        microphoneStream = null;
-        console.log('[VoicePilot] Microphone capture stopped');
       }
     }
 
     // End call function
     function endCall() {
-      if (!isCallActive || !websocket) return;
+      if (!isCallActive) return;
 
-      try {
+      console.log('[VoicePilot] Ending call');
+
+      isCallActive = false;
+      statusText.textContent = 'Call ended';
+      statusIndicator.textContent = '📞';
+      startBtn.style.display = 'block';
+      endBtn.style.display = 'none';
+      transcript.style.display = 'none';
+      
+      // Stop microphone capture
+      stopMicrophoneCapture();
+      
+      // Close WebSocket
+      if (websocket) {
         websocket.close();
         websocket = null;
-        isCallActive = false;
-        
-        // Stop microphone capture
-        stopMicrophoneCapture();
-        
-        // Clear any highlights
-        if (window.voicePilotClearHighlights) {
-          window.voicePilotClearHighlights();
-        }
-
-        console.log('[VoicePilot] Call ended');
-
-      } catch (error) {
-        console.error('[VoicePilot] Error ending call:', error);
       }
-    }
-
-    // Audio playback functions
-    async function playAudioBlob(blob) {
-      try {
-        const arrayBuffer = await blob.arrayBuffer();
-        playAudioBuffer(arrayBuffer);
-      } catch (error) {
-        console.error('[VoicePilot] Error playing audio blob:', error);
+      
+      // Clear any highlights
+      if (window.voicePilotClearHighlights) {
+        window.voicePilotClearHighlights();
       }
-    }
 
-    function playBase64Audio(base64Data) {
-      try {
-        const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        playAudioBuffer(bytes.buffer);
-      } catch (error) {
-        console.error('[VoicePilot] Error playing base64 audio:', error);
-      }
-    }
-
-    // Fixed audio buffer playback for raw PCM data
-    async function playAudioBuffer(arrayBuffer) {
-      try {
-        if (!audioContext) {
-          console.warn('[VoicePilot] Audio context not initialized');
-          return;
-        }
-
-        // Assume the incoming data is raw PCM (16-bit signed integers)
-        const int16Array = new Int16Array(arrayBuffer);
-        const sampleRate = 24000; // Common sample rate for voice data
-        const numberOfChannels = 1; // Mono audio
-        
-        // Create AudioBuffer manually for raw PCM data
-        const audioBuffer = audioContext.createBuffer(
-          numberOfChannels,
-          int16Array.length,
-          sampleRate
-        );
-        
-        // Convert Int16 to Float32 and copy to AudioBuffer
-        const channelData = audioBuffer.getChannelData(0);
-        for (let i = 0; i < int16Array.length; i++) {
-          // Convert from 16-bit signed integer to float (-1.0 to 1.0)
-          channelData[i] = int16Array[i] / 32768.0;
-        }
-        
-        // Create and configure audio source
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        
-        // Queue audio to play smoothly without gaps
-        const startTime = Math.max(audioContext.currentTime, audioQueueTime);
-        source.start(startTime);
-        
-        // Update queue time for next audio chunk
-        audioQueueTime = startTime + audioBuffer.duration;
-        
-        console.log('[VoicePilot] Playing audio chunk:', {
-          duration: audioBuffer.duration,
-          sampleRate: sampleRate,
-          samples: int16Array.length
-        });
-        
-      } catch (error) {
-        console.error('[VoicePilot] Error playing audio buffer:', error);
-        
-        // Reset audio queue time on error to prevent getting stuck
-        if (audioContext) {
-          audioQueueTime = audioContext.currentTime;
-        }
-      }
+      setTimeout(() => {
+        statusText.textContent = 'Ready to help';
+        statusIndicator.textContent = '🎤';
+      }, 2000);
     }
 
     // Event listeners
