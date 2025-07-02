@@ -248,6 +248,8 @@ enabled = true
 policy = "oneshot"
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
+# Enable outbound TCP/WebSocket connections for all edge functions
+deno_socket = true
 
 # Use these configurations to customize your Edge Function.
 # [functions.MY_FUNCTION_NAME]
@@ -265,11 +267,6 @@ inspector_port = 8083
 [functions.start-call]
 enabled = true
 verify_jwt = false
-
-# Configure the relay Edge Function to enable outbound socket connections
-[functions.relay]
-enabled = true
-deno_socket = true
 
 [analytics]
 enabled = true
