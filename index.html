@@ -32,8 +32,9 @@
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <script type="module">
-      // Get the Supabase URL from environment variables
+      // Get the Supabase URL and anon key from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       // Create and configure the embed script with absolute URL
       const script = document.createElement('script');
@@ -41,6 +42,7 @@
       script.setAttribute('data-agent', '783bc043-42e4-4f60-afb6-e0d8ee947fa2');
       script.setAttribute('data-position', 'bottom-right');
       script.setAttribute('data-supabase-url', supabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co');
+      script.setAttribute('data-supabase-anon-key', supabaseAnonKey || '');
       script.async = true;
       document.body.appendChild(script);
     </script>

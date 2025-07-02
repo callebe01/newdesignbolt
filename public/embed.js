@@ -6,6 +6,7 @@
   const agentId = currentScript?.getAttribute('data-agent');
   const position = currentScript?.getAttribute('data-position') || 'bottom-right';
   const supabaseUrl = currentScript?.getAttribute('data-supabase-url');
+  const supabaseAnonKey = currentScript?.getAttribute('data-supabase-anon-key');
 
   if (!agentId) {
     console.error('VoicePilot: data-agent attribute is required');
@@ -14,6 +15,11 @@
 
   if (!supabaseUrl) {
     console.error('VoicePilot: data-supabase-url attribute is required');
+    return;
+  }
+
+  if (!supabaseAnonKey) {
+    console.error('VoicePilot: data-supabase-anon-key attribute is required');
     return;
   }
 
@@ -1071,11 +1077,12 @@
 
         console.log('[VoicePilot] Starting call for agent:', agentId);
 
-        // Call the start-call edge function using absolute URL
+        // Call the start-call edge function using absolute URL with Authorization header
         const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
           },
           body: JSON.stringify({
             agentId: agentId,
