@@ -1059,16 +1059,74 @@
 
     let isCallActive = false;
     let websocket = null;
-    let greetingSentRef = false;
 
-    // ✅ TWO-BUFFER SYSTEM FOR REAL-TIME TRANSCRIPTION
-    let committedTextRef = ''; // All finalized text
-    let partialTextRef = '';   // Current in-flight fragment
+    // Audio processing refs (mirroring LiveCallContext)
+    let audioContextRef = { current: null };
+    let audioQueueTimeRef = { current: 0 };
+    let committedTextRef = { current: '' };
+    let partialTextRef = { current: '' };
+    let greetingSentRef = { current: false };
+    let pageContextIntervalRef = { current: null };
+    let currentPageContextRef = { current: '' };
+    let lastSentPageContextRef = { current: '' };
 
-    // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
+    // Initialize Supabase client
+    let supabaseClient = null;
+    if (window.voicepilotSupabaseUrl && window.voicepilotSupabaseKey) {
+      // Dynamically import Supabase client
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+      document.head.appendChild(script);
+      
+      script.onload = () => {
+        supabaseClient = window.supabase.createClient(
+          window.voicepilotSupabaseUrl,
+          window.voicepilotSupabaseKey
+        );
+      };
+    }
+
+    // Audio processing functions (copied from LiveCallContext)
+    const playAudioBuffer = async (pcmBlob) => {
+      try {
+        console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+
+        let startAt = audioCtx.currentTime;
+        if (audioQueueTimeRef.current > audioCtx.currentTime) {
+          startAt = audioQueueTimeRef.current;
+        }
+        source.start(startAt);
+        audioQueueTimeRef.current = startAt + buffer.duration;
+        
+        console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
+      } catch (err) {
+        console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
+      }
+    };
+
     const updateTranscriptDisplay = () => {
-      const committed = committedTextRef;
-      const partial = partialTextRef;
+      const committed = committedTextRef.current;
+      const partial = partialTextRef.current;
       
       // Smart spacing: add space between committed and partial if needed
       let fullText = committed;
@@ -1082,348 +1140,86 @@
       transcript.textContent = fullText;
     };
 
-    // Close widget
-    closeBtn.addEventListener('click', () => {
-      widget.style.display = 'none';
-    });
-
-    // Start call function
-    async function startCall() {
-      if (isCallActive) return;
-
+    const getPageContext = () => {
       try {
-        statusText.textContent = 'Connecting...';
-        statusIndicator.textContent = '⏳';
-
-        // Get configuration
-        const supabaseUrl = window.voicepilotSupabaseUrl || 'https://ljfidzppyflrrszkgusa.supabase.co';
-        const supabaseAnonKey = window.voicepilotSupabaseKey || '';
-
-        console.log('[VoicePilot] Configuration check:', {
-          hasSupabaseUrl: !!supabaseUrl,
-          hasSupabaseKey: !!supabaseAnonKey
-        });
-
-        if (!supabaseUrl || !supabaseAnonKey) {
-          throw new Error('Supabase configuration is required. Please provide both URL and anonymous key.');
+        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+          return window.voicePilotGetPageContext();
         }
-
-        // Always use Supabase relay
-        console.log('[VoicePilot] Using Supabase relay connection');
-
-        const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({
-            agentId: agentId,
-            instructions: 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.',
-            documentationUrls: []
-          })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to start call');
-        }
-
-        const { relayUrl } = await response.json();
-        console.log('[VoicePilot] Got relay URL:', relayUrl);
-
-        // Connect to WebSocket
-        websocket = new WebSocket(relayUrl);
-
-        websocket.onopen = () => {
-          console.log('[VoicePilot] WebSocket connected');
-          isCallActive = true;
-          statusText.textContent = 'Connected - Speak now';
-          statusIndicator.textContent = '🎯';
-          startBtn.style.display = 'none';
-          endBtn.style.display = 'block';
-          transcript.style.display = 'block';
-
-          // Send setup message
-          const setupMsg = {
-            setup: {
-              model: 'models/gemini-2.0-flash-live-001',
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: 'Kore'
-                    }
-                  }
-                }
-              },
-              outputAudioTranscription: {},
-              inputAudioTranscription: {},
-              systemInstruction: {
-                parts: [{
-                  text: `You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively. 
-
-Current page context: ${window.voicePilotGetPageContext ? window.voicePilotGetPageContext() : 'Unknown page'}
-
-Your role:
-- Help users complete tasks step-by-step
-- Guide them through the interface with clear instructions
-- Answer questions about features and functionality
-- Provide contextual help based on what they're currently viewing
-
-When you mention UI elements like buttons, forms, or links, they will be automatically highlighted. Speak naturally and conversationally.`
-                }]
-              }
-            }
-          };
-
-          websocket.send(JSON.stringify(setupMsg));
-        };
-
-        websocket.onmessage = async (event) => {
-          let blob;
-
-          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
-          if (event.data instanceof Blob) {
-            blob = event.data;
-          } else if (event.data instanceof ArrayBuffer) {
-            blob = new Blob([event.data]);
-          } else {
-            return;
-          }
-
-          // Try to parse as JSON first
-          let maybeText = null;
-          try {
-            maybeText = await blob.text();
-          } catch {
-            maybeText = null;
-          }
-
-          if (maybeText) {
-            try {
-              const parsed = JSON.parse(maybeText);
-              console.log('[VoicePilot] Received JSON message:', parsed);
-
-              if (parsed.setupComplete) {
-                console.log('[VoicePilot] Setup complete ✅');
-                
-                // Send initial greeting
-                if (!greetingSentRef) {
-                  const greeting = {
-                    clientContent: {
-                      turns: [
-                        {
-                          role: 'user',
-                          parts: [{ text: 'Hello!' }],
-                        },
-                      ],
-                      turnComplete: true,
-                    },
-                  };
-                  websocket.send(JSON.stringify(greeting));
-                  greetingSentRef = true;
-                  console.log('[VoicePilot] Sent initial greeting');
-                }
-
-                // Start microphone
-                startMicrophone();
-                return;
-              }
-
-              if (parsed.serverContent) {
-                const sc = parsed.serverContent;
-
-                // ✅ HANDLE AI SPEECH TRANSCRIPTION WITH TWO-BUFFER SYSTEM
-                if (sc.outputTranscription) {
-                  const { text, finished } = sc.outputTranscription;
-                  
-                  if (text) {
-                    // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
-                    partialTextRef += text;
-                    
-                    // 2) Update the display immediately with committed + partial
-                    updateTranscriptDisplay();
-                    
-                    // 3) Real-time highlighting for streaming text
-                    if (window.voicePilotHighlightStream) {
-                      window.voicePilotHighlightStream(text);
-                    }
-                    
-                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
-                  }
-
-                  // 3) When finished, MOVE partial to committed and clear partial
-                  if (finished && partialTextRef) {
-                    const partialText = partialTextRef.trim();
-                    
-                    // Add to committed with smart spacing
-                    if (committedTextRef && partialText) {
-                      const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
-                      committedTextRef += (needsSpace ? ' ' : '') + partialText;
-                    } else if (partialText) {
-                      committedTextRef = partialText;
-                    }
-                    
-                    // Clear partial buffer
-                    partialTextRef = '';
-                    
-                    // Update display with committed text only
-                    updateTranscriptDisplay();
-                    
-                    // ✅ HIGHLIGHT THE COMPLETE PHRASE
-                    if (window.voicePilotHighlight && partialText) {
-                      window.voicePilotHighlight(partialText);
-                    }
-                    
-                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
-                  }
-                }
-
-                // ✅ HANDLE USER SPEECH TRANSCRIPTION
-                if (sc.inputTranscription?.text) {
-                  const userText = sc.inputTranscription.text.trim();
-                  if (userText) {
-                    // Add to committed text with smart spacing
-                    if (committedTextRef) {
-                      const needsSpace = !committedTextRef.endsWith(' ') && !userText.startsWith(' ');
-                      committedTextRef += (needsSpace ? ' ' : '') + userText;
-                    } else {
-                      committedTextRef = userText;
-                    }
-                    
-                    updateTranscriptDisplay();
-                    console.log('[VoicePilot] User transcription:', userText);
-                  }
-                }
-
-                // Handle audio data from modelTurn.parts
-                const mt = sc.modelTurn;
-                if (mt?.parts) {
-                  for (const part of mt.parts) {
-                    // Handle audio data
-                    if (part.inlineData && typeof part.inlineData.data === 'string') {
-                      try {
-                        const base64str = part.inlineData.data;
-                        const binaryStr = atob(base64str);
-                        const len = binaryStr.length;
-                        const rawBuffer = new Uint8Array(len);
-                        for (let i = 0; i < len; i++) {
-                          rawBuffer[i] = binaryStr.charCodeAt(i);
-                        }
-                        const pcmBlob = new Blob([rawBuffer.buffer], {
-                          type: 'audio/pcm;rate=24000',
-                        });
-                        console.log('[VoicePilot] Playing audio buffer');
-                        playAudioBuffer(pcmBlob);
-                      } catch (err) {
-                        console.error('[VoicePilot] Error decoding audio:', err);
-                      }
-                    }
-                  }
-                  return; // ✅ BAIL OUT AFTER HANDLING AUDIO
-                }
-
-                // ✅ CHECK FOR TURN COMPLETE TO FORCE COMMIT PARTIAL BUFFER
-                if (sc.turnComplete && partialTextRef) {
-                  console.log('[VoicePilot] Turn complete - committing partial buffer');
-                  const partialText = partialTextRef.trim();
-                  
-                  // Move partial to committed
-                  if (committedTextRef && partialText) {
-                    const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
-                    committedTextRef += (needsSpace ? ' ' : '') + partialText;
-                  } else if (partialText) {
-                    committedTextRef = partialText;
-                  }
-                  
-                  // Clear partial buffer
-                  partialTextRef = '';
-                  
-                  updateTranscriptDisplay();
-                  
-                  if (window.voicePilotHighlight && partialText) {
-                    window.voicePilotHighlight(partialText);
-                  }
-                  
-                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
-                }
-              }
-
-              return;
-            } catch (parseError) {
-              console.error('[VoicePilot] JSON parse error:', parseError);
-              // Continue to fallback for binary data
-            }
-          }
-
-          console.log('[VoicePilot] Received binary data, playing as audio');
-          playAudioBuffer(blob);
-        };
-
-        websocket.onerror = (error) => {
-          console.error('[VoicePilot] WebSocket error:', error);
-          statusText.textContent = 'Connection failed';
-          statusIndicator.textContent = '❌';
-        };
-
-        websocket.onclose = () => {
-          console.log('[VoicePilot] WebSocket closed');
-          isCallActive = false;
-          statusText.textContent = 'Call ended';
-          statusIndicator.textContent = '📞';
-          startBtn.style.display = 'block';
-          endBtn.style.display = 'none';
-          transcript.style.display = 'none';
-        };
-
       } catch (error) {
-        console.error('[VoicePilot] Failed to start call:', error);
-        statusText.textContent = 'Connection failed';
-        statusIndicator.textContent = '❌';
-        setTimeout(() => {
-          statusText.textContent = 'Ready to help';
-          statusIndicator.textContent = '🎤';
-        }, 3000);
+        console.warn('[VoicePilot] Error getting page context:', error);
       }
-    }
+      
+      // Fallback context
+      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+    };
 
-    // Audio playback function
-    async function playAudioBuffer(pcmBlob) {
-      try {
-        const arrayBuffer = await pcmBlob.arrayBuffer();
-        const pcm16 = new Int16Array(arrayBuffer);
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-          float32[i] = pcm16[i] / 32768;
+    const startPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+      }
+
+      pageContextIntervalRef.current = setInterval(() => {
+        if (!isCallActive || !websocket || websocket.readyState !== WebSocket.OPEN) {
+          return;
         }
 
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
-        buffer.copyToChannel(float32, 0, 0);
+        try {
+          const newContext = getPageContext();
+          currentPageContextRef.current = newContext;
 
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-        source.start(0);
-        
-        console.log('[VoicePilot] Audio buffer played successfully');
-      } catch (err) {
-        console.error('[VoicePilot] Audio playback error:', err);
+          // Check if context has changed significantly
+          if (newContext !== lastSentPageContextRef.current) {
+            console.log('[VoicePilot] Page context changed, updating AI:', newContext);
+            
+            // Send page context update to AI
+            const contextUpdateMessage = {
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [{ 
+                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                    }],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+
+            websocket.send(JSON.stringify(contextUpdateMessage));
+            lastSentPageContextRef.current = newContext;
+            
+            console.log('[VoicePilot] Sent page context update to AI');
+          }
+        } catch (error) {
+          console.warn('[VoicePilot] Error monitoring page context:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    const stopPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+        pageContextIntervalRef.current = null;
       }
-    }
+    };
 
-    // Microphone function
-    async function startMicrophone() {
+    const startMicStreaming = async () => {
       try {
-        console.log('[VoicePilot] Starting microphone...');
+        console.log('[VoicePilot][Audio] Requesting microphone access...');
         
         const micStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
+        
+        console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
 
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
         const sourceNode = audioCtx.createMediaStreamSource(micStream);
         const bufferSize = 4096;
         const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
@@ -1464,14 +1260,371 @@ When you mention UI elements like buttons, forms, or links, they will be automat
 
           if (websocket?.readyState === WebSocket.OPEN) {
             websocket.send(JSON.stringify(payload));
+            // Log audio data transmission (throttled to avoid spam)
+            if (Math.random() < 0.01) { // Log ~1% of audio chunks
+              console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+            }
           }
         };
 
-        console.log('[VoicePilot] Microphone started successfully');
+        console.log('[VoicePilot][Audio] Microphone streaming started successfully');
       } catch (err) {
-        console.error('[VoicePilot] Microphone error:', err);
-        statusText.textContent = 'Microphone failed';
+        console.error('[VoicePilot] Mic streaming error:', err);
+        statusText.textContent = 'Failed to capture microphone';
+      }
+    };
+
+    // Close widget
+    closeBtn.addEventListener('click', () => {
+      widget.style.display = 'none';
+    });
+
+    // Start call function
+    async function startCall() {
+      if (isCallActive) return;
+
+      try {
+        statusText.textContent = 'Connecting...';
+        statusIndicator.textContent = '⏳';
+
+        // Reset state
+        committedTextRef.current = '';
+        partialTextRef.current = '';
+        transcript.textContent = '';
+        greetingSentRef.current = false;
+
+        console.log('[VoicePilot] Configuration check:', {
+          hasSupabaseUrl: !!window.voicepilotSupabaseUrl,
+          hasSupabaseKey: !!window.voicepilotSupabaseKey,
+          hasSupabaseClient: !!supabaseClient
+        });
+
+        // Fetch agent details from Supabase
+        let agentInstructions = 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.';
+        let documentationUrls = [];
+
+        if (supabaseClient && agentId) {
+          try {
+            console.log('[VoicePilot] Fetching agent details for ID:', agentId);
+            const { data: agent, error } = await supabaseClient
+              .from('agents')
+              .select('instructions, documentation_urls, status')
+              .eq('id', agentId)
+              .single();
+
+            if (error) {
+              console.error('[VoicePilot] Error fetching agent:', error);
+            } else if (agent) {
+              if (agent.status !== 'active') {
+                throw new Error('This agent is not currently active');
+              }
+              agentInstructions = agent.instructions || agentInstructions;
+              documentationUrls = agent.documentation_urls || [];
+              console.log('[VoicePilot] Using agent instructions:', agentInstructions.substring(0, 100) + '...');
+            } else {
+              console.warn('[VoicePilot] Agent not found, using default instructions');
+            }
+          } catch (err) {
+            console.error('[VoicePilot] Failed to fetch agent details:', err);
+            throw new Error('Failed to load agent configuration: ' + err.message);
+          }
+        } else {
+          console.warn('[VoicePilot] No Supabase client or agent ID, using default instructions');
+        }
+
+        // Use relay through Supabase
+        console.log('[VoicePilot] Using Supabase relay connection');
+
+        const response = await fetch(`${window.voicepilotSupabaseUrl}/functions/v1/start-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${window.voicepilotSupabaseKey}`,
+          },
+          body: JSON.stringify({
+            agentId: agentId,
+            instructions: agentInstructions,
+            documentationUrls: documentationUrls
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start call');
+        }
+
+        const { relayUrl } = await response.json();
+        console.log('[VoicePilot] Got relay URL:', relayUrl);
+
+        // Connect to WebSocket
+        websocket = new WebSocket(relayUrl);
+
+        websocket.onopen = () => {
+          console.log('[VoicePilot] WebSocket connected');
+          
+          // Get current page context and initialize monitoring
+          const pageContext = getPageContext();
+          currentPageContextRef.current = pageContext;
+          lastSentPageContextRef.current = pageContext;
+          console.log('[VoicePilot] Initial page context:', pageContext);
+
+          // Create URL context tools if documentation URLs are provided
+          const tools = [];
+          
+          if (documentationUrls?.length) {
+            tools.push({
+              url_context: {
+                urls: documentationUrls
+              }
+            });
+          }
+
+          // Enhanced system instruction with page context
+          const enhancedSystemInstruction = `${agentInstructions} 
+
+CURRENT PAGE CONTEXT: ${pageContext}
+
+When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
+
+          // Send setup message
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
+                    }
+                  }
+                }
+              },
+              tools: tools.length > 0 ? tools : undefined,
+              outputAudioTranscription: {},
+              inputAudioTranscription: {},
+              systemInstruction: {
+                parts: [{
+                  text: enhancedSystemInstruction,
+                }]
+              }
+            }
+          };
+
+          console.log('[VoicePilot] Sending setup:', setupMsg);
+          websocket.send(JSON.stringify(setupMsg));
+        };
+
+        websocket.onmessage = async (ev) => {
+          let blob;
+
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (ev.data instanceof Blob) {
+            blob = ev.data;
+          } else if (ev.data instanceof ArrayBuffer) {
+            blob = new Blob([ev.data]);
+          } else {
+            return;
+          }
+
+          let maybeText = null;
+          try {
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
+
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
+
+              if (parsed.setupComplete) {
+                console.log('[VoicePilot] Received setupComplete ✅');
+                isCallActive = true;
+                statusText.textContent = 'Connected - Speak now';
+                statusIndicator.textContent = '🎯';
+                startBtn.style.display = 'none';
+                endBtn.style.display = 'block';
+                transcript.style.display = 'block';
+
+                // Start page context monitoring when call becomes active
+                startPageContextMonitoring();
+
+                if (websocket.readyState === WebSocket.OPEN && !greetingSentRef.current) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  websocket.send(JSON.stringify(greeting));
+                  greetingSentRef.current = true;
+                  console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
+                }
+
+                startMicStreaming();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // Handle AI speech transcription with two-buffer system
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
+                  
+                  if (text) {
+                    // Accumulate fragments in the partial buffer
+                    partialTextRef.current += text;
+                    
+                    // Update the display immediately with committed + partial
+                    updateTranscriptDisplay();
+                    
+                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                  }
+
+                  // When finished, move partial to committed and clear partial
+                  if (finished && partialTextRef.current) {
+                    const partialText = partialTextRef.current.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (committedTextRef.current && partialText) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      committedTextRef.current = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    partialTextRef.current = '';
+                    
+                    // Update display with committed text only
+                    updateTranscriptDisplay();
+                    
+                    // Highlight the complete phrase
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // Handle user speech transcription
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (committedTextRef.current) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      committedTextRef.current = userText;
+                    }
+                    
+                    updateTranscriptDisplay();
+                    console.log('[VoicePilot] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
+                        playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding inlineData audio:', err);
+                      }
+                    }
+                  }
+                  return; // Bail out after handling audio
+                }
+
+                // Check for turn complete to force commit partial buffer
+                if (sc.turnComplete && partialTextRef.current) {
+                  console.log('[VoicePilot] Turn complete - committing partial buffer');
+                  const partialText = partialTextRef.current.trim();
+                  
+                  // Move partial to committed
+                  if (committedTextRef.current && partialText) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                  } else if (partialText) {
+                    committedTextRef.current = partialText;
+                  }
+                  
+                  // Clear partial buffer
+                  partialTextRef.current = '';
+                  
+                  updateTranscriptDisplay();
+                  
+                  if (window.voicePilotHighlight && partialText) {
+                    window.voicePilotHighlight(partialText);
+                  }
+                  
+                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
+                }
+              }
+
+              return;
+            } catch (parseError) {
+              console.error('[VoicePilot] JSON parse error:', parseError);
+              // Continue to fallback for binary data
+            }
+          }
+
+          console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
+          playAudioBuffer(blob);
+        };
+
+        websocket.onerror = (err) => {
+          console.error('[VoicePilot] WebSocket error:', err);
+          statusText.textContent = 'Connection failed';
+          statusIndicator.textContent = '❌';
+        };
+
+        websocket.onclose = (ev) => {
+          console.log(`[VoicePilot] WebSocket closed: code=${ev.code}, reason="${ev.reason}"`);
+          isCallActive = false;
+          statusText.textContent = 'Call ended';
+          statusIndicator.textContent = '📞';
+          startBtn.style.display = 'block';
+          endBtn.style.display = 'none';
+          transcript.style.display = 'none';
+          websocket = null;
+          
+          // Stop page context monitoring when call ends
+          stopPageContextMonitoring();
+        };
+
+      } catch (error) {
+        console.error('[VoicePilot] Failed to start call:', error);
+        statusText.textContent = 'Connection failed';
         statusIndicator.textContent = '❌';
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
       }
     }
 
@@ -1497,9 +1650,8 @@ When you mention UI elements like buttons, forms, or links, they will be automat
           window.voicePilotClearHighlights();
         }
 
-        // Clear transcript buffers
-        committedTextRef = '';
-        partialTextRef = '';
+        // Stop page context monitoring
+        stopPageContextMonitoring();
 
         setTimeout(() => {
           statusText.textContent = 'Ready to help';
