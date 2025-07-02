@@ -31,28 +31,14 @@
       };
     </script>
     <script type="module" src="/src/main.tsx"></script>
-    <script type="module">
-      // Access the environment variables from the module context
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      // Create and configure the embed script to load the React widget bundle
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = '/embed-widget.js';
-      script.setAttribute('data-agent', '2d85d376-15e2-4eb6-8495-7023559b886a');
-      script.setAttribute('data-position', 'bottom-right');
-      
-      // Set Supabase configuration for secure relay connection
-      if (supabaseUrl) {
-        script.setAttribute('data-supabase-url', supabaseUrl);
-      }
-      if (supabaseAnonKey) {
-        script.setAttribute('data-supabase-anon-key', supabaseAnonKey);
-      }
-      
-      script.async = true;
-      document.body.appendChild(script);
-    </script>
+    <script 
+      type="module"
+      src="/embed-widget.js"
+      data-agent="2d85d376-15e2-4eb6-8495-7023559b886a"
+      data-position="bottom-right"
+      data-supabase-url="https://ljfidzppyflrrszkgusa.supabase.co"
+      data-supabase-anon-key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZmlkenBweWZscnJzemtndXNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4ODg4ODEsImV4cCI6MjA2NDQ2NDg4MX0.mFatLnmbgYM3fytYAfPcowYHo0d0SzC6SApglgSBLww"
+      async
+    ></script>
   </body>
 </html>
