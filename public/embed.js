@@ -935,10 +935,23 @@
     container.id = 'voicepilot-widget-root';
     document.body.appendChild(container);
 
-    // Load React widget script
+    // ✅ FIX: Construct the correct URL for embed-widget.js based on the current script's location
     const script = document.createElement('script');
     script.type = 'module';
-    script.src = '/embed-widget.js';
+    
+    // Get the base URL from the current script's source
+    const currentScriptSrc = currentScript?.src;
+    if (currentScriptSrc) {
+      // Create URL object from current script source
+      const baseUrl = new URL(currentScriptSrc);
+      // Replace the filename with embed-widget.js
+      baseUrl.pathname = baseUrl.pathname.replace(/[^/]*$/, 'embed-widget.js');
+      script.src = baseUrl.toString();
+    } else {
+      // Fallback to relative path (should work in most cases)
+      script.src = '/embed-widget.js';
+    }
+    
     script.setAttribute('data-agent', agentId);
     script.setAttribute('data-position', position);
     if (supabaseUrl) script.setAttribute('data-supabase-url', supabaseUrl);
