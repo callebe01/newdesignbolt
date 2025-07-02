@@ -36,9 +36,10 @@
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
-      // Create and configure the embed script
+      // Create and configure the embed script to load the React widget bundle
       const script = document.createElement('script');
-      script.src = '/embed.js';
+      script.type = 'module';
+      script.src = '/embed-widget.js';
       script.setAttribute('data-agent', '2d85d376-15e2-4eb6-8495-7023559b886a');
       script.setAttribute('data-position', 'bottom-right');
       
