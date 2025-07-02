@@ -22,10 +22,11 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
   exposeApi
 }) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
-  const { 
-    startCall, 
-    endCall, 
-    status, 
+  const minimize = () => setIsOpen(false);
+  const {
+    startCall,
+    endCall,
+    status,
     transcript,
     toggleMicrophone,
     toggleScreenShare,
@@ -56,8 +57,22 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
 
   const handleEndCall = () => {
     endCall();
-    setIsOpen(false);
+    minimize();
   };
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        minimize();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKey);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!exposeApi) return;
@@ -74,12 +89,13 @@ export const AgentWidget: React.FC<AgentWidgetProps> = ({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
+            style={{ width: 'min(320px, 90vw)' }}
+            initial={{ opacity: 0, y: 30, width: 0 }}
+            animate={{ opacity: 1, y: 0, width: 'min(320px, 90vw)' }}
+            exit={{ opacity: 0, y: 30, width: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="w-[320px] rounded-2xl shadow-xl border border-border bg-card relative mb-4">
+            <div className="w-full rounded-2xl shadow-xl border border-border bg-card relative mb-4">
               <button
                 onClick={() => {
                   if (status === 'active') {
