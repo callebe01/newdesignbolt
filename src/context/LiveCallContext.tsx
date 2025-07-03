@@ -107,6 +107,20 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+  // ✅ NEW: Clean transcript text by removing tool execution artifacts
+  const cleanTranscriptText = (text: string): string => {
+    if (!text) return text;
+    
+    // Remove tool_code patterns and other technical artifacts
+    return text
+      // Remove "tool_code [toolname]" patterns
+      .replace(/\btool_code\s+\w+\b/gi, '')
+      // Remove multiple spaces
+      .replace(/\s+/g, ' ')
+      // Remove leading/trailing spaces
+      .trim();
+  };
+
   // ✅ HELPER FUNCTION TO UPDATE TRANSCRIPT WITH TWO-BUFFER SYSTEM
   const updateTranscriptDisplay = () => {
     const committed = committedTextRef.current;
@@ -121,7 +135,8 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
       fullText = partial;
     }
     
-    setTranscript(fullText);
+    // ✅ Clean the transcript before displaying
+    setTranscript(cleanTranscriptText(fullText));
   };
 
   const playAudioBuffer = async (pcmBlob: Blob) => {
@@ -658,13 +673,17 @@ When responding, consider the user's current location and what they can see on t
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
-                  partialTextRef.current += text;
-                  
-                  // 2) Update the display immediately with committed + partial
-                  updateTranscriptDisplay();
-                  
-                  console.log('[Live] AI transcription fragment (partial):', text);
+                  // ✅ Clean the text before adding to partial buffer
+                  const cleanedText = cleanTranscriptText(text);
+                  if (cleanedText) {
+                    // 1) ACCUMULATE fragments in the partial buffer (don't replace!)
+                    partialTextRef.current += cleanedText;
+                    
+                    // 2) Update the display immediately with committed + partial
+                    updateTranscriptDisplay();
+                    
+                    console.log('[Live] AI transcription fragment (cleaned):', cleanedText);
+                  }
                 }
 
                 // 3) When finished, MOVE partial to committed and clear partial
@@ -696,7 +715,7 @@ When responding, consider the user's current location and what they can see on t
 
               // ✅ HANDLE USER SPEECH TRANSCRIPTION
               if (sc.inputTranscription?.text) {
-                const userText = sc.inputTranscription.text.trim();
+                const userText = cleanTranscriptText(sc.inputTranscription.text.trim());
                 if (userText) {
                   // Add to committed text with smart spacing
                   if (committedTextRef.current) {
@@ -707,7 +726,7 @@ When responding, consider the user's current location and what they can see on t
                   }
                   
                   updateTranscriptDisplay();
-                  console.log('[Live] User transcription:', userText);
+                  console.log('[Live] User transcription (cleaned):', userText);
                 }
               }
 
@@ -1039,8 +1058,8 @@ When responding, consider the user's current location and what they can see on t
     
     try {
       const finalDuration = duration;
-      // ✅ GET FINAL TRANSCRIPT FROM BOTH BUFFERS
-      const finalTranscript = (committedTextRef.current + partialTextRef.current).trim();
+      // ✅ GET FINAL TRANSCRIPT FROM BOTH BUFFERS AND CLEAN IT
+      const finalTranscript = cleanTranscriptText((committedTextRef.current + partialTextRef.current).trim());
       const agentId = currentAgentIdRef.current;
       const conversationId = conversationIdRef.current;
 
