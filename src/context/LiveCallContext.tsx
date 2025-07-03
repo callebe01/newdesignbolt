@@ -315,22 +315,39 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const endConversationRecord = async (conversationId: string, duration: number): Promise<void> => {
     try {
-      const { error } = await supabase
-        .from('agent_conversations')
-        .update({
-          status: 'completed',
-          end_time: new Date().toISOString(),
-          duration: duration,
-        })
-        .eq('id', conversationId);
+      console.log(`[Live] Ending conversation record ${conversationId} with duration ${duration}s`);
 
-      if (error) {
-        console.error('Failed to end conversation record:', error);
-      } else {
-        console.log('Ended conversation record:', conversationId);
+      // Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      // Use the Edge Function to update the conversation record
+      const response = await fetch(
+        `${env.VITE_SUPABASE_URL}/functions/v1/end-conversation-record`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            conversationId,
+            duration,
+            sentimentScore: null // Could be calculated from transcript analysis in the future
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to end conversation record');
       }
+
+      const result = await response.json();
+      console.log('Successfully ended conversation record:', result);
     } catch (err) {
       console.error('Error ending conversation record:', err);
+      // Don't throw here to avoid breaking the call end flow
     }
   };
 
