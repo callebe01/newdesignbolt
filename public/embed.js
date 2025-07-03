@@ -1240,7 +1240,7 @@ When responding, consider the user's current location and what they can see on t
                 justify-content: center;
                 gap: 4px;
               ">
-                ${isMicrophoneActive ? '🎤' : '🔇'} ${isMicrophoneActive ? 'Mute' : 'Unmute'}
+          ${isMicrophoneActive ? 'Mute' : 'Unmute'}
               </button>
             </div>
 
