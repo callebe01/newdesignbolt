@@ -1433,43 +1433,533 @@ When responding, consider the user's current location and what they can see on t
     init();
   }
 
-  // Add highlight functionality
-  window.voicePilotHighlight = (message) => {
-    if (!message) return;
-    const lower = message.toLowerCase();
-    const candidates = Array.from(
-      document.querySelectorAll('[data-agent-id],button,a,[role="button"],input')
+// ═══════════════════════════════════════════════
+// Enhanced DOM Highlighting System – EXPANDED ELEMENT SUPPORT
+// ═══════════════════════════════════════════════
+class DOMHighlighter {
+  constructor() {
+    this.highlightedElements = new Set();
+    this.highlightClass = 'voicepilot-highlight';
+    this.highlightStyle = null;
+    this.injectStyles();
+  }
+
+  injectStyles() {
+    if (this.highlightStyle) this.highlightStyle.remove();
+    this.highlightStyle = document.createElement('style');
+    this.highlightStyle.id = 'voicepilot-highlight-styles';
+    this.highlightStyle.textContent = `
+      .${this.highlightClass} {
+        position: relative !important;
+        outline: 2px solid #f59e0b !important;
+        outline-offset: 2px !important;
+        box-shadow: 
+          0 0 0 4px rgba(245, 158, 11, 0.2),
+          0 0 12px rgba(245, 158, 11, 0.4) !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+        z-index: 9999 !important;
+        animation: gentle-pulse 2s infinite ease-in-out;
+      }
+      
+      @keyframes gentle-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+      }
+      
+      .${this.highlightClass}-badge {
+        position: absolute;
+        top: -12px;
+        right: -8px;
+        background: #f59e0b;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 3px 6px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: badge-appear 0.3s ease-out;
+        pointer-events: none;
+      }
+      
+      @keyframes badge-appear {
+        0% { opacity: 0; transform: translateY(-4px) scale(0.8); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+    `;
+    document.head.appendChild(this.highlightStyle);
+  }
+
+  isElementVisible(el) {
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return (
+      rect.width > 0 && rect.height > 0 &&
+      style.visibility !== 'hidden' &&
+      style.display !== 'none' &&
+      style.opacity !== '0' &&
+      rect.top < window.innerHeight &&
+      rect.bottom > 0 &&
+      rect.left < window.innerWidth &&
+      rect.right > 0
     );
-    for (const el of candidates) {
-      const label = (
-        el.getAttribute('data-agent-id') ||
-        el.getAttribute('aria-label') ||
-        el.innerText ||
-        ''
-      ).trim();
-      if (label && label.length > 2 && lower.includes(label.toLowerCase())) {
-        el.classList.add('agent-highlight');
-        setTimeout(() => el.classList.remove('agent-highlight'), 3000);
-        break;
+  }
+
+  // 🆕 EXPANDED: More comprehensive element selector
+  getInteractiveElements() {
+    const selectors = [
+      // Original button/input selectors
+      'button',
+      'input[type="button"]',
+      'input[type="submit"]',
+      'input[type="reset"]',
+      
+      // 🆕 Form elements
+      'input[type="text"]',
+      'input[type="email"]',
+      'input[type="password"]',
+      'input[type="search"]',
+      'input[type="tel"]',
+      'input[type="url"]',
+      'input[type="number"]',
+      'input[type="date"]',
+      'input[type="datetime-local"]',
+      'input[type="time"]',
+      'input[type="checkbox"]',
+      'input[type="radio"]',
+      'input[type="file"]',
+      'textarea',
+      'select',
+      
+      // 🆕 Navigation elements
+      'a[href]',
+      '[role="tab"]',
+      '[role="tabpanel"]',
+      '[data-tab]',
+      '.tab',
+      '.nav-item',
+      '.navigation-item',
+      
+      // 🆕 Interactive UI elements
+      '[role="button"]',
+      '[role="menuitem"]',
+      '[role="option"]',
+      '[role="switch"]',
+      '[role="slider"]',
+      '[aria-expanded]',
+      '[data-toggle]',
+      '[data-action]',
+      
+      // 🆕 Common clickable elements
+      '.dropdown-toggle',
+      '.menu-item',
+      '.clickable',
+      '[onclick]',
+      
+      // 🆕 Cards and panels (if they're clickable)
+      '.card[role="button"]',
+      '.panel[role="button"]',
+      '[data-clickable="true"]',
+      
+      // Keep compatibility with old system
+      '[data-agent-id]'
+    ];
+
+    return Array.from(
+      document.querySelectorAll(selectors.join(','))
+    ).filter(el => this.isElementVisible(el) && this.isElementInteractive(el));
+  }
+
+  // 🆕 Helper to determine if element is truly interactive
+  isElementInteractive(el) {
+    // Skip if disabled
+    if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+      return false;
+    }
+
+    // Skip if it's a label without for attribute (not directly interactive)
+    if (el.tagName === 'LABEL' && !el.getAttribute('for')) {
+      return false;
+    }
+
+    // For links, ensure they have href
+    if (el.tagName === 'A' && !el.getAttribute('href')) {
+      return false;
+    }
+
+    // Check if element has click handlers or interactive roles
+    const hasClickHandler = el.onclick || 
+                           el.getAttribute('onclick') || 
+                           el.getAttribute('data-action') ||
+                           el.getAttribute('data-toggle');
+                           
+    const isFormElement = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName);
+    
+    const hasInteractiveRole = [
+      'button', 'tab', 'menuitem', 'option', 'switch', 'slider'
+    ].includes(el.getAttribute('role'));
+
+    return isFormElement || hasClickHandler || hasInteractiveRole || el.tagName === 'A';
+  }
+
+  // 🆕 ENHANCED: Better text extraction for different element types
+  getElementText(el) {
+    let text = '';
+    
+    // For form inputs, prioritize labels and placeholders
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
+      // Try to find associated label by ID
+      const id = el.id;
+      if (id) {
+        const label = document.querySelector(`label[for="${id}"]`);
+        if (label && label.textContent?.trim()) {
+          text = label.textContent.trim();
+        }
+      }
+      
+      // 🆕 Try to find nearby labels (common pattern where label appears before input)
+      if (!text) {
+        // Look for label immediately before this element
+        let previousElement = el.previousElementSibling;
+        while (previousElement && !text) {
+          if (previousElement.tagName === 'LABEL' && previousElement.textContent?.trim()) {
+            text = previousElement.textContent.trim();
+            break;
+          }
+          // Also check if the previous element contains a label
+          const labelInPrev = previousElement.querySelector('label');
+          if (labelInPrev && labelInPrev.textContent?.trim()) {
+            text = labelInPrev.textContent.trim();
+            break;
+          }
+          previousElement = previousElement.previousElementSibling;
+        }
+      }
+
+      // 🆕 Try to find parent container with label
+      if (!text) {
+        let parent = el.parentElement;
+        let depth = 0;
+        while (parent && depth < 3) { // Don't go too far up
+          const labelInParent = parent.querySelector('label');
+          if (labelInParent && labelInParent.textContent?.trim()) {
+            text = labelInParent.textContent.trim();
+            break;
+          }
+          parent = parent.parentElement;
+          depth++;
+        }
+      }
+      
+      // Fallback to placeholder or aria-label
+      if (!text) {
+        text = el.placeholder?.trim() || 
+               el.getAttribute('aria-label')?.trim() || 
+               el.getAttribute('title')?.trim() || 
+               el.value?.trim() || '';
       }
     }
-  };
+    // For other elements, use text content or aria-label
+    else {
+      text = el.getAttribute('data-agent-id')?.trim() ||
+             el.getAttribute('aria-label')?.trim() ||
+             el.getAttribute('title')?.trim() ||
+             el.textContent?.trim() ||
+             el.value?.trim() || '';
+    }
 
-  window.voicePilotClearHighlights = () => {
-    document.querySelectorAll('.agent-highlight').forEach(el => {
-      el.classList.remove('agent-highlight');
-    });
-  };
-
-  window.voicePilotGetPageContext = () => {
-    return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
-  };
-
-  // Add CSS for highlights
-  if (!document.getElementById('voicepilot-highlight-style')) {
-    const style = document.createElement('style');
-    style.id = 'voicepilot-highlight-style';
-    style.textContent = `.agent-highlight {\n  outline: 3px solid #f00;\n  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.6);\n  transition: outline-color 0.2s;\n}`;
-    document.head.appendChild(style);
+    return text;
   }
-})();
+
+  // 🆕 ENHANCED: Smarter scoring system for different element types
+  scoreMatch(element, searchPhrase) {
+    const elementText = this.getElementText(element).toLowerCase();
+    const phrase = searchPhrase.toLowerCase();
+    
+    if (!elementText || !phrase) return 0;
+
+    // Exact match gets highest score
+    if (elementText === phrase) return 10;
+    
+    // Word boundary matches get high score
+    const wordBoundaryRegex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    if (wordBoundaryRegex.test(elementText)) return 8;
+    
+    // Starts with gets good score
+    if (elementText.startsWith(phrase)) return 6;
+    
+    // Contains gets medium score
+    if (elementText.includes(phrase)) return 4;
+    
+    // Fuzzy matching for slight variations
+    const similarity = this.calculateSimilarity(elementText, phrase);
+    if (similarity > 0.8) return 3;
+    if (similarity > 0.6) return 2;
+    
+    return 0;
+  }
+
+  // 🆕 Simple similarity calculation for fuzzy matching
+  calculateSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  levenshteinDistance(str1, str2) {
+    const matrix = Array(str2.length + 1).fill(null).map(() => 
+      Array(str1.length + 1).fill(null)
+    );
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + indicator
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  highlightElement(searchText) {
+    // Extract phrase from quotes or use full text
+    let phrase = searchText.trim();
+    const quotedMatch = phrase.match(/['"]([^'"]+)['"]/);
+    if (quotedMatch) {
+      phrase = quotedMatch[1];
+    }
+
+    phrase = phrase.toLowerCase();
+    if (!phrase || phrase.length < 2) return false;
+
+    // Get all interactive elements
+    const elements = this.getInteractiveElements();
+    
+    // Score all matches
+    const matches = elements
+      .map(el => ({
+        el,
+        text: this.getElementText(el),
+        score: this.scoreMatch(el, phrase)
+      }))
+      .filter(match => match.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    if (!matches.length) {
+      console.log('[VoicePilot] No interactive elements matching:', phrase);
+      return false;
+    }
+
+    // Highlight the best match
+    this.clearHighlights();
+    const bestMatch = matches[0];
+    this.addHighlight(bestMatch.el, true);
+    bestMatch.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    console.log('[VoicePilot] Highlighting element:', {
+      text: bestMatch.text,
+      type: bestMatch.el.tagName,
+      score: bestMatch.score
+    });
+    
+    return true;
+  }
+
+  addHighlight(el, isPrimary = false) {
+    el.classList.add(this.highlightClass);
+    this.highlightedElements.add(el);
+
+    if (isPrimary) {
+      const badge = document.createElement('div');
+      badge.className = `${this.highlightClass}-badge`;
+      badge.textContent = 'AI';
+      badge.style.position = 'absolute';
+      el.style.position = 'relative';
+      el.appendChild(badge);
+    }
+
+    // Auto-remove after 3 seconds (like the old system)
+    setTimeout(() => {
+      el.classList.remove(this.highlightClass);
+      this.highlightedElements.delete(el);
+      el.querySelectorAll(`.${this.highlightClass}-badge`)
+        .forEach(badge => badge.remove());
+    }, 3000);
+  }
+
+  clearHighlights() {
+    this.highlightedElements.forEach(el => {
+      el.classList.remove(this.highlightClass);
+      el.querySelectorAll(`.${this.highlightClass}-badge`)
+        .forEach(badge => badge.remove());
+    });
+    this.highlightedElements.clear();
+  }
+
+  destroy() {
+    this.clearHighlights();
+    if (this.highlightStyle) this.highlightStyle.remove();
+    this.highlightStyle = null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SmartHighlighter (real-time highlighting as AI speaks)
+// ═══════════════════════════════════════════════
+class SmartHighlighter {
+  constructor() {
+    this.textBuffer = '';
+    this.bufferTimeout = null;
+    this.lastHighlightTime = 0;
+    this.cooldown = 1500;   // Reduced from 2000ms
+    this.delay    = 300;    // Reduced from 1500ms for faster response
+    this.streamBuffer = ''; // New: for real-time streaming
+    this.streamTimeout = null;
+    this.lastStreamHighlight = 0;
+  }
+
+  // 🆕 NEW: Real-time highlighting for streaming text
+  addStreamingText(txt) {
+    if (!txt || !txt.trim()) return;
+    
+    // Clear existing timeout
+    if (this.streamTimeout) clearTimeout(this.streamTimeout);
+    
+    // Add to stream buffer
+    this.streamBuffer += (this.streamBuffer && !this.streamBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+    
+    // Process immediately if we detect quoted text (highest priority)
+    const quotedMatch = this.streamBuffer.match(/['"]([^'"]+)['"]/);
+    if (quotedMatch && quotedMatch[1].length > 2) {
+      this.processStream(quotedMatch[1]);
+      return;
+    }
+    
+    // Look for common UI element patterns in real-time
+    const patterns = [
+      /\b(click|tap|press)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:button|link|tab|field|input|dropdown|menu))/i,
+      /\b(go\s+to|open|select)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:tab|section|page|menu))/i,
+      /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = this.streamBuffer.match(pattern);
+      if (match && match[2] && match[2].length > 2) {
+        this.processStream(match[2]);
+        return;
+      }
+    }
+    
+    // Fallback: process with short delay for any other potential matches
+    this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
+  }
+
+  processStream(elementText) {
+    const now = Date.now();
+    if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
+    
+    console.log('[VoicePilot] Real-time highlight attempt:', elementText);
+    if (domHighlighter.highlightElement(elementText)) {
+      this.lastStreamHighlight = now;
+      this.streamBuffer = ''; // Clear buffer on successful highlight
+    }
+  }
+
+  processStreamBuffer() {
+    // Extract the most recent potential element name
+    const words = this.streamBuffer.trim().split(/\s+/);
+    if (words.length >= 2) {
+      // Try last 2-4 words as potential element names
+      for (let i = Math.min(4, words.length); i >= 2; i--) {
+        const phrase = words.slice(-i).join(' ');
+        if (phrase.length > 3 && phrase.length < 30) {
+          this.processStream(phrase);
+          break;
+        }
+      }
+    }
+  }
+
+  // Original method for backward compatibility
+  addText(txt) {
+    if (!txt || !txt.trim()) return;
+    if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+    this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+    this.bufferTimeout = setTimeout(() => this.process(), this.delay);
+  }
+
+  process() {
+    const now = Date.now();
+    if (now - this.lastHighlightTime < this.cooldown) {
+      this.textBuffer = '';
+      return;
+    }
+    const phrase = this.textBuffer.trim();
+    this.textBuffer = '';
+    if (!phrase || phrase.length < 3) return;
+    // simple filter to skip greetings
+    if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
+    console.log('[VoicePilot] Trying to highlight:', phrase);
+    if (domHighlighter.highlightElement(phrase)) {
+      this.lastHighlightTime = now;
+    }
+  }
+
+  clear() {
+    this.textBuffer = '';
+    this.streamBuffer = '';
+    if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+    if (this.streamTimeout) clearTimeout(this.streamTimeout);
+  }
+}
+
+// Initialize the highlighting system
+const domHighlighter = new DOMHighlighter();
+const smartHighlighter = new SmartHighlighter();
+
+// Expose global functions (keeping same names for compatibility)
+window.voicePilotHighlight = (message) => {
+  if (!message) return;
+  
+  // Use the enhanced highlighting system
+  if (smartHighlighter.addText) {
+    smartHighlighter.addText(message);
+  }
+  return true;
+};
+
+// 🆕 NEW: Expose real-time streaming highlight function
+window.voicePilotHighlightStream = text => {
+  if (text && text.trim()) {
+    smartHighlighter.addStreamingText(text);
+  }
+  return true;
+};
+
+window.voicePilotClearHighlights = () => {
+  domHighlighter.clearHighlights();
+  smartHighlighter.clear();
+};
+
+window.voicePilotGetPageContext = () => {
+  return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+};
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (domHighlighter && domHighlighter.destroy) {
+    domHighlighter.destroy();
+  }
+});
