@@ -1630,41 +1630,66 @@ When responding, consider the user's current location and what they can see on t
     }
 
     // End call function
-    function endCall() {
-      if (!isCallActive) return;
-
-      try {
-        if (websocket) {
-          websocket.close();
-          websocket = null;
-        }
-
-        isCallActive = false;
-        statusText.textContent = 'Call ended';
-        statusIndicator.textContent = '📞';
-        startBtn.style.display = 'block';
-        endBtn.style.display = 'none';
-        transcript.style.display = 'none';
-        
-        // Clear any highlights
-        if (window.voicePilotClearHighlights) {
-          window.voicePilotClearHighlights();
-        }
-
-        // Stop page context monitoring
-        stopPageContextMonitoring();
-
-        setTimeout(() => {
-          statusText.textContent = 'Ready to help';
-          statusIndicator.textContent = '🎤';
-        }, 2000);
-
-        console.log('[VoicePilot] Call ended');
-
-      } catch (error) {
-        console.error('[VoicePilot] Error ending call:', error);
-      }
+function endCall() {
+  if (!isCallActive) return;
+  try {
+    // 1. Clear audio
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
     }
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // 2. Tear down WebSocket
+    if (websocket) {
+      websocket.onmessage = null;
+      websocket.onclose   = null;
+      websocket.onerror   = null;
+      websocket.close();
+      websocket = null;
+    }
+
+    // 3. Reset UI state
+    isCallActive = false;
+    committedTextRef.current = '';
+    partialTextRef.current = '';
+    transcript.textContent = '';
+    transcript.style.display = 'none';
+    statusText.textContent = 'Call ended';
+    statusIndicator.textContent = '📞';
+    startBtn.style.display = 'block';
+    endBtn.style.display = 'none';
+
+    // 4. Clean up highlights & context monitoring
+    if (window.voicePilotClearHighlights) {
+      window.voicePilotClearHighlights();
+    }
+    stopPageContextMonitoring();
+    pageContextCapture.destroy();
+
+    // 5. Return to idle
+    setTimeout(() => {
+      statusText.textContent = 'Ready to help';
+      statusIndicator.textContent = '🎤';
+    }, 2000);
+
+    console.log('[VoicePilot] Call fully ended and cleaned up');
+  } catch (error) {
+    console.error('[VoicePilot] Error ending call:', error);
+  }
+}
+
 
     // Event listeners
     startBtn.addEventListener('click', startCall);
