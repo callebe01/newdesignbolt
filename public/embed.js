@@ -1254,7 +1254,7 @@ When responding, consider the user's current location and what they can see on t
               font-weight: 600;
               cursor: pointer;
               font-size: 13px;
-            ">📞 End Call</button>
+            ">End Call</button>
           `}
         </div>
       </div>
