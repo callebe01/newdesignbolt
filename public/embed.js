@@ -1070,6 +1070,9 @@
     let pageContextIntervalRef = { current: null };
     let currentPageContextRef = { current: '' };
     let lastSentPageContextRef = { current: '' };
+    let micStreamRef    = { current: null };
+    let sourceNodeRef   = { current: null };
+    let processorRef    = { current: null };
 
     // Initialize Supabase client
     let supabaseClient = null;
