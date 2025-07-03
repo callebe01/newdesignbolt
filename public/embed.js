@@ -1067,31 +1067,36 @@ When responding, consider the user's current location and what they can see on t
   }
 
   // Render collapsed widget
-  function renderCollapsedWidget() {
-    container.innerHTML = `
-      <button id="voicepilot-toggle" style="
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-        color: white;
-        font-size: 0;
-        overflow: hidden;
-      " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-        <img src="/logovp.png" alt="VoicePilot" style="
-          width: 32px;
-          height: 32px;
-          object-fit: contain;
-        " onerror="this.style.display='none'; this.parentElement.innerHTML='💬'; this.parentElement.style.fontSize='24px';">
-      </button>
-    `;
+function renderCollapsedWidget() {
+  container.innerHTML = `
+    <button id="voicepilot-toggle" style="
+      min-width: 160px;
+      height: 48px;
+      border-radius: 24px;
+      background: #000000;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 20px;
+    " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 25px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 20px rgba(0,0,0,0.3)'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+      VOICE CHAT
+    </button>
+  `;
+}
 
     document.getElementById('voicepilot-toggle').onclick = () => {
       isOpen = true;
