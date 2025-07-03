@@ -961,6 +961,77 @@ When responding, consider the user's current location and what they can see on t
         window.voicePilotClearHighlights();
       }
 
+      // ✅ IMPROVED: Explicitly stop microphone stream first with detailed logging
+      if (microphoneStream.current) {
+        console.log('[Live][Audio] Explicitly stopping microphone stream...');
+        try {
+          microphoneStream.current.getTracks().forEach((track) => {
+            console.log('[Live][Audio] Stopping microphone track:', track.kind, track.readyState);
+            track.stop();
+            console.log('[Live][Audio] Microphone track stopped, new state:', track.readyState);
+          });
+          microphoneStream.current = null;
+          setIsMicrophoneActive(false);
+          console.log('[Live][Audio] Microphone stream fully stopped and cleared');
+        } catch (err) {
+          console.error('[Live][Audio] Error stopping microphone stream:', err);
+        }
+      }
+
+      // ✅ IMPROVED: Explicitly stop screen stream with detailed logging
+      if (screenStream.current) {
+        console.log('[Live][Screen] Explicitly stopping screen stream...');
+        try {
+          screenStream.current.getTracks().forEach((track) => {
+            console.log('[Live][Screen] Stopping screen track:', track.kind, track.readyState);
+            track.stop();
+            console.log('[Live][Screen] Screen track stopped, new state:', track.readyState);
+          });
+          screenStream.current = null;
+          setIsScreenSharing(false);
+          console.log('[Live][Screen] Screen stream fully stopped and cleared');
+        } catch (err) {
+          console.error('[Live][Screen] Error stopping screen stream:', err);
+        }
+      }
+      
+      // ✅ IMPROVED: Stop screen streaming explicitly
+      stopScreenStreaming();
+
+      // ✅ IMPROVED: Explicitly stop video stream with detailed logging
+      if (videoStream.current) {
+        console.log('[Live][Video] Explicitly stopping video stream...');
+        try {
+          videoStream.current.getTracks().forEach((track) => {
+            console.log('[Live][Video] Stopping video track:', track.kind, track.readyState);
+            track.stop();
+            console.log('[Live][Video] Video track stopped, new state:', track.readyState);
+          });
+          videoStream.current = null;
+          setIsVideoActive(false);
+          console.log('[Live][Video] Video stream fully stopped and cleared');
+        } catch (err) {
+          console.error('[Live][Video] Error stopping video stream:', err);
+        }
+      }
+
+      // ✅ IMPROVED: Explicitly close audio context with detailed logging
+      if (audioContextRef.current) {
+        console.log('[Live][Audio] Explicitly closing audio context...');
+        try {
+          audioContextRef.current.close().then(() => {
+            console.log('[Live][Audio] Audio context closed successfully');
+          }).catch((err) => {
+            console.error('[Live][Audio] Error closing audio context:', err);
+          });
+          audioContextRef.current = null;
+          audioQueueTimeRef.current = 0;
+          console.log('[Live][Audio] Audio context reference cleared');
+        } catch (err) {
+          console.error('[Live][Audio] Error closing audio context:', err);
+        }
+      }
+
       // Save transcript and conversation data
       if (agentId && finalTranscript) {
         console.log('[Live] Saving transcript for agent:', agentId);
@@ -1012,25 +1083,7 @@ When responding, consider the user's current location and what they can see on t
         websocketRef.current.close();
         websocketRef.current = null;
       }
-      stopScreenStreaming();
-      [screenStream.current, microphoneStream.current, videoStream.current].forEach(
-        (stream) => {
-          if (stream) {
-            stream.getTracks().forEach((t) => t.stop());
-          }
-        }
-      );
-      screenStream.current = null;
-      microphoneStream.current = null;
-      videoStream.current = null;
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-        audioQueueTimeRef.current = 0;
-      }
-      setIsScreenSharing(false);
-      setIsMicrophoneActive(false);
-      setIsVideoActive(false);
+      
       setStatus('ended');
       agentOwnerIdRef.current = null;
       currentAgentIdRef.current = null;
@@ -1039,6 +1092,8 @@ When responding, consider the user's current location and what they can see on t
       // ✅ CLEAR BOTH BUFFERS
       committedTextRef.current = '';
       partialTextRef.current = '';
+      
+      console.log('[Live] Call ended successfully - all streams stopped and resources cleaned up');
     } catch (err) {
       console.error('[Live] Error ending call:', err);
       setErrorMessage('Error ending call.');
