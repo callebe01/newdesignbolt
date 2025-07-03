@@ -1,1965 +1,1751 @@
 (function() {
   'use strict';
 
-  // Get configuration from script attributes
-  const currentScript = document.currentScript || document.querySelector('script[data-agent]');
-  if (!currentScript) {
-    console.error('[VoicePilot] Script element not found');
-    return;
-  }
-
-  const agentId = currentScript.getAttribute('data-agent');
-  const position = currentScript.getAttribute('data-position') || 'bottom-right';
-  const supabaseUrl = currentScript.getAttribute('data-supabase-url') || 
-                     window.voicepilotSupabaseUrl || 
-                     'https://ljfidzppyflrrszkgusa.supabase.co';
-  const supabaseAnonKey = currentScript.getAttribute('data-supabase-anon-key') || 
-                         window.voicepilotSupabaseKey || 
-                         '';
+  // Get script attributes
+  const currentScript = document.currentScript;
+  const agentId = currentScript?.getAttribute('data-agent');
+  const position = currentScript?.getAttribute('data-position') || 'bottom-right';
+  const supabaseUrl = currentScript?.getAttribute('data-supabase-url');
+  const supabaseAnonKey = currentScript?.getAttribute('data-supabase-anon-key');
 
   if (!agentId) {
-    console.error('[VoicePilot] No agent ID provided');
+    console.error('VoicePilot: data-agent attribute is required');
     return;
   }
 
-  // State variables
-  let isOpen = false;
-  let status = 'idle'; // 'idle', 'connecting', 'active', 'ended', 'error'
-  let duration = 0;
-  let errorMessage = null;
-  let isMicrophoneActive = false;
-  let isScreenSharing = false;
-  let websocketRef = null;
-  let microphoneStream = null;
-  let screenStream = null;
-  let audioContextRef = null;
-  let audioQueueTimeRef = 0;
-  let durationTimerRef = null;
-  let maxDurationTimerRef = null;
-  let usageRecordedRef = false;
-  let callEndedRef = false;
-  let agentOwnerIdRef = null;
-  let currentAgentIdRef = null;
-  let conversationIdRef = null;
-  let supabaseClient = null;
-
-  // Two-buffer system for real-time transcription
-  let committedTextRef = '';
-  let partialTextRef = '';
-
-  // Page context monitoring
-  let currentPageContextRef = '';
-  let lastSentPageContextRef = '';
-  let pageContextIntervalRef = null;
-
-  // Screen streaming
-  let screenVideoRef = null;
-  let screenCanvasRef = null;
-  let screenIntervalRef = null;
-
-  // Initialize Supabase client
-  async function initSupabase() {
-    if (supabaseClient) return supabaseClient;
-
-    try {
-      // Dynamically import Supabase
-      const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2.39.3');
-      supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-      console.log('[VoicePilot] Supabase client initialized');
-      return supabaseClient;
-    } catch (error) {
-      console.error('[VoicePilot] Failed to initialize Supabase:', error);
-      return null;
-    }
+  // Set global configuration if provided
+  if (supabaseUrl) {
+    window.voicepilotSupabaseUrl = supabaseUrl;
+  }
+  if (supabaseAnonKey) {
+    window.voicepilotSupabaseKey = supabaseAnonKey;
   }
 
-  // Fetch agent details from Supabase
-  async function fetchAgentDetails(agentId) {
-    try {
-      console.log('[VoicePilot] Fetching agent details for:', agentId);
+  // ═══════════════════════════════════════════════
+  // Enhanced Page Context Capture System - GENERIC APPROACH
+  // ═══════════════════════════════════════════════
+  class PageContextCapture {
+    constructor() {
+      this.lastContext = null;
+      this.contextUpdateInterval = null;
+      this.startContextMonitoring();
+    }
+
+    capturePageContext() {
+      try {
+        const context = {
+          url: {
+            pathname: window.location.pathname,
+            search: window.location.search,
+            hash: window.location.hash,
+            hostname: window.location.hostname
+          },
+          page: {
+            title: document.title || '',
+            description: this.getMetaDescription(),
+            mainHeading: this.getMainHeading(),
+            breadcrumbs: this.getBreadcrumbs(),
+            navigationItems: this.getNavigationItems(),
+            currentScreen: this.getCurrentScreen()
+          },
+          ui: {
+            visibleButtons: this.getVisibleButtons(),
+            formElements: this.getFormElements(),
+            activeSection: this.getActiveSection()
+          },
+          timestamp: new Date().toISOString()
+        };
+
+        this.lastContext = context;
+        return context;
+      } catch (error) {
+        console.warn('[VoicePilot] Error capturing page context:', error);
+        return {
+          url: { pathname: window.location.pathname },
+          page: { title: document.title || 'Unknown Page', currentScreen: 'Unknown' },
+          ui: {},
+          timestamp: new Date().toISOString()
+        };
+      }
+    }
+
+    getMetaDescription() {
+      const metaDesc = document.querySelector('meta[name="description"]');
+      return metaDesc ? metaDesc.getAttribute('content') || '' : '';
+    }
+
+    getMainHeading() {
+      // Look for the most prominent heading in order of importance
+      const h1 = document.querySelector('h1');
+      if (h1 && h1.textContent?.trim()) {
+        return h1.textContent.trim();
+      }
       
-      if (!supabaseClient) {
-        await initSupabase();
+      // Fallback to h2 if no h1
+      const h2 = document.querySelector('h2');
+      if (h2 && h2.textContent?.trim()) {
+        return h2.textContent.trim();
       }
 
-      if (!supabaseClient) {
-        throw new Error('Failed to initialize Supabase client');
+      // Fallback to h3 if no h2
+      const h3 = document.querySelector('h3');
+      if (h3 && h3.textContent?.trim()) {
+        return h3.textContent.trim();
       }
 
-      const { data, error } = await supabaseClient
-        .from('agents')
-        .select('instructions, documentation_urls, status')
-        .eq('id', agentId)
-        .single();
+      return '';
+    }
 
-      if (error) {
-        console.error('[VoicePilot] Supabase error fetching agent:', error);
-        throw new Error(`Failed to fetch agent details: ${error.message}`);
+    getCurrentScreen() {
+      // ✅ GENERIC APPROACH - Focus on content, not specific URLs
+      const mainHeading = this.getMainHeading().toLowerCase();
+      const title = document.title.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
+      
+      // Look for common UI patterns and content indicators
+      const indicators = [];
+      
+      // Check for form-related content
+      if (mainHeading.includes('create') || mainHeading.includes('new') || mainHeading.includes('add')) {
+        indicators.push('creation_form');
+      }
+      if (mainHeading.includes('edit') || mainHeading.includes('update') || mainHeading.includes('modify')) {
+        indicators.push('edit_form');
+      }
+      if (mainHeading.includes('settings') || mainHeading.includes('preferences') || mainHeading.includes('configuration')) {
+        indicators.push('settings_page');
+      }
+      if (mainHeading.includes('dashboard') || mainHeading.includes('overview') || mainHeading.includes('home')) {
+        indicators.push('dashboard_page');
+      }
+      if (mainHeading.includes('list') || mainHeading.includes('browse') || document.querySelectorAll('table, .list, .grid').length > 0) {
+        indicators.push('list_page');
+      }
+      if (mainHeading.includes('details') || mainHeading.includes('view') || mainHeading.includes('information')) {
+        indicators.push('details_page');
+      }
+      if (mainHeading.includes('login') || mainHeading.includes('sign in') || title.includes('login')) {
+        indicators.push('login_page');
+      }
+      if (mainHeading.includes('signup') || mainHeading.includes('register') || mainHeading.includes('sign up')) {
+        indicators.push('signup_page');
       }
 
-      if (!data) {
-        throw new Error('Agent not found');
+      // Check for specific form elements to determine page type
+      const forms = document.querySelectorAll('form');
+      if (forms.length > 0) {
+        const hasPasswordField = document.querySelector('input[type="password"]');
+        const hasEmailField = document.querySelector('input[type="email"]');
+        
+        if (hasPasswordField && hasEmailField) {
+          if (mainHeading.includes('sign up') || mainHeading.includes('register')) {
+            indicators.push('signup_form');
+          } else {
+            indicators.push('login_form');
+          }
+        } else if (forms.length === 1 && forms[0].querySelectorAll('input, textarea, select').length > 3) {
+          indicators.push('data_entry_form');
+        }
       }
 
-      if (data.status !== 'active') {
-        throw new Error('Agent is not active');
+      // Return the most specific indicator, or a generic description
+      if (indicators.length > 0) {
+        return indicators[0];
       }
 
-      console.log('[VoicePilot] Successfully fetched agent details:', {
-        instructionsLength: data.instructions?.length || 0,
-        documentationUrls: data.documentation_urls?.length || 0
+      // Fallback to generic content description
+      if (mainHeading) {
+        return `content_page_${mainHeading.replace(/[^a-z0-9]/g, '_').substring(0, 20)}`;
+      }
+
+      return 'content_page';
+    }
+
+    getBreadcrumbs() {
+      const breadcrumbs = [];
+      
+      // Common breadcrumb selectors
+      const selectors = [
+        '[aria-label*="breadcrumb"] a',
+        '.breadcrumb a',
+        '.breadcrumbs a',
+        'nav[role="navigation"] a',
+        '.nav-breadcrumb a'
+      ];
+
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0 && elements.length < 10) { // Reasonable breadcrumb size
+          elements.forEach(el => {
+            const text = el.textContent?.trim();
+            if (text && text.length > 0 && text.length < 100) {
+              breadcrumbs.push(text);
+            }
+          });
+          break; // Use first matching selector
+        }
+      }
+
+      return breadcrumbs.slice(0, 5); // Limit to 5 items
+    }
+
+    getNavigationItems() {
+      const navItems = [];
+      
+      // Look for main navigation - prioritize semantic navigation
+      const navSelectors = [
+        'nav[role="navigation"] a',
+        'nav a',
+        '[role="navigation"] a',
+        'header nav a',
+        '.navigation a',
+        '.nav a'
+      ];
+
+      for (const selector of navSelectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0 && elements.length < 20) { // Reasonable nav size
+          elements.forEach(el => {
+            if (this.isElementVisible(el)) {
+              const text = el.textContent?.trim();
+              if (text && text.length > 0 && text.length < 50) {
+                navItems.push(text);
+              }
+            }
+          });
+          if (navItems.length > 0) break; // Use first successful selector
+        }
+      }
+
+      return navItems.slice(0, 10); // Limit to 10 items
+    }
+
+    getVisibleButtons() {
+      const buttons = [];
+      const buttonElements = document.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]');
+      
+      buttonElements.forEach(el => {
+        if (this.isElementVisible(el)) {
+          const text = el.textContent?.trim() || 
+                      el.value?.trim() || 
+                      el.getAttribute('aria-label')?.trim() ||
+                      el.getAttribute('title')?.trim();
+          if (text && text.length > 0 && text.length < 50) {
+            buttons.push(text);
+          }
+        }
       });
 
-      return {
-        instructions: data.instructions || 'You are a helpful AI assistant.',
-        documentationUrls: data.documentation_urls || []
-      };
-    } catch (err) {
-      console.error('[VoicePilot] Error fetching agent details:', err);
-      throw err;
+      return buttons.slice(0, 15); // Limit to 15 buttons
     }
-  }
 
-  // Create widget HTML
-  function createWidget() {
-    const widget = document.createElement('div');
-    widget.id = 'voicepilot-widget';
-    widget.style.cssText = `
-      position: fixed;
-      z-index: 9999;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      ${getPositionStyles(position)}
-    `;
-
-    widget.innerHTML = `
-      <div id="voicepilot-fab" style="
-        width: 60px;
-        height: 60px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        transition: all 0.3s ease;
-      ">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </div>
+    getFormElements() {
+      const forms = [];
+      const formElements = document.querySelectorAll('form');
       
-      <div id="voicepilot-panel" style="
-        position: absolute;
-        bottom: 80px;
-        right: 0;
-        width: 320px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-        display: none;
-        overflow: hidden;
-      ">
-        <div style="
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 16px;
-          position: relative;
-        ">
-          <button id="voicepilot-close" style="
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            padding: 4px;
-          ">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-          <h3 style="margin: 0; font-size: 16px; font-weight: 600;">AI Assistant</h3>
-          <p id="voicepilot-status" style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9;">Ready to help</p>
-        </div>
-        
-        <div style="padding: 16px;">
-          <div id="voicepilot-content">
-            <div id="voicepilot-idle" style="text-align: center;">
-              <div style="
-                width: 60px;
-                height: 60px;
-                background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 16px;
-              ">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-              </div>
-              <p style="margin: 0 0 16px; color: #666; font-size: 14px;">Start a voice conversation with your AI assistant</p>
-              <button id="voicepilot-start" style="
-                width: 100%;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                padding: 12px;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.2s ease;
-              ">Start Voice Chat</button>
-            </div>
-            
-            <div id="voicepilot-active" style="display: none;">
-              <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 16px;
-                gap: 8px;
-              ">
-                <div style="
-                  width: 8px;
-                  height: 8px;
-                  background: #ef4444;
-                  border-radius: 50%;
-                  animation: pulse 2s infinite;
-                "></div>
-                <span style="font-size: 12px; font-weight: 500; color: #666;">LIVE</span>
-              </div>
-              
-              <div id="voicepilot-transcript" style="
-                background: #f8f9fa;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 16px;
-                max-height: 120px;
-                overflow-y: auto;
-                font-size: 13px;
-                line-height: 1.4;
-                color: #333;
-                min-height: 40px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-              ">Start speaking to begin the conversation</div>
-              
-              <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                <button id="voicepilot-mic" style="
-                  flex: 1;
-                  background: #667eea;
-                  color: white;
-                  border: none;
-                  padding: 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 4px;
-                ">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                  </svg>
-                  Mute
-                </button>
-                
-                <button id="voicepilot-screen" style="
-                  flex: 1;
-                  background: #f3f4f6;
-                  color: #374151;
-                  border: none;
-                  padding: 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 4px;
-                ">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                    <line x1="8" y1="21" x2="16" y2="21"/>
-                    <line x1="12" y1="17" x2="12" y2="21"/>
-                  </svg>
-                  Share
-                </button>
-              </div>
-              
-              <button id="voicepilot-end" style="
-                width: 100%;
-                background: #ef4444;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 500;
-                cursor: pointer;
-              ">End Call</button>
-            </div>
-            
-            <div id="voicepilot-error" style="display: none;">
-              <div style="
-                background: #fef2f2;
-                border: 1px solid #fecaca;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 16px;
-              ">
-                <p style="margin: 0; color: #dc2626; font-size: 13px;" id="voicepilot-error-text"></p>
-              </div>
-              <button id="voicepilot-retry" style="
-                width: 100%;
-                background: #667eea;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 8px;
-                font-size: 14px;
-                cursor: pointer;
-              ">Try Again</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+      formElements.forEach(form => {
+        if (this.isElementVisible(form)) {
+          const inputs = form.querySelectorAll('input:not([type="hidden"]), textarea, select');
+          const labels = [];
+          
+          inputs.forEach(input => {
+            const label = this.getInputLabel(input);
+            if (label && label.length < 50) {
+              labels.push(label);
+            }
+          });
 
-    // Add CSS animations
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-      #voicepilot-fab:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 25px rgba(0,0,0,0.2);
-      }
-      #voicepilot-start:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-      }
-    `;
-    document.head.appendChild(style);
-
-    return widget;
-  }
-
-  function getPositionStyles(pos) {
-    const spacing = '24px';
-    switch (pos) {
-      case 'bottom-left':
-        return `bottom: ${spacing}; left: ${spacing};`;
-      case 'top-right':
-        return `top: ${spacing}; right: ${spacing};`;
-      case 'top-left':
-        return `top: ${spacing}; left: ${spacing};`;
-      default:
-        return `bottom: ${spacing}; right: ${spacing};`;
-    }
-  }
-
-  // Update transcript display
-  function updateTranscriptDisplay() {
-    const transcriptEl = document.getElementById('voicepilot-transcript');
-    if (!transcriptEl) return;
-
-    const committed = committedTextRef;
-    const partial = partialTextRef;
-    
-    let fullText = committed;
-    if (committed && partial) {
-      const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
-      fullText = committed + (needsSpace ? ' ' : '') + partial;
-    } else if (partial) {
-      fullText = partial;
-    }
-    
-    if (fullText.trim()) {
-      transcriptEl.textContent = fullText;
-      transcriptEl.style.textAlign = 'left';
-    } else {
-      transcriptEl.textContent = 'Start speaking to begin the conversation';
-      transcriptEl.style.textAlign = 'center';
-    }
-  }
-
-  // Update UI based on status
-  function updateUI() {
-    const statusEl = document.getElementById('voicepilot-status');
-    const idleEl = document.getElementById('voicepilot-idle');
-    const activeEl = document.getElementById('voicepilot-active');
-    const errorEl = document.getElementById('voicepilot-error');
-    const micBtn = document.getElementById('voicepilot-mic');
-    const screenBtn = document.getElementById('voicepilot-screen');
-
-    // Update status text
-    if (statusEl) {
-      switch (status) {
-        case 'connecting':
-          statusEl.textContent = 'Connecting...';
-          break;
-        case 'active':
-          statusEl.textContent = `${formatTime(duration)} elapsed`;
-          break;
-        case 'error':
-          statusEl.textContent = 'Connection failed';
-          break;
-        case 'ended':
-          statusEl.textContent = 'Call ended';
-          break;
-        default:
-          statusEl.textContent = 'Ready to help';
-      }
-    }
-
-    // Show/hide content sections
-    if (idleEl) idleEl.style.display = (status === 'idle' || status === 'ended') ? 'block' : 'none';
-    if (activeEl) activeEl.style.display = (status === 'active' || status === 'connecting') ? 'block' : 'none';
-    if (errorEl) errorEl.style.display = status === 'error' ? 'block' : 'none';
-
-    // Update button states
-    if (micBtn) {
-      micBtn.style.background = isMicrophoneActive ? '#667eea' : '#f3f4f6';
-      micBtn.style.color = isMicrophoneActive ? 'white' : '#374151';
-      micBtn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          ${isMicrophoneActive ? 
-            '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>' :
-            '<path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/><line x1="2" y1="2" x2="22" y2="22"/>'
+          if (labels.length > 0) {
+            forms.push({
+              action: form.action || '',
+              fields: labels.slice(0, 10) // Limit fields per form
+            });
           }
-        </svg>
-        ${isMicrophoneActive ? 'Mute' : 'Unmute'}
-      `;
+        }
+      });
+
+      return forms.slice(0, 3); // Limit to 3 forms
     }
 
-    if (screenBtn) {
-      screenBtn.style.background = isScreenSharing ? '#667eea' : '#f3f4f6';
-      screenBtn.style.color = isScreenSharing ? 'white' : '#374151';
-      screenBtn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        ${isScreenSharing ? 'Stop Share' : 'Share'}
-      `;
+    getInputLabel(input) {
+      // Try various ways to get input label
+      const id = input.id;
+      if (id) {
+        const label = document.querySelector(`label[for="${id}"]`);
+        if (label && label.textContent?.trim()) {
+          return label.textContent.trim();
+        }
+      }
+
+      // Check for parent label
+      const parentLabel = input.closest('label');
+      if (parentLabel && parentLabel.textContent?.trim()) {
+        return parentLabel.textContent.trim();
+      }
+
+      const placeholder = input.placeholder?.trim();
+      if (placeholder) return placeholder;
+
+      const ariaLabel = input.getAttribute('aria-label')?.trim();
+      if (ariaLabel) return ariaLabel;
+
+      const title = input.getAttribute('title')?.trim();
+      if (title) return title;
+
+      return '';
     }
 
-    // Update error message
-    const errorTextEl = document.getElementById('voicepilot-error-text');
-    if (errorTextEl && errorMessage) {
-      errorTextEl.textContent = errorMessage;
-    }
-  }
-
-  function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  }
-
-  // Audio playback
-  async function playAudioBuffer(pcmBlob) {
-    try {
-      console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+    getActiveSection() {
+      // Try to determine what section of the page is most prominent
+      const sections = document.querySelectorAll('main, section, article, .content, .main-content, [role="main"]');
       
-      const arrayBuffer = await pcmBlob.arrayBuffer();
-      const pcm16 = new Int16Array(arrayBuffer);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 32768;
+      for (const section of sections) {
+        if (this.isElementVisible(section)) {
+          const heading = section.querySelector('h1, h2, h3');
+          if (heading && heading.textContent?.trim()) {
+            return heading.textContent.trim();
+          }
+        }
       }
 
-      if (!audioContextRef) {
-        audioContextRef = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      const audioCtx = audioContextRef;
+      return '';
+    }
 
-      const buffer = audioCtx.createBuffer(1, float32.length, 24000);
-      buffer.copyToChannel(float32, 0, 0);
+    isElementVisible(el) {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return (
+        rect.width > 0 && rect.height > 0 &&
+        style.visibility !== 'hidden' &&
+        style.display !== 'none' &&
+        style.opacity !== '0'
+      );
+    }
 
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioCtx.destination);
+    startContextMonitoring() {
+      // Update context periodically and on navigation changes
+      this.contextUpdateInterval = setInterval(() => {
+        this.capturePageContext();
+      }, 5000); // Update every 5 seconds
 
-      let startAt = audioCtx.currentTime;
-      if (audioQueueTimeRef > audioCtx.currentTime) {
-        startAt = audioQueueTimeRef;
-      }
-      source.start(startAt);
-      audioQueueTimeRef = startAt + buffer.duration;
+      // Listen for navigation changes
+      let lastUrl = window.location.href;
+      const observer = new MutationObserver(() => {
+        if (window.location.href !== lastUrl) {
+          lastUrl = window.location.href;
+          setTimeout(() => this.capturePageContext(), 500); // Small delay for DOM updates
+        }
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      // Listen for popstate (back/forward navigation)
+      window.addEventListener('popstate', () => {
+        setTimeout(() => this.capturePageContext(), 500);
+      });
+    }
+
+    getContextSummary() {
+      const context = this.lastContext || this.capturePageContext();
       
-      console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
-    } catch (err) {
-      console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
-    }
-  }
-
-  // Get page context
-  function getPageContext() {
-    try {
-      if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
-        return window.voicePilotGetPageContext();
+      // Create a concise summary for the AI with prioritized current screen info
+      const summary = [];
+      
+      // ✅ PRIORITIZE MAIN HEADING - Most descriptive context
+      if (context.page.mainHeading) {
+        summary.push(`Current page: "${context.page.mainHeading}"`);
       }
-    } catch (error) {
-      console.warn('[VoicePilot] Error getting page context:', error);
+
+      // Page type context (if different from heading)
+      if (context.page.currentScreen && !summary.join(' ').toLowerCase().includes(context.page.currentScreen.replace(/_/g, ' '))) {
+        const screenType = context.page.currentScreen.replace(/_/g, ' ').replace(/page|form/, '').trim();
+        if (screenType) {
+          summary.push(`Page type: ${screenType}`);
+        }
+      }
+
+      // Page title for additional context (if different from heading)
+      if (context.page.title && !summary.join(' ').includes(context.page.title)) {
+        summary.push(`Page title: "${context.page.title}"`);
+      }
+      
+      // URL context (only if meaningful)
+      if (context.url.pathname !== '/' && context.url.pathname.length > 1) {
+        const pathParts = context.url.pathname.split('/').filter(p => p && p.length > 0);
+        if (pathParts.length > 0) {
+          summary.push(`URL path: /${pathParts.join('/')}`);
+        }
+      }
+
+      // Navigation context
+      if (context.page.breadcrumbs && context.page.breadcrumbs.length > 0) {
+        summary.push(`Navigation: ${context.page.breadcrumbs.join(' > ')}`);
+      }
+
+      // Available actions (most relevant buttons)
+      if (context.ui.visibleButtons && context.ui.visibleButtons.length > 0) {
+        const buttons = context.ui.visibleButtons.slice(0, 5).join(', ');
+        summary.push(`Available actions: ${buttons}`);
+      }
+
+      // Form context (if user is on a form)
+      if (context.ui.formElements && context.ui.formElements.length > 0) {
+        const formFields = context.ui.formElements[0].fields.slice(0, 3).join(', ');
+        summary.push(`Form fields: ${formFields}`);
+      }
+
+      return summary.join('. ');
     }
-    
-    return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+
+    destroy() {
+      if (this.contextUpdateInterval) {
+        clearInterval(this.contextUpdateInterval);
+      }
+    }
   }
 
-  // Start page context monitoring
-  function startPageContextMonitoring() {
-    if (pageContextIntervalRef) {
-      clearInterval(pageContextIntervalRef);
+  const pageContextCapture = new PageContextCapture();
+
+  // ═══════════════════════════════════════════════
+  // Enhanced DOM Highlighting System – EXPANDED ELEMENT SUPPORT
+  // ═══════════════════════════════════════════════
+  class DOMHighlighter {
+    constructor() {
+      this.highlightedElements = new Set();
+      this.highlightClass = 'voicepilot-highlight';
+      this.highlightStyle = null;
+      this.injectStyles();
     }
 
-    pageContextIntervalRef = setInterval(() => {
-      if (status !== 'active' || !websocketRef || websocketRef.readyState !== WebSocket.OPEN) {
+    injectStyles() {
+      if (this.highlightStyle) this.highlightStyle.remove();
+      this.highlightStyle = document.createElement('style');
+      this.highlightStyle.id = 'voicepilot-highlight-styles';
+      this.highlightStyle.textContent = `
+        .${this.highlightClass} {
+          position: relative !important;
+          outline: 2px solid #f59e0b !important;
+          outline-offset: 2px !important;
+          box-shadow: 
+            0 0 0 4px rgba(245, 158, 11, 0.2),
+            0 0 12px rgba(245, 158, 11, 0.4) !important;
+          border-radius: 8px !important;
+          transition: all 0.3s ease !important;
+          z-index: 9999 !important;
+          animation: gentle-pulse 2s infinite ease-in-out;
+        }
+        
+        @keyframes gentle-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+        }
+        
+        .${this.highlightClass}-badge {
+          position: absolute;
+          top: -12px;
+          right: -8px;
+          background: #f59e0b;
+          color: #ffffff;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 3px 6px;
+          border-radius: 4px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          z-index: 10000;
+          animation: badge-appear 0.3s ease-out;
+          pointer-events: none;
+        }
+        
+        @keyframes badge-appear {
+          0% { opacity: 0; transform: translateY(-4px) scale(0.8); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `;
+      document.head.appendChild(this.highlightStyle);
+    }
+
+    isElementVisible(el) {
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return (
+        rect.width > 0 && rect.height > 0 &&
+        style.visibility !== 'hidden' &&
+        style.display !== 'none' &&
+        style.opacity !== '0' &&
+        rect.top < window.innerHeight &&
+        rect.bottom > 0 &&
+        rect.left < window.innerWidth &&
+        rect.right > 0
+      );
+    }
+
+    // 🆕 EXPANDED: More comprehensive element selector
+    getInteractiveElements() {
+      const selectors = [
+        // Original button/input selectors
+        'button',
+        'input[type="button"]',
+        'input[type="submit"]',
+        'input[type="reset"]',
+        
+        // 🆕 Form elements
+        'input[type="text"]',
+        'input[type="email"]',
+        'input[type="password"]',
+        'input[type="search"]',
+        'input[type="tel"]',
+        'input[type="url"]',
+        'input[type="number"]',
+        'input[type="date"]',
+        'input[type="datetime-local"]',
+        'input[type="time"]',
+        'input[type="checkbox"]',
+        'input[type="radio"]',
+        'input[type="file"]',
+        'textarea',
+        'select',
+        
+        // 🆕 Navigation elements
+        'a[href]',
+        '[role="tab"]',
+        '[role="tabpanel"]',
+        '[data-tab]',
+        '.tab',
+        '.nav-item',
+        '.navigation-item',
+        
+        // 🆕 Interactive UI elements
+        '[role="button"]',
+        '[role="menuitem"]',
+        '[role="option"]',
+        '[role="switch"]',
+        '[role="slider"]',
+        '[aria-expanded]',
+        '[data-toggle]',
+        '[data-action]',
+        
+        // 🆕 Common clickable elements
+        '.dropdown-toggle',
+        '.menu-item',
+        '.clickable',
+        '[onclick]',
+        
+        // 🆕 Cards and panels (if they're clickable)
+        '.card[role="button"]',
+        '.panel[role="button"]',
+        '[data-clickable="true"]'
+      ];
+
+      return Array.from(
+        document.querySelectorAll(selectors.join(','))
+      ).filter(el => this.isElementVisible(el) && this.isElementInteractive(el));
+    }
+
+    // 🆕 Helper to determine if element is truly interactive
+    isElementInteractive(el) {
+      // Skip if disabled
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+        return false;
+      }
+
+      // Skip if it's a label without for attribute (not directly interactive)
+      if (el.tagName === 'LABEL' && !el.getAttribute('for')) {
+        return false;
+      }
+
+      // For links, ensure they have href
+      if (el.tagName === 'A' && !el.getAttribute('href')) {
+        return false;
+      }
+
+      // Check if element has click handlers or interactive roles
+      const hasClickHandler = el.onclick || 
+                             el.getAttribute('onclick') || 
+                             el.getAttribute('data-action') ||
+                             el.getAttribute('data-toggle');
+                             
+      const isFormElement = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName);
+      
+      const hasInteractiveRole = [
+        'button', 'tab', 'menuitem', 'option', 'switch', 'slider'
+      ].includes(el.getAttribute('role'));
+
+      return isFormElement || hasClickHandler || hasInteractiveRole || el.tagName === 'A';
+    }
+
+    // 🆕 ENHANCED: Better text extraction for different element types
+    getElementText(el) {
+      let text = '';
+      
+      // For form inputs, prioritize labels and placeholders
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
+        // Try to find associated label by ID
+        const id = el.id;
+        if (id) {
+          const label = document.querySelector(`label[for="${id}"]`);
+          if (label && label.textContent?.trim()) {
+            text = label.textContent.trim();
+          }
+        }
+        
+        // 🆕 Try to find nearby labels (common pattern where label appears before input)
+        if (!text) {
+          // Look for label immediately before this element
+          let previousElement = el.previousElementSibling;
+          while (previousElement && !text) {
+            if (previousElement.tagName === 'LABEL' && previousElement.textContent?.trim()) {
+              text = previousElement.textContent.trim();
+              break;
+            }
+            // Also check if the previous element contains a label
+            const labelInPrev = previousElement.querySelector('label');
+            if (labelInPrev && labelInPrev.textContent?.trim()) {
+              text = labelInPrev.textContent.trim();
+              break;
+            }
+            previousElement = previousElement.previousElementSibling;
+          }
+        }
+
+        // 🆕 Try to find parent container with label
+        if (!text) {
+          let parent = el.parentElement;
+          let depth = 0;
+          while (parent && depth < 3) { // Don't go too far up
+            const labelInParent = parent.querySelector('label');
+            if (labelInParent && labelInParent.textContent?.trim()) {
+              text = labelInParent.textContent.trim();
+              break;
+            }
+            parent = parent.parentElement;
+            depth++;
+          }
+        }
+        
+        // Fallback to placeholder or aria-label
+        if (!text) {
+          text = el.placeholder?.trim() || 
+                 el.getAttribute('aria-label')?.trim() || 
+                 el.getAttribute('title')?.trim() || 
+                 el.value?.trim() || '';
+        }
+      }
+      // For other elements, use text content or aria-label
+      else {
+        text = el.getAttribute('aria-label')?.trim() ||
+               el.getAttribute('title')?.trim() ||
+               el.textContent?.trim() ||
+               el.value?.trim() || '';
+      }
+
+      return text;
+    }
+
+    // 🆕 ENHANCED: Smarter scoring system for different element types
+    scoreMatch(element, searchPhrase) {
+      const elementText = this.getElementText(element).toLowerCase();
+      const phrase = searchPhrase.toLowerCase();
+      
+      if (!elementText || !phrase) return 0;
+
+      // Exact match gets highest score
+      if (elementText === phrase) return 10;
+      
+      // Word boundary matches get high score
+      const wordBoundaryRegex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (wordBoundaryRegex.test(elementText)) return 8;
+      
+      // Starts with gets good score
+      if (elementText.startsWith(phrase)) return 6;
+      
+      // Contains gets medium score
+      if (elementText.includes(phrase)) return 4;
+      
+      // Fuzzy matching for slight variations
+      const similarity = this.calculateSimilarity(elementText, phrase);
+      if (similarity > 0.8) return 3;
+      if (similarity > 0.6) return 2;
+      
+      return 0;
+    }
+
+    // 🆕 Simple similarity calculation for fuzzy matching
+    calculateSimilarity(str1, str2) {
+      const longer = str1.length > str2.length ? str1 : str2;
+      const shorter = str1.length > str2.length ? str2 : str1;
+      
+      if (longer.length === 0) return 1.0;
+      
+      const editDistance = this.levenshteinDistance(longer, shorter);
+      return (longer.length - editDistance) / longer.length;
+    }
+
+    levenshteinDistance(str1, str2) {
+      const matrix = Array(str2.length + 1).fill(null).map(() => 
+        Array(str1.length + 1).fill(null)
+      );
+      
+      for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+      for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+      
+      for (let j = 1; j <= str2.length; j++) {
+        for (let i = 1; i <= str1.length; i++) {
+          const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+          matrix[j][i] = Math.min(
+            matrix[j][i - 1] + 1,
+            matrix[j - 1][i] + 1,
+            matrix[j - 1][i - 1] + indicator
+          );
+        }
+      }
+      
+      return matrix[str2.length][str1.length];
+    }
+
+    highlightElement(searchText) {
+      // Extract phrase from quotes or use full text
+      let phrase = searchText.trim();
+      const quotedMatch = phrase.match(/['"]([^'"]+)['"]/);
+      if (quotedMatch) {
+        phrase = quotedMatch[1];
+      }
+
+      phrase = phrase.toLowerCase();
+      if (!phrase || phrase.length < 2) return false;
+
+      // Get all interactive elements
+      const elements = this.getInteractiveElements();
+      
+      // Score all matches
+      const matches = elements
+        .map(el => ({
+          el,
+          text: this.getElementText(el),
+          score: this.scoreMatch(el, phrase)
+        }))
+        .filter(match => match.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      if (!matches.length) {
+        console.log('[VoicePilot] No interactive elements matching:', phrase);
+        return false;
+      }
+
+      // Highlight the best match
+      this.clearHighlights();
+      const bestMatch = matches[0];
+      this.addHighlight(bestMatch.el, true);
+      bestMatch.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      console.log('[VoicePilot] Highlighting element:', {
+        text: bestMatch.text,
+        type: bestMatch.el.tagName,
+        score: bestMatch.score
+      });
+      
+      return true;
+    }
+
+    addHighlight(el, isPrimary = false) {
+      el.classList.add(this.highlightClass);
+      this.highlightedElements.add(el);
+
+      if (isPrimary) {
+        const badge = document.createElement('div');
+        badge.className = `${this.highlightClass}-badge`;
+        badge.textContent = 'AI';
+        badge.style.position = 'absolute';
+        el.style.position = 'relative';
+        el.appendChild(badge);
+      }
+    }
+
+    clearHighlights() {
+      this.highlightedElements.forEach(el => {
+        el.classList.remove(this.highlightClass);
+        el.querySelectorAll(`.${this.highlightClass}-badge`)
+          .forEach(badge => badge.remove());
+      });
+      this.highlightedElements.clear();
+    }
+
+    destroy() {
+      this.clearHighlights();
+      if (this.highlightStyle) this.highlightStyle.remove();
+      this.highlightStyle = null;
+    }
+  }
+
+  const domHighlighter = new DOMHighlighter();
+
+  // ═══════════════════════════════════════════════
+  // SmartHighlighter (real-time highlighting as AI speaks)
+  // ═══════════════════════════════════════════════
+  class SmartHighlighter {
+    constructor() {
+      this.textBuffer = '';
+      this.bufferTimeout = null;
+      this.lastHighlightTime = 0;
+      this.cooldown = 1500;   // Reduced from 2000ms
+      this.delay    = 300;    // Reduced from 1500ms for faster response
+      this.streamBuffer = ''; // New: for real-time streaming
+      this.streamTimeout = null;
+      this.lastStreamHighlight = 0;
+    }
+
+    // 🆕 NEW: Real-time highlighting for streaming text
+    addStreamingText(txt) {
+      if (!txt || !txt.trim()) return;
+      
+      // Clear existing timeout
+      if (this.streamTimeout) clearTimeout(this.streamTimeout);
+      
+      // Add to stream buffer
+      this.streamBuffer += (this.streamBuffer && !this.streamBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+      
+      // Process immediately if we detect quoted text (highest priority)
+      const quotedMatch = this.streamBuffer.match(/['"]([^'"]+)['"]/);
+      if (quotedMatch && quotedMatch[1].length > 2) {
+        this.processStream(quotedMatch[1]);
         return;
       }
+      
+      // Look for common UI element patterns in real-time
+      const patterns = [
+        /\b(click|tap|press)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:button|link|tab|field|input|dropdown|menu))/i,
+        /\b(go\s+to|open|select)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:tab|section|page|menu))/i,
+        /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = this.streamBuffer.match(pattern);
+        if (match && match[2] && match[2].length > 2) {
+          this.processStream(match[2]);
+          return;
+        }
+      }
+      
+      // Fallback: process with short delay for any other potential matches
+      this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
+    }
 
+    processStream(elementText) {
+      const now = Date.now();
+      if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
+      
+      console.log('[VoicePilot] Real-time highlight attempt:', elementText);
+      if (domHighlighter.highlightElement(elementText)) {
+        this.lastStreamHighlight = now;
+        this.streamBuffer = ''; // Clear buffer on successful highlight
+      }
+    }
+
+    processStreamBuffer() {
+      // Extract the most recent potential element name
+      const words = this.streamBuffer.trim().split(/\s+/);
+      if (words.length >= 2) {
+        // Try last 2-4 words as potential element names
+        for (let i = Math.min(4, words.length); i >= 2; i--) {
+          const phrase = words.slice(-i).join(' ');
+          if (phrase.length > 3 && phrase.length < 30) {
+            this.processStream(phrase);
+            break;
+          }
+        }
+      }
+    }
+
+    // Original method for backward compatibility
+    addText(txt) {
+      if (!txt || !txt.trim()) return;
+      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+      this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
+      this.bufferTimeout = setTimeout(() => this.process(), this.delay);
+    }
+
+    process() {
+      const now = Date.now();
+      if (now - this.lastHighlightTime < this.cooldown) {
+        this.textBuffer = '';
+        return;
+      }
+      const phrase = this.textBuffer.trim();
+      this.textBuffer = '';
+      if (!phrase || phrase.length < 3) return;
+      // simple filter to skip greetings
+      if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
+      console.log('[VoicePilot] Trying to highlight:', phrase);
+      if (domHighlighter.highlightElement(phrase)) {
+        this.lastHighlightTime = now;
+      }
+    }
+
+    clear() {
+      this.textBuffer = '';
+      this.streamBuffer = '';
+      if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
+      if (this.streamTimeout) clearTimeout(this.streamTimeout);
+    }
+  }
+
+  const smartHighlighter = new SmartHighlighter();
+
+  // Expose global functions
+  window.voicePilotHighlight = text => { 
+    if (text && text.trim()) {
+      smartHighlighter.addText(text); 
+    }
+    return true; 
+  };
+
+  // 🆕 NEW: Expose real-time streaming highlight function
+  window.voicePilotHighlightStream = text => {
+    if (text && text.trim()) {
+      smartHighlighter.addStreamingText(text);
+    }
+    return true;
+  };
+  
+  window.voicePilotClearHighlights = () => {
+    domHighlighter.clearHighlights();
+    smartHighlighter.clear();
+  };
+
+  // ✅ NEW: Expose page context function
+  window.voicePilotGetPageContext = () => {
+    return pageContextCapture.getContextSummary();
+  };
+
+  // ────────────────────────────────────────────────────
+  // Widget creation
+  // ────────────────────────────────────────────────────
+  function createWidget() {
+    // Create widget container
+    const widget = document.createElement('div');
+    widget.id = 'voicepilot-widget';
+    
+    // Position mapping
+    const positions = {
+      'bottom-right': { bottom: '20px', right: '20px' },
+      'bottom-left': { bottom: '20px', left: '20px' },
+      'top-right': { top: '20px', right: '20px' },
+      'top-left': { top: '20px', left: '20px' }
+    };
+    
+    const pos = positions[position] || positions['bottom-right'];
+    
+    // Apply styles
+    Object.assign(widget.style, {
+      position: 'fixed',
+      zIndex: '10000',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      ...pos
+    });
+
+    // Widget HTML
+    widget.innerHTML = `
+      <div id="voicepilot-container" style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        padding: 20px;
+        min-width: 320px;
+        max-width: 400px;
+        color: white;
+        transition: all 0.3s ease;
+      ">
+        <div id="voicepilot-header" style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 15px;
+        ">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
+            🎯 Voice Guide
+          </h3>
+          <button id="voicepilot-close" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">×</button>
+        </div>
+        
+        <div id="voicepilot-status" style="
+          text-align: center;
+          margin-bottom: 20px;
+        ">
+          <div id="voicepilot-status-indicator" style="
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+          ">🎤</div>
+          <div id="voicepilot-status-text" style="
+            font-size: 14px;
+            opacity: 0.9;
+          ">Ready to help</div>
+        </div>
+        
+        <div id="voicepilot-controls" style="
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        ">
+          <button id="voicepilot-start" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+          ">Start Call</button>
+          <button id="voicepilot-end" style="
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: none;
+          ">End Call</button>
+        </div>
+        
+        <div id="voicepilot-transcript" style="
+          margin-top: 15px;
+          padding: 10px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 10px;
+          font-size: 12px;
+          max-height: 100px;
+          overflow-y: auto;
+          display: none;
+        "></div>
+      </div>
+    `;
+
+    document.body.appendChild(widget);
+
+    // Get elements
+    const container = widget.querySelector('#voicepilot-container');
+    const closeBtn = widget.querySelector('#voicepilot-close');
+    const startBtn = widget.querySelector('#voicepilot-start');
+    const endBtn = widget.querySelector('#voicepilot-end');
+    const statusIndicator = widget.querySelector('#voicepilot-status-indicator');
+    const statusText = widget.querySelector('#voicepilot-status-text');
+    const transcript = widget.querySelector('#voicepilot-transcript');
+
+    let isCallActive = false;
+    let websocket = null;
+
+    // Audio processing refs (mirroring LiveCallContext)
+    let audioContextRef = { current: null };
+    let audioQueueTimeRef = { current: 0 };
+    let committedTextRef = { current: '' };
+    let partialTextRef = { current: '' };
+    let greetingSentRef = { current: false };
+    let pageContextIntervalRef = { current: null };
+    let currentPageContextRef = { current: '' };
+    let lastSentPageContextRef = { current: '' };
+    let micStreamRef    = { current: null };
+    let sourceNodeRef   = { current: null };
+    let processorRef    = { current: null };
+
+    // Initialize Supabase client
+    let supabaseClient = null;
+    if (window.voicepilotSupabaseUrl && window.voicepilotSupabaseKey) {
+      // Dynamically import Supabase client
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+      document.head.appendChild(script);
+      
+      script.onload = () => {
+        supabaseClient = window.supabase.createClient(
+          window.voicepilotSupabaseUrl,
+          window.voicepilotSupabaseKey
+        );
+      };
+    }
+
+    // Audio processing functions (copied from LiveCallContext)
+    const playAudioBuffer = async (pcmBlob) => {
       try {
-        const newContext = getPageContext();
-        currentPageContextRef = newContext;
+        console.log('[VoicePilot][Audio] Received audio buffer, size:', pcmBlob.size, 'bytes');
+        
+        const arrayBuffer = await pcmBlob.arrayBuffer();
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768;
+        }
 
-        if (newContext !== lastSentPageContextRef) {
-          console.log('[VoicePilot] Page context changed, updating AI:', newContext);
-          
-          const contextUpdateMessage = {
-            clientContent: {
-              turns: [
-                {
-                  role: 'user',
-                  parts: [{ 
-                    text: `PAGE CONTEXT UPDATE: ${newContext}` 
-                  }],
-                },
-              ],
-              turnComplete: true,
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+        buffer.copyToChannel(float32, 0, 0);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+
+        let startAt = audioCtx.currentTime;
+        if (audioQueueTimeRef.current > audioCtx.currentTime) {
+          startAt = audioQueueTimeRef.current;
+        }
+        source.start(startAt);
+        audioQueueTimeRef.current = startAt + buffer.duration;
+        
+        console.log('[VoicePilot][Audio] Playing audio buffer, duration:', buffer.duration.toFixed(3), 'seconds');
+      } catch (err) {
+        console.error('[VoicePilot] playAudioBuffer() error decoding PCM16:', err);
+      }
+    };
+
+    const updateTranscriptDisplay = () => {
+      const committed = committedTextRef.current;
+      const partial = partialTextRef.current;
+      
+      // Smart spacing: add space between committed and partial if needed
+      let fullText = committed;
+      if (committed && partial) {
+        const needsSpace = !committed.endsWith(' ') && !partial.startsWith(' ');
+        fullText = committed + (needsSpace ? ' ' : '') + partial;
+      } else if (partial) {
+        fullText = partial;
+      }
+      
+      transcript.textContent = fullText;
+    };
+
+    const getPageContext = () => {
+      try {
+        if (typeof window !== 'undefined' && window.voicePilotGetPageContext) {
+          return window.voicePilotGetPageContext();
+        }
+      } catch (error) {
+        console.warn('[VoicePilot] Error getting page context:', error);
+      }
+      
+      // Fallback context
+      return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
+    };
+
+    const startPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+      }
+
+      pageContextIntervalRef.current = setInterval(() => {
+        if (!isCallActive || !websocket || websocket.readyState !== WebSocket.OPEN) {
+          return;
+        }
+
+        try {
+          const newContext = getPageContext();
+          currentPageContextRef.current = newContext;
+
+          // Check if context has changed significantly
+          if (newContext !== lastSentPageContextRef.current) {
+            console.log('[VoicePilot] Page context changed, updating AI:', newContext);
+            
+            // Send page context update to AI
+            const contextUpdateMessage = {
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [{ 
+                      text: `PAGE CONTEXT UPDATE: ${newContext}` 
+                    }],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+
+            websocket.send(JSON.stringify(contextUpdateMessage));
+            lastSentPageContextRef.current = newContext;
+            
+            console.log('[VoicePilot] Sent page context update to AI');
+          }
+        } catch (error) {
+          console.warn('[VoicePilot] Error monitoring page context:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    const stopPageContextMonitoring = () => {
+      if (pageContextIntervalRef.current) {
+        clearInterval(pageContextIntervalRef.current);
+        pageContextIntervalRef.current = null;
+      }
+    };
+
+    const startMicStreaming = async () => {
+      try {
+        console.log('[VoicePilot][Audio] Requesting microphone access...');
+        
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        
+        console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
+
+        if (!audioContextRef.current) {
+          audioContextRef.current =
+            new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioCtx = audioContextRef.current;
+
+        const sourceNode = audioCtx.createMediaStreamSource(micStream);
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+        micStreamRef.current  = micStream;
+        sourceNodeRef.current = sourceNode;
+        processorRef.current  = processor;
+
+        sourceNode.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (event) => {
+          const float32Data = event.inputBuffer.getChannelData(0);
+          const inRate = audioCtx.sampleRate;
+          const outRate = 16000;
+          const ratio = inRate / outRate;
+          const outLength = Math.floor(float32Data.length / ratio);
+
+          const pcm16 = new Int16Array(outLength);
+          for (let i = 0; i < outLength; i++) {
+            const idx = Math.floor(i * ratio);
+            let sample = float32Data[idx];
+            sample = Math.max(-1, Math.min(1, sample));
+            pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = '';
+          for (let i = 0; i < u8.byteLength; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          const payload = {
+            realtime_input: {
+              audio: {
+                data: base64Audio,
+                mime_type: 'audio/pcm;rate=16000',
+              },
             },
           };
 
-          websocketRef.send(JSON.stringify(contextUpdateMessage));
-          lastSentPageContextRef = newContext;
-          
-          console.log('[VoicePilot] Sent page context update to AI');
-        }
-      } catch (error) {
-        console.warn('[VoicePilot] Error monitoring page context:', error);
-      }
-    }, 2000);
-  }
-
-  function stopPageContextMonitoring() {
-    if (pageContextIntervalRef) {
-      clearInterval(pageContextIntervalRef);
-      pageContextIntervalRef = null;
-    }
-  }
-
-  // Check agent usage
-  async function checkAgentOwnerUsage(agentId) {
-    try {
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/check-agent-usage`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({ 
-            agentId,
-            estimatedDuration: 5
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to check usage');
-      }
-
-      const result = await response.json();
-      agentOwnerIdRef = result.ownerId;
-      return result.canUse;
-    } catch (err) {
-      console.error('[VoicePilot] Error checking agent owner usage:', err);
-      return false;
-    }
-  }
-
-  // Create conversation record
-  async function createConversationRecord(agentId) {
-    try {
-      console.log(`[VoicePilot] Creating conversation record for agent ${agentId}`);
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/create-conversation-record`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({ agentId })
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create conversation record');
-      }
-
-      const result = await response.json();
-      console.log('[VoicePilot] Created conversation record:', result.conversationId);
-      return result.conversationId;
-    } catch (err) {
-      console.error('[VoicePilot] Error creating conversation record:', err);
-      return null;
-    }
-  }
-
-  // Start microphone streaming
-  async function startMicStreaming() {
-    try {
-      console.log('[VoicePilot][Audio] Requesting microphone access...');
-      
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-      microphoneStream = micStream;
-      
-      console.log('[VoicePilot][Audio] Microphone access granted, setting up audio processing...');
-
-      if (!audioContextRef) {
-        audioContextRef = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      const audioCtx = audioContextRef;
-
-      const sourceNode = audioCtx.createMediaStreamSource(micStream);
-      const bufferSize = 4096;
-      const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
-
-      sourceNode.connect(processor);
-      processor.connect(audioCtx.destination);
-
-      processor.onaudioprocess = (event) => {
-        const float32Data = event.inputBuffer.getChannelData(0);
-        const inRate = audioCtx.sampleRate;
-        const outRate = 16000;
-        const ratio = inRate / outRate;
-        const outLength = Math.floor(float32Data.length / ratio);
-
-        const pcm16 = new Int16Array(outLength);
-        for (let i = 0; i < outLength; i++) {
-          const idx = Math.floor(i * ratio);
-          let sample = float32Data[idx];
-          sample = Math.max(-1, Math.min(1, sample));
-          pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-        }
-
-        const u8 = new Uint8Array(pcm16.buffer);
-        let binary = '';
-        for (let i = 0; i < u8.byteLength; i++) {
-          binary += String.fromCharCode(u8[i]);
-        }
-        const base64Audio = btoa(binary);
-
-        const payload = {
-          realtime_input: {
-            audio: {
-              data: base64Audio,
-              mime_type: 'audio/pcm;rate=16000',
-            },
-          },
+          if (websocket?.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify(payload));
+            // Log audio data transmission (throttled to avoid spam)
+            if (Math.random() < 0.01) { // Log ~1% of audio chunks
+              console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
+            }
+          }
         };
 
-        if (websocketRef?.readyState === WebSocket.OPEN) {
-          websocketRef.send(JSON.stringify(payload));
-          if (Math.random() < 0.01) {
-            console.log(`[VoicePilot][Audio] Sent PCM16 chunk (${pcm16.byteLength * 2} bytes) to relay`);
-          }
-        }
-      };
-
-      isMicrophoneActive = true;
-      updateUI();
-      console.log('[VoicePilot][Audio] Microphone streaming started successfully');
-    } catch (err) {
-      console.error('[VoicePilot] Mic streaming error:', err);
-      setError('Failed to capture microphone.');
-    }
-  }
-
-  // Start call
-  async function startCall() {
-    try {
-      if (websocketRef) {
-        const ws = websocketRef;
-        
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          console.warn('[VoicePilot] startCall() called but WebSocket is already active or connecting.');
-          return;
-        } else if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
-          console.log('[VoicePilot] Clearing stale WebSocket reference (state:', ws.readyState, ')');
-          if (ws.readyState === WebSocket.CLOSING) {
-            try {
-              ws.close();
-            } catch (error) {
-              console.warn('[VoicePilot] Error closing stale WebSocket:', error);
-            }
-          }
-          websocketRef = null;
-        }
-      }
-
-      setError(null);
-      duration = 0;
-      usageRecordedRef = false;
-      currentAgentIdRef = agentId;
-      conversationIdRef = null;
-      callEndedRef = false;
-      
-      committedTextRef = '';
-      partialTextRef = '';
-      updateTranscriptDisplay();
-      
-      window.addEventListener('beforeunload', handleBeforeUnload);
-
-      // Fetch agent details from Supabase
-      console.log('[VoicePilot] Fetching agent details before starting call...');
-      let agentDetails;
-      try {
-        agentDetails = await fetchAgentDetails(agentId);
+        console.log('[VoicePilot][Audio] Microphone streaming started successfully');
       } catch (err) {
-        console.error('[VoicePilot] Failed to fetch agent details:', err);
-        throw new Error(`Failed to load agent configuration: ${err.message}`);
+        console.error('[VoicePilot] Mic streaming error:', err);
+        statusText.textContent = 'Failed to capture microphone';
       }
+    };
 
-      // Check agent owner's usage limits
-      const canUse = await checkAgentOwnerUsage(agentId);
-      if (!canUse) {
-        throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
-      }
+    // Close widget
+    closeBtn.addEventListener('click', () => {
+      widget.style.display = 'none';
+    });
 
-      // Create conversation record
-      const conversationId = await createConversationRecord(agentId);
-      conversationIdRef = conversationId;
+    // Start call function
+    async function startCall() {
+      if (isCallActive) return;
 
-      // Start duration timer
-      durationTimerRef = setInterval(() => {
-        duration += 1;
-        updateUI();
-      }, 1000);
+      try {
+        statusText.textContent = 'Connecting...';
+        statusIndicator.textContent = '⏳';
 
-      // Get relay URL from backend
-      const response = await fetch(`${supabaseUrl}/functions/v1/start-call`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({ 
-          agentId, 
-          instructions: agentDetails.instructions,
-          documentationUrls: agentDetails.documentationUrls
-        })
-      });
+        // Reset state
+        committedTextRef.current = '';
+        partialTextRef.current = '';
+        transcript.textContent = '';
+        greetingSentRef.current = false;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to start call');
-      }
+        console.log('[VoicePilot] Configuration check:', {
+          hasSupabaseUrl: !!window.voicepilotSupabaseUrl,
+          hasSupabaseKey: !!window.voicepilotSupabaseKey,
+          hasSupabaseClient: !!supabaseClient
+        });
 
-      const { relayUrl } = await response.json();
-      console.log('[VoicePilot] Using relay URL:', relayUrl);
+        // Fetch agent details from Supabase
+        let agentInstructions = 'You are VoicePilot, an AI assistant embedded in a SaaS application to help users navigate and use the app effectively.';
+        let documentationUrls = [];
 
-      const ws = new WebSocket(relayUrl);
-      websocketRef = ws;
+        if (supabaseClient && agentId) {
+          try {
+            console.log('[VoicePilot] Fetching agent details for ID:', agentId);
+            const { data: agent, error } = await supabaseClient
+              .from('agents')
+              .select('instructions, documentation_urls, status')
+              .eq('id', agentId)
+              .single();
 
-      ws.onopen = () => {
-        console.log('[VoicePilot][WebSocket] onopen: connection established');
-        setStatus('connecting');
-
-        const pageContext = getPageContext();
-        currentPageContextRef = pageContext;
-        lastSentPageContextRef = pageContext;
-        console.log('[VoicePilot] Initial page context:', pageContext);
-
-        // Create URL context tools if documentation URLs are provided
-        const tools = [];
-        
-        if (agentDetails.documentationUrls?.length) {
-          tools.push({
-            url_context: {
-              urls: agentDetails.documentationUrls
+            if (error) {
+              console.error('[VoicePilot] Error fetching agent:', error);
+            } else if (agent) {
+              if (agent.status !== 'active') {
+                throw new Error('This agent is not currently active');
+              }
+              agentInstructions = agent.instructions || agentInstructions;
+              documentationUrls = agent.documentation_urls || [];
+              console.log('[VoicePilot] Using agent instructions:', agentInstructions.substring(0, 100) + '...');
+            } else {
+              console.warn('[VoicePilot] Agent not found, using default instructions');
             }
-          });
+          } catch (err) {
+            console.error('[VoicePilot] Failed to fetch agent details:', err);
+            throw new Error('Failed to load agent configuration: ' + err.message);
+          }
+        } else {
+          console.warn('[VoicePilot] No Supabase client or agent ID, using default instructions');
         }
 
-        // Enhanced system instruction with page context and agent's custom instructions
-        const enhancedSystemInstruction = `${agentDetails.instructions} 
+        // Use relay through Supabase
+        console.log('[VoicePilot] Using Supabase relay connection');
+
+        const response = await fetch(`${window.voicepilotSupabaseUrl}/functions/v1/start-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${window.voicepilotSupabaseKey}`,
+          },
+          body: JSON.stringify({
+            agentId: agentId,
+            instructions: agentInstructions,
+            documentationUrls: documentationUrls
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start call');
+        }
+
+        const { relayUrl } = await response.json();
+        console.log('[VoicePilot] Got relay URL:', relayUrl);
+
+        // Connect to WebSocket
+        websocket = new WebSocket(relayUrl);
+
+        websocket.onopen = () => {
+          console.log('[VoicePilot] WebSocket connected');
+          
+          // Get current page context and initialize monitoring
+          const pageContext = getPageContext();
+          currentPageContextRef.current = pageContext;
+          lastSentPageContextRef.current = pageContext;
+          console.log('[VoicePilot] Initial page context:', pageContext);
+
+          // Create URL context tools if documentation URLs are provided
+          const tools = [];
+          
+          if (documentationUrls?.length) {
+            tools.push({
+              url_context: {
+                urls: documentationUrls
+              }
+            });
+          }
+
+          // Enhanced system instruction with page context
+          const enhancedSystemInstruction = `${agentInstructions} 
 
 CURRENT PAGE CONTEXT: ${pageContext}
 
 When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
-        const setupMsg = {
-          setup: {
-            model: 'models/gemini-2.0-flash-live-001',
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: 'Kore'
+          // Send setup message
+          const setupMsg = {
+            setup: {
+              model: 'models/gemini-2.0-flash-live-001',
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Kore'
+                    }
                   }
                 }
-              }
-            },
-            tools: tools.length > 0 ? tools : undefined,
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
-            systemInstruction: {
-              parts: [
-                {
+              },
+              tools: tools.length > 0 ? tools : undefined,
+              outputAudioTranscription: {},
+              inputAudioTranscription: {},
+              systemInstruction: {
+                parts: [{
                   text: enhancedSystemInstruction,
-                },
-              ],
-            },
-          },
+                }]
+              }
+            }
+          };
+
+          console.log('[VoicePilot] Sending setup:', setupMsg);
+          websocket.send(JSON.stringify(setupMsg));
         };
 
-        console.log('[VoicePilot][WebSocket] Sending setup with agent instructions:', {
-          instructionsLength: agentDetails.instructions.length,
-          toolsCount: tools.length
-        });
-        ws.send(JSON.stringify(setupMsg));
-      };
+        websocket.onmessage = async (ev) => {
+          let blob;
 
-      ws.onmessage = async (ev) => {
-        let blob;
+          // Chrome delivers ArrayBuffer, Firefox delivers Blob — handle both
+          if (ev.data instanceof Blob) {
+            blob = ev.data;
+          } else if (ev.data instanceof ArrayBuffer) {
+            blob = new Blob([ev.data]);
+          } else {
+            return;
+          }
 
-        if (ev.data instanceof Blob) {
-          blob = ev.data;
-        } else if (ev.data instanceof ArrayBuffer) {
-          blob = new Blob([ev.data]);
-        } else {
-          return;
-        }
-
-        let maybeText = null;
-        try {
-          maybeText = await blob.text();
-        } catch {
-          maybeText = null;
-        }
-
-        if (maybeText) {
+          let maybeText = null;
           try {
-            const parsed = JSON.parse(maybeText);
-            console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
+            maybeText = await blob.text();
+          } catch {
+            maybeText = null;
+          }
 
-            if (parsed.setupComplete) {
-              console.log('[VoicePilot][WebSocket] Received setupComplete ✅');
-              setStatus('active');
+          if (maybeText) {
+            try {
+              const parsed = JSON.parse(maybeText);
+              console.log('[VoicePilot][Debug] incoming JSON frame:', parsed);
 
-              startPageContextMonitoring();
+              if (parsed.setupComplete) {
+                console.log('[VoicePilot] Received setupComplete ✅');
+                isCallActive = true;
+                statusText.textContent = 'Connected - Speak now';
+                statusIndicator.textContent = '🎯';
+                startBtn.style.display = 'none';
+                endBtn.style.display = 'block';
+                transcript.style.display = 'block';
 
-              if (ws.readyState === WebSocket.OPEN) {
-                const greeting = {
-                  clientContent: {
-                    turns: [
-                      {
-                        role: 'user',
-                        parts: [{ text: 'Hello!' }],
-                      },
-                    ],
-                    turnComplete: true,
-                  },
-                };
-                ws.send(JSON.stringify(greeting));
-                console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
-              }
+                // Start page context monitoring when call becomes active
+                startPageContextMonitoring();
 
-              startMicStreaming();
-              return;
-            }
-
-            if (parsed.serverContent) {
-              const sc = parsed.serverContent;
-
-              // Handle AI speech transcription
-              if (sc.outputTranscription) {
-                const { text, finished } = sc.outputTranscription;
-                
-                if (text) {
-                  partialTextRef += text;
-                  updateTranscriptDisplay();
-                  console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                if (websocket.readyState === WebSocket.OPEN && !greetingSentRef.current) {
+                  const greeting = {
+                    clientContent: {
+                      turns: [
+                        {
+                          role: 'user',
+                          parts: [{ text: 'Hello!' }],
+                        },
+                      ],
+                      turnComplete: true,
+                    },
+                  };
+                  websocket.send(JSON.stringify(greeting));
+                  greetingSentRef.current = true;
+                  console.log('[VoicePilot] Sent initial text greeting: "Hello!"');
                 }
 
-                if (finished && partialTextRef) {
-                  const partialText = partialTextRef.trim();
+                startMicStreaming();
+                return;
+              }
+
+              if (parsed.serverContent) {
+                const sc = parsed.serverContent;
+
+                // Handle AI speech transcription with two-buffer system
+                if (sc.outputTranscription) {
+                  const { text, finished } = sc.outputTranscription;
                   
-                  if (committedTextRef && partialText) {
-                    const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
-                    committedTextRef += (needsSpace ? ' ' : '') + partialText;
+                  if (text) {
+                    // Accumulate fragments in the partial buffer
+                    partialTextRef.current += text;
+                    
+                    // Update the display immediately with committed + partial
+                    updateTranscriptDisplay();
+                    
+                    console.log('[VoicePilot] AI transcription fragment (partial):', text);
+                  }
+
+                  // When finished, move partial to committed and clear partial
+                  if (finished && partialTextRef.current) {
+                    const partialText = partialTextRef.current.trim();
+                    
+                    // Add to committed with smart spacing
+                    if (committedTextRef.current && partialText) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
+                    } else if (partialText) {
+                      committedTextRef.current = partialText;
+                    }
+                    
+                    // Clear partial buffer
+                    partialTextRef.current = '';
+                    
+                    // Update display with committed text only
+                    updateTranscriptDisplay();
+                    
+                    // Highlight the complete phrase
+                    if (window.voicePilotHighlight && partialText) {
+                      window.voicePilotHighlight(partialText);
+                    }
+                    
+                    console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  }
+                }
+
+                // Handle user speech transcription
+                if (sc.inputTranscription?.text) {
+                  const userText = sc.inputTranscription.text.trim();
+                  if (userText) {
+                    // Add to committed text with smart spacing
+                    if (committedTextRef.current) {
+                      const needsSpace = !committedTextRef.current.endsWith(' ') && !userText.startsWith(' ');
+                      committedTextRef.current += (needsSpace ? ' ' : '') + userText;
+                    } else {
+                      committedTextRef.current = userText;
+                    }
+                    
+                    updateTranscriptDisplay();
+                    console.log('[VoicePilot] User transcription:', userText);
+                  }
+                }
+
+                // Handle audio data from modelTurn.parts
+                const mt = sc.modelTurn;
+                if (mt?.parts) {
+                  for (const part of mt.parts) {
+                    // Handle audio data
+                    if (part.inlineData && typeof part.inlineData.data === 'string') {
+                      try {
+                        const base64str = part.inlineData.data;
+                        const binaryStr = atob(base64str);
+                        const len = binaryStr.length;
+                        const rawBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                          rawBuffer[i] = binaryStr.charCodeAt(i);
+                        }
+                        const pcmBlob = new Blob([rawBuffer.buffer], {
+                          type: 'audio/pcm;rate=24000',
+                        });
+                        console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
+                        playAudioBuffer(pcmBlob);
+                      } catch (err) {
+                        console.error('[VoicePilot] Error decoding inlineData audio:', err);
+                      }
+                    }
+                  }
+                  return; // Bail out after handling audio
+                }
+
+                // Check for turn complete to force commit partial buffer
+                if (sc.turnComplete && partialTextRef.current) {
+                  console.log('[VoicePilot] Turn complete - committing partial buffer');
+                  const partialText = partialTextRef.current.trim();
+                  
+                  // Move partial to committed
+                  if (committedTextRef.current && partialText) {
+                    const needsSpace = !committedTextRef.current.endsWith(' ') && !partialText.startsWith(' ');
+                    committedTextRef.current += (needsSpace ? ' ' : '') + partialText;
                   } else if (partialText) {
-                    committedTextRef = partialText;
+                    committedTextRef.current = partialText;
                   }
                   
-                  partialTextRef = '';
+                  // Clear partial buffer
+                  partialTextRef.current = '';
+                  
                   updateTranscriptDisplay();
                   
                   if (window.voicePilotHighlight && partialText) {
                     window.voicePilotHighlight(partialText);
                   }
                   
-                  console.log('[VoicePilot] AI said (complete phrase):', partialText);
+                  console.log('[VoicePilot] AI said (turn complete commit):', partialText);
                 }
               }
 
-              // Handle user speech transcription
-              if (sc.inputTranscription?.text) {
-                const userText = sc.inputTranscription.text.trim();
-                if (userText) {
-                  if (committedTextRef) {
-                    const needsSpace = !committedTextRef.endsWith(' ') && !userText.startsWith(' ');
-                    committedTextRef += (needsSpace ? ' ' : '') + userText;
-                  } else {
-                    committedTextRef = userText;
-                  }
-                  
-                  updateTranscriptDisplay();
-                  console.log('[VoicePilot] User transcription:', userText);
-                }
-              }
-
-              // Handle audio data
-              const mt = sc.modelTurn;
-              if (mt?.parts) {
-                for (const part of mt.parts) {
-                  if (part.inlineData && typeof part.inlineData.data === 'string') {
-                    try {
-                      const base64str = part.inlineData.data;
-                      const binaryStr = atob(base64str);
-                      const len = binaryStr.length;
-                      const rawBuffer = new Uint8Array(len);
-                      for (let i = 0; i < len; i++) {
-                        rawBuffer[i] = binaryStr.charCodeAt(i);
-                      }
-                      const pcmBlob = new Blob([rawBuffer.buffer], {
-                        type: 'audio/pcm;rate=24000',
-                      });
-                      console.log('[VoicePilot][Debug] Decoded inlineData, scheduling audio playback');
-                      playAudioBuffer(pcmBlob);
-                    } catch (err) {
-                      console.error('[VoicePilot] Error decoding inlineData audio:', err);
-                    }
-                  }
-                }
-                return;
-              }
-
-              if (sc.turnComplete && partialTextRef) {
-                console.log('[VoicePilot] Turn complete - committing partial buffer');
-                const partialText = partialTextRef.trim();
-                
-                if (committedTextRef && partialText) {
-                  const needsSpace = !committedTextRef.endsWith(' ') && !partialText.startsWith(' ');
-                  committedTextRef += (needsSpace ? ' ' : '') + partialText;
-                } else if (partialText) {
-                  committedTextRef = partialText;
-                }
-                
-                partialTextRef = '';
-                updateTranscriptDisplay();
-                
-                if (window.voicePilotHighlight && partialText) {
-                  window.voicePilotHighlight(partialText);
-                }
-                
-                console.log('[VoicePilot] AI said (turn complete commit):', partialText);
-              }
+              return;
+            } catch (parseError) {
+              console.error('[VoicePilot] JSON parse error:', parseError);
+              // Continue to fallback for binary data
             }
-
-            return;
-          } catch (parseError) {
-            console.error('[VoicePilot] JSON parse error:', parseError);
           }
-        }
 
-        console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
-        playAudioBuffer(blob);
-      };
-
-      ws.onerror = (err) => {
-        console.error('[VoicePilot][WebSocket] onerror:', err);
-        setError('WebSocket encountered an error.');
-        setStatus('error');
-      };
-
-      ws.onclose = (ev) => {
-        console.log(`[VoicePilot][WebSocket] onclose: code=${ev.code}, reason="${ev.reason}"`);
-        setStatus('ended');
-        websocketRef = null;
-        stopPageContextMonitoring();
-      };
-    } catch (err) {
-      console.error('[VoicePilot] Failed to start call:', err);
-      setError(err.message ?? 'Failed to start call.');
-      setStatus('error');
-    }
-  }
-
-  // End call with transcript saving functionality
-  function endCall(fromUnload = false) {
-    if (callEndedRef) {
-      return;
-    }
-    callEndedRef = true;
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    
-    try {
-      const finalDuration = duration;
-      const finalTranscript = (committedTextRef + partialTextRef).trim();
-      const agentId = currentAgentIdRef;
-      const conversationId = conversationIdRef;
-
-      console.log('[VoicePilot] Ending call - Duration:', finalDuration, 'seconds, Transcript length:', finalTranscript.length);
-
-      // Clear any DOM highlights
-      if (window.voicePilotClearHighlights) {
-        window.voicePilotClearHighlights();
-      }
-
-      // Stop microphone stream
-      if (microphoneStream) {
-        console.log('[VoicePilot][Audio] Explicitly stopping microphone stream...');
-        try {
-          microphoneStream.getTracks().forEach((track) => {
-            console.log('[VoicePilot][Audio] Stopping microphone track:', track.kind, track.readyState);
-            track.stop();
-            console.log('[VoicePilot][Audio] Microphone track stopped, new state:', track.readyState);
-          });
-          microphoneStream = null;
-          isMicrophoneActive = false;
-          console.log('[VoicePilot][Audio] Microphone stream fully stopped and cleared');
-        } catch (err) {
-          console.error('[VoicePilot][Audio] Error stopping microphone stream:', err);
-        }
-      }
-
-      // Stop screen stream
-      if (screenStream) {
-        console.log('[VoicePilot][Screen] Explicitly stopping screen stream...');
-        try {
-          screenStream.getTracks().forEach((track) => {
-            console.log('[VoicePilot][Screen] Stopping screen track:', track.kind, track.readyState);
-            track.stop();
-            console.log('[VoicePilot][Screen] Screen track stopped, new state:', track.readyState);
-          });
-          screenStream = null;
-          isScreenSharing = false;
-          console.log('[VoicePilot][Screen] Screen stream fully stopped and cleared');
-        } catch (err) {
-          console.error('[VoicePilot][Screen] Error stopping screen stream:', err);
-        }
-      }
-
-      // Close audio context
-      if (audioContextRef) {
-        console.log('[VoicePilot][Audio] Explicitly closing audio context...');
-        try {
-          audioContextRef.close().then(() => {
-            console.log('[VoicePilot][Audio] Audio context closed successfully');
-          }).catch((err) => {
-            console.error('[VoicePilot][Audio] Error closing audio context:', err);
-          });
-          audioContextRef = null;
-          audioQueueTimeRef = 0;
-          console.log('[VoicePilot][Audio] Audio context reference cleared');
-        } catch (err) {
-          console.error('[VoicePilot][Audio] Error closing audio context:', err);
-        }
-      }
-
-      // Save transcript and conversation data
-      if (agentId && finalTranscript) {
-        console.log('[VoicePilot] Saving transcript for agent:', agentId);
-        
-        // Save transcript using Edge Function
-        const saveTranscriptData = {
-          agentId,
-          content: finalTranscript
+          console.log('[VoicePilot][Debug] incoming Blob is not JSON or not recognized → playing raw PCM');
+          playAudioBuffer(blob);
         };
 
-        if (fromUnload) {
-          // Use sendBeacon for page unload
-          try {
-            const blob = new Blob([JSON.stringify(saveTranscriptData)], { type: 'application/json' });
-            navigator.sendBeacon(`${supabaseUrl}/functions/v1/save-transcript-record`, blob);
-            console.log('[VoicePilot] Sent transcript via beacon');
-          } catch (err) {
-            console.error('[VoicePilot] Failed to send transcript via beacon:', err);
-          }
-        } else {
-          // Use regular fetch
-          fetch(`${supabaseUrl}/functions/v1/save-transcript-record`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-            },
-            body: JSON.stringify(saveTranscriptData)
-          }).then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-          }).then(result => {
-            console.log('[VoicePilot] Transcript saved successfully:', result.transcriptId);
-          }).catch(err => {
-            console.error('[VoicePilot] Failed to save transcript:', err);
-            if (!fromUnload) {
-              alert(`Transcript wasn't saved: ${err.message ?? err}`);
-            }
-          });
-        }
-
-        // Save conversation messages if we have a conversation record
-        if (conversationId) {
-          const saveMessagesData = {
-            conversationId,
-            content: finalTranscript
-          };
-
-          if (!fromUnload) {
-            fetch(`${supabaseUrl}/functions/v1/save-conversation-messages`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseAnonKey}`,
-              },
-              body: JSON.stringify(saveMessagesData)
-            }).then(response => {
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-              }
-              return response.json();
-            }).then(result => {
-              console.log('[VoicePilot] Conversation messages saved successfully:', result.messageId);
-            }).catch(err => {
-              console.error('[VoicePilot] Failed to save conversation messages:', err);
-            });
-          }
-        }
-      }
-
-      // End conversation record
-      if (conversationId && finalDuration > 0) {
-        const endConversationData = {
-          conversationId,
-          duration: finalDuration,
-          sentimentScore: null
+        websocket.onerror = (err) => {
+          console.error('[VoicePilot] WebSocket error:', err);
+          statusText.textContent = 'Connection failed';
+          statusIndicator.textContent = '❌';
         };
 
-        if (!fromUnload) {
-          fetch(`${supabaseUrl}/functions/v1/end-conversation-record`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-            },
-            body: JSON.stringify(endConversationData)
-          }).then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-          }).then(result => {
-            console.log('[VoicePilot] Conversation record ended successfully:', result.conversationId);
-          }).catch(err => {
-            console.error('[VoicePilot] Failed to end conversation record:', err);
-          });
-        }
-      }
-
-      // Record usage for the agent owner
-      if (agentId && finalDuration > 0 && !usageRecordedRef) {
-        const minutes = Math.ceil(finalDuration / 60);
-        const recordUsageData = {
-          agentId,
-          minutes
+        websocket.onclose = (ev) => {
+          console.log(`[VoicePilot] WebSocket closed: code=${ev.code}, reason="${ev.reason}"`);
+          isCallActive = false;
+          statusText.textContent = 'Call ended';
+          statusIndicator.textContent = '📞';
+          startBtn.style.display = 'block';
+          endBtn.style.display = 'none';
+          transcript.style.display = 'none';
+          websocket = null;
+          
+          // Stop page context monitoring when call ends
+          stopPageContextMonitoring();
         };
 
-        if (!fromUnload) {
-          fetch(`${supabaseUrl}/functions/v1/record-agent-usage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-            },
-            body: JSON.stringify(recordUsageData)
-          }).then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-          }).then(result => {
-            console.log('[VoicePilot] Agent usage recorded successfully');
-          }).catch(err => {
-            console.error('[VoicePilot] Failed to record agent usage:', err);
-          });
-        }
-        usageRecordedRef = true;
+      } catch (error) {
+        console.error('[VoicePilot] Failed to start call:', error);
+        statusText.textContent = 'Connection failed';
+        statusIndicator.textContent = '❌';
+        setTimeout(() => {
+          statusText.textContent = 'Ready to help';
+          statusIndicator.textContent = '🎤';
+        }, 3000);
       }
-
-      if (durationTimerRef) {
-        clearInterval(durationTimerRef);
-        durationTimerRef = null;
-      }
-      if (maxDurationTimerRef) {
-        clearTimeout(maxDurationTimerRef);
-        maxDurationTimerRef = null;
-      }
-
-      stopPageContextMonitoring();
-
-      if (websocketRef) {
-        websocketRef.close();
-        websocketRef = null;
-      }
-      
-      setStatus('ended');
-      agentOwnerIdRef = null;
-      currentAgentIdRef = null;
-      conversationIdRef = null;
-      
-      committedTextRef = '';
-      partialTextRef = '';
-      
-      console.log('[VoicePilot] Call fully ended and cleaned up - all streams stopped and resources cleaned up');
-    } catch (err) {
-      console.error('[VoicePilot] Error ending call:', err);
-      setError('Error ending call.');
-      setStatus('error');
     }
-  }
 
-  function handleBeforeUnload() {
-    endCall(true);
-  }
-
-  // Toggle microphone
-  function toggleMicrophone() {
-    try {
-      setError(null);
-      if (isMicrophoneActive && microphoneStream) {
-        console.log('[VoicePilot][Audio] Stopping microphone...');
-        if (audioContextRef) {
-          audioContextRef.close().catch(() => {});
-          audioContextRef = null;
-          audioQueueTimeRef = 0;
-        }
-        microphoneStream.getTracks().forEach((t) => t.stop());
-        microphoneStream = null;
-        isMicrophoneActive = false;
-        updateUI();
-        console.log('[VoicePilot][Audio] Microphone stopped');
-      } else if (!isMicrophoneActive) {
-        console.log('[VoicePilot][Audio] Starting microphone...');
-        startMicStreaming().catch((err) => {
-          console.error('[VoicePilot] toggleMicrophone start error:', err);
-          setError('Failed to start microphone.');
-        });
-      }
-    } catch (err) {
-      console.error('[VoicePilot] toggleMicrophone error:', err);
-      setError('Failed to toggle microphone.');
+    // End call function
+function endCall() {
+  if (!isCallActive) return;
+  try {
+    // 1. Clear audio
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
     }
-  }
-
-  // Toggle screen share
-  async function toggleScreenShare() {
-    try {
-      setError(null);
-
-      if (isScreenSharing && screenStream) {
-        screenStream.getTracks().forEach((t) => t.stop());
-        screenStream = null;
-        isScreenSharing = false;
-        updateUI();
-      } else {
-        const screen = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-        });
-        screenStream = screen;
-        screen.getVideoTracks()[0].addEventListener('ended', () => {
-          isScreenSharing = false;
-          screenStream = null;
-          updateUI();
-        });
-        isScreenSharing = true;
-        updateUI();
-      }
-    } catch (err) {
-      console.error('[VoicePilot] Screen sharing error:', err);
-      setError('Failed to toggle screen sharing.');
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
     }
-  }
-
-  // Set status
-  function setStatus(newStatus) {
-    status = newStatus;
-    updateUI();
-  }
-
-  // Set error
-  function setError(message) {
-    errorMessage = message;
-    if (message) {
-      setStatus('error');
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
     }
-    updateUI();
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // 2. Tear down WebSocket
+    if (websocket) {
+      websocket.onmessage = null;
+      websocket.onclose   = null;
+      websocket.onerror   = null;
+      websocket.close();
+      websocket = null;
+    }
+
+    // 3. Reset UI state
+    isCallActive = false;
+    committedTextRef.current = '';
+    partialTextRef.current = '';
+    transcript.textContent = '';
+    transcript.style.display = 'none';
+    statusText.textContent = 'Call ended';
+    statusIndicator.textContent = '📞';
+    startBtn.style.display = 'block';
+    endBtn.style.display = 'none';
+
+    // 4. Clean up highlights & context monitoring
+    if (window.voicePilotClearHighlights) {
+      window.voicePilotClearHighlights();
+    }
+    stopPageContextMonitoring();
+    pageContextCapture.destroy();
+
+    // 5. Return to idle
+    setTimeout(() => {
+      statusText.textContent = 'Ready to help';
+      statusIndicator.textContent = '🎤';
+    }, 2000);
+
+    console.log('[VoicePilot] Call fully ended and cleaned up');
+  } catch (error) {
+    console.error('[VoicePilot] Error ending call:', error);
+  }
+}
+
+
+    // Event listeners
+    startBtn.addEventListener('click', startCall);
+    endBtn.addEventListener('click', endCall);
+
+    // Hover effects
+    startBtn.addEventListener('mouseenter', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    startBtn.addEventListener('mouseleave', () => {
+      startBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+
+    endBtn.addEventListener('mouseenter', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+    endBtn.addEventListener('mouseleave', () => {
+      endBtn.style.background = 'rgba(255,255,255,0.1)';
+    });
+
+    closeBtn.addEventListener('mouseenter', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.3)';
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+      closeBtn.style.background = 'rgba(255,255,255,0.2)';
+    });
+
+    // Return widget API
+    return {
+      show: () => widget.style.display = 'block',
+      hide: () => widget.style.display = 'none',
+      startCall,
+      endCall,
+      isActive: () => isCallActive
+    };
   }
 
   // Initialize widget
-  async function init() {
-    // Initialize Supabase
-    await initSupabase();
-
-    // Create and mount widget
-    const widget = createWidget();
-    document.body.appendChild(widget);
-
-    // Add event listeners
-    const fab = document.getElementById('voicepilot-fab');
-    const closeBtn = document.getElementById('voicepilot-close');
-    const startBtn = document.getElementById('voicepilot-start');
-    const endBtn = document.getElementById('voicepilot-end');
-    const micBtn = document.getElementById('voicepilot-mic');
-    const screenBtn = document.getElementById('voicepilot-screen');
-    const retryBtn = document.getElementById('voicepilot-retry');
-
-    fab?.addEventListener('click', () => {
-      isOpen = !isOpen;
-      const panel = document.getElementById('voicepilot-panel');
-      if (panel) {
-        panel.style.display = isOpen ? 'block' : 'none';
-      }
-    });
-
-    closeBtn?.addEventListener('click', () => {
-      if (status === 'active') {
-        endCall();
-      } else {
-        isOpen = false;
-        const panel = document.getElementById('voicepilot-panel');
-        if (panel) {
-          panel.style.display = 'none';
-        }
-      }
-    });
-
-    startBtn?.addEventListener('click', startCall);
-    endBtn?.addEventListener('click', () => endCall());
-    micBtn?.addEventListener('click', toggleMicrophone);
-    screenBtn?.addEventListener('click', toggleScreenShare);
-    retryBtn?.addEventListener('click', startCall);
-
-    console.log('[VoicePilot] Widget initialized successfully');
-  }
-
-  // Expose API
-  window.voicepilot = {
-    open: () => {
-      isOpen = true;
-      const panel = document.getElementById('voicepilot-panel');
-      if (panel) {
-        panel.style.display = 'block';
-      }
-    },
-    close: () => {
-      if (status === 'active') {
-        endCall();
-      } else {
-        isOpen = false;
-        const panel = document.getElementById('voicepilot-panel');
-        if (panel) {
-          panel.style.display = 'none';
-        }
-      }
-    },
-    startCall: startCall,
-    endCall: () => endCall(),
-    setPulse: (enabled) => {
-      const fab = document.getElementById('voicepilot-fab');
-      if (fab) {
-        if (enabled) {
-          fab.style.animation = 'pulse 2s infinite';
-        } else {
-          fab.style.animation = '';
-        }
-      }
-    }
-  };
-
-  // Initialize when DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+      window.voicepilot = createWidget();
+    });
   } else {
-    init();
+    window.voicepilot = createWidget();
   }
 
-// ═══════════════════════════════════════════════
-// Enhanced DOM Highlighting System – EXPANDED ELEMENT SUPPORT
-// ═══════════════════════════════════════════════
-class DOMHighlighter {
-  constructor() {
-    this.highlightedElements = new Set();
-    this.highlightClass = 'voicepilot-highlight';
-    this.highlightStyle = null;
-    this.injectStyles();
-  }
-
-  injectStyles() {
-    if (this.highlightStyle) this.highlightStyle.remove();
-    this.highlightStyle = document.createElement('style');
-    this.highlightStyle.id = 'voicepilot-highlight-styles';
-    this.highlightStyle.textContent = `
-      .${this.highlightClass} {
-        position: relative !important;
-        outline: 2px solid #f59e0b !important;
-        outline-offset: 2px !important;
-        box-shadow: 
-          0 0 0 4px rgba(245, 158, 11, 0.2),
-          0 0 12px rgba(245, 158, 11, 0.4) !important;
-        border-radius: 8px !important;
-        transition: all 0.3s ease !important;
-        z-index: 9999 !important;
-        animation: gentle-pulse 2s infinite ease-in-out;
-      }
-      
-      @keyframes gentle-pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-      }
-      
-      .${this.highlightClass}-badge {
-        position: absolute;
-        top: -12px;
-        right: -8px;
-        background: #f59e0b;
-        color: #ffffff;
-        font-size: 10px;
-        font-weight: 600;
-        padding: 3px 6px;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        z-index: 10000;
-        animation: badge-appear 0.3s ease-out;
-        pointer-events: none;
-      }
-      
-      @keyframes badge-appear {
-        0% { opacity: 0; transform: translateY(-4px) scale(0.8); }
-        100% { opacity: 1; transform: translateY(0) scale(1); }
-      }
-    `;
-    document.head.appendChild(this.highlightStyle);
-  }
-
-  isElementVisible(el) {
-    const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-    return (
-      rect.width > 0 && rect.height > 0 &&
-      style.visibility !== 'hidden' &&
-      style.display !== 'none' &&
-      style.opacity !== '0' &&
-      rect.top < window.innerHeight &&
-      rect.bottom > 0 &&
-      rect.left < window.innerWidth &&
-      rect.right > 0
-    );
-  }
-
-  // 🆕 EXPANDED: More comprehensive element selector
-  getInteractiveElements() {
-    const selectors = [
-      // Original button/input selectors
-      'button',
-      'input[type="button"]',
-      'input[type="submit"]',
-      'input[type="reset"]',
-      
-      // 🆕 Form elements
-      'input[type="text"]',
-      'input[type="email"]',
-      'input[type="password"]',
-      'input[type="search"]',
-      'input[type="tel"]',
-      'input[type="url"]',
-      'input[type="number"]',
-      'input[type="date"]',
-      'input[type="datetime-local"]',
-      'input[type="time"]',
-      'input[type="checkbox"]',
-      'input[type="radio"]',
-      'input[type="file"]',
-      'textarea',
-      'select',
-      
-      // 🆕 Navigation elements
-      'a[href]',
-      '[role="tab"]',
-      '[role="tabpanel"]',
-      '[data-tab]',
-      '.tab',
-      '.nav-item',
-      '.navigation-item',
-      
-      // 🆕 Interactive UI elements
-      '[role="button"]',
-      '[role="menuitem"]',
-      '[role="option"]',
-      '[role="switch"]',
-      '[role="slider"]',
-      '[aria-expanded]',
-      '[data-toggle]',
-      '[data-action]',
-      
-      // 🆕 Common clickable elements
-      '.dropdown-toggle',
-      '.menu-item',
-      '.clickable',
-      '[onclick]',
-      
-      // 🆕 Cards and panels (if they're clickable)
-      '.card[role="button"]',
-      '.panel[role="button"]',
-      '[data-clickable="true"]',
-      
-      // Keep compatibility with old system
-      '[data-agent-id]'
-    ];
-
-    return Array.from(
-      document.querySelectorAll(selectors.join(','))
-    ).filter(el => this.isElementVisible(el) && this.isElementInteractive(el));
-  }
-
-  // 🆕 Helper to determine if element is truly interactive
-  isElementInteractive(el) {
-    // Skip if disabled
-    if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
-      return false;
-    }
-
-    // Skip if it's a label without for attribute (not directly interactive)
-    if (el.tagName === 'LABEL' && !el.getAttribute('for')) {
-      return false;
-    }
-
-    // For links, ensure they have href
-    if (el.tagName === 'A' && !el.getAttribute('href')) {
-      return false;
-    }
-
-    // Check if element has click handlers or interactive roles
-    const hasClickHandler = el.onclick || 
-                           el.getAttribute('onclick') || 
-                           el.getAttribute('data-action') ||
-                           el.getAttribute('data-toggle');
-                           
-    const isFormElement = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName);
-    
-    const hasInteractiveRole = [
-      'button', 'tab', 'menuitem', 'option', 'switch', 'slider'
-    ].includes(el.getAttribute('role'));
-
-    return isFormElement || hasClickHandler || hasInteractiveRole || el.tagName === 'A';
-  }
-
-  // 🆕 ENHANCED: Better text extraction for different element types
-  getElementText(el) {
-    let text = '';
-    
-    // For form inputs, prioritize labels and placeholders
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
-      // Try to find associated label by ID
-      const id = el.id;
-      if (id) {
-        const label = document.querySelector(`label[for="${id}"]`);
-        if (label && label.textContent?.trim()) {
-          text = label.textContent.trim();
-        }
-      }
-      
-      // 🆕 Try to find nearby labels (common pattern where label appears before input)
-      if (!text) {
-        // Look for label immediately before this element
-        let previousElement = el.previousElementSibling;
-        while (previousElement && !text) {
-          if (previousElement.tagName === 'LABEL' && previousElement.textContent?.trim()) {
-            text = previousElement.textContent.trim();
-            break;
-          }
-          // Also check if the previous element contains a label
-          const labelInPrev = previousElement.querySelector('label');
-          if (labelInPrev && labelInPrev.textContent?.trim()) {
-            text = labelInPrev.textContent.trim();
-            break;
-          }
-          previousElement = previousElement.previousElementSibling;
-        }
-      }
-
-      // 🆕 Try to find parent container with label
-      if (!text) {
-        let parent = el.parentElement;
-        let depth = 0;
-        while (parent && depth < 3) { // Don't go too far up
-          const labelInParent = parent.querySelector('label');
-          if (labelInParent && labelInParent.textContent?.trim()) {
-            text = labelInParent.textContent.trim();
-            break;
-          }
-          parent = parent.parentElement;
-          depth++;
-        }
-      }
-      
-      // Fallback to placeholder or aria-label
-      if (!text) {
-        text = el.placeholder?.trim() || 
-               el.getAttribute('aria-label')?.trim() || 
-               el.getAttribute('title')?.trim() || 
-               el.value?.trim() || '';
-      }
-    }
-    // For other elements, use text content or aria-label
-    else {
-      text = el.getAttribute('data-agent-id')?.trim() ||
-             el.getAttribute('aria-label')?.trim() ||
-             el.getAttribute('title')?.trim() ||
-             el.textContent?.trim() ||
-             el.value?.trim() || '';
-    }
-
-    return text;
-  }
-
-  // 🆕 ENHANCED: Smarter scoring system for different element types
-  scoreMatch(element, searchPhrase) {
-    const elementText = this.getElementText(element).toLowerCase();
-    const phrase = searchPhrase.toLowerCase();
-    
-    if (!elementText || !phrase) return 0;
-
-    // Exact match gets highest score
-    if (elementText === phrase) return 10;
-    
-    // Word boundary matches get high score
-    const wordBoundaryRegex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-    if (wordBoundaryRegex.test(elementText)) return 8;
-    
-    // Starts with gets good score
-    if (elementText.startsWith(phrase)) return 6;
-    
-    // Contains gets medium score
-    if (elementText.includes(phrase)) return 4;
-    
-    // Fuzzy matching for slight variations
-    const similarity = this.calculateSimilarity(elementText, phrase);
-    if (similarity > 0.8) return 3;
-    if (similarity > 0.6) return 2;
-    
-    return 0;
-  }
-
-  // 🆕 Simple similarity calculation for fuzzy matching
-  calculateSimilarity(str1, str2) {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) return 1.0;
-    
-    const editDistance = this.levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
-  }
-
-  levenshteinDistance(str1, str2) {
-    const matrix = Array(str2.length + 1).fill(null).map(() => 
-      Array(str1.length + 1).fill(null)
-    );
-    
-    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-    
-    for (let j = 1; j <= str2.length; j++) {
-      for (let i = 1; i <= str1.length; i++) {
-        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1,
-          matrix[j - 1][i] + 1,
-          matrix[j - 1][i - 1] + indicator
-        );
-      }
-    }
-    
-    return matrix[str2.length][str1.length];
-  }
-
-  highlightElement(searchText) {
-    // Extract phrase from quotes or use full text
-    let phrase = searchText.trim();
-    const quotedMatch = phrase.match(/['"]([^'"]+)['"]/);
-    if (quotedMatch) {
-      phrase = quotedMatch[1];
-    }
-
-    phrase = phrase.toLowerCase();
-    if (!phrase || phrase.length < 2) return false;
-
-    // Get all interactive elements
-    const elements = this.getInteractiveElements();
-    
-    // Score all matches
-    const matches = elements
-      .map(el => ({
-        el,
-        text: this.getElementText(el),
-        score: this.scoreMatch(el, phrase)
-      }))
-      .filter(match => match.score > 0)
-      .sort((a, b) => b.score - a.score);
-
-    if (!matches.length) {
-      console.log('[VoicePilot] No interactive elements matching:', phrase);
-      return false;
-    }
-
-    // Highlight the best match
-    this.clearHighlights();
-    const bestMatch = matches[0];
-    this.addHighlight(bestMatch.el, true);
-    bestMatch.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    console.log('[VoicePilot] Highlighting element:', {
-      text: bestMatch.text,
-      type: bestMatch.el.tagName,
-      score: bestMatch.score
-    });
-    
-    return true;
-  }
-
-  addHighlight(el, isPrimary = false) {
-    el.classList.add(this.highlightClass);
-    this.highlightedElements.add(el);
-
-    if (isPrimary) {
-      const badge = document.createElement('div');
-      badge.className = `${this.highlightClass}-badge`;
-      badge.textContent = 'AI';
-      badge.style.position = 'absolute';
-      el.style.position = 'relative';
-      el.appendChild(badge);
-    }
-
-    // Auto-remove after 3 seconds (like the old system)
-    setTimeout(() => {
-      el.classList.remove(this.highlightClass);
-      this.highlightedElements.delete(el);
-      el.querySelectorAll(`.${this.highlightClass}-badge`)
-        .forEach(badge => badge.remove());
-    }, 3000);
-  }
-
-  clearHighlights() {
-    this.highlightedElements.forEach(el => {
-      el.classList.remove(this.highlightClass);
-      el.querySelectorAll(`.${this.highlightClass}-badge`)
-        .forEach(badge => badge.remove());
-    });
-    this.highlightedElements.clear();
-  }
-
-  destroy() {
-    this.clearHighlights();
-    if (this.highlightStyle) this.highlightStyle.remove();
-    this.highlightStyle = null;
-  }
-}
-
-// ═══════════════════════════════════════════════
-// SmartHighlighter (real-time highlighting as AI speaks)
-// ═══════════════════════════════════════════════
-class SmartHighlighter {
-  constructor() {
-    this.textBuffer = '';
-    this.bufferTimeout = null;
-    this.lastHighlightTime = 0;
-    this.cooldown = 1500;   // Reduced from 2000ms
-    this.delay    = 300;    // Reduced from 1500ms for faster response
-    this.streamBuffer = ''; // New: for real-time streaming
-    this.streamTimeout = null;
-    this.lastStreamHighlight = 0;
-  }
-
-  // 🆕 NEW: Real-time highlighting for streaming text
-  addStreamingText(txt) {
-    if (!txt || !txt.trim()) return;
-    
-    // Clear existing timeout
-    if (this.streamTimeout) clearTimeout(this.streamTimeout);
-    
-    // Add to stream buffer
-    this.streamBuffer += (this.streamBuffer && !this.streamBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
-    
-    // Process immediately if we detect quoted text (highest priority)
-    const quotedMatch = this.streamBuffer.match(/['"]([^'"]+)['"]/);
-    if (quotedMatch && quotedMatch[1].length > 2) {
-      this.processStream(quotedMatch[1]);
-      return;
-    }
-    
-    // Look for common UI element patterns in real-time
-    const patterns = [
-      /\b(click|tap|press)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:button|link|tab|field|input|dropdown|menu))/i,
-      /\b(go\s+to|open|select)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:tab|section|page|menu))/i,
-      /\b(fill\s+in|enter|type\s+in)\s+(?:the\s+)?['"]?([^'".\s]+(?:\s+[^'".\s]+)*?)['"]?(?:\s+(?:field|input|box|area))/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = this.streamBuffer.match(pattern);
-      if (match && match[2] && match[2].length > 2) {
-        this.processStream(match[2]);
-        return;
-      }
-    }
-    
-    // Fallback: process with short delay for any other potential matches
-    this.streamTimeout = setTimeout(() => this.processStreamBuffer(), 200);
-  }
-
-  processStream(elementText) {
-    const now = Date.now();
-    if (now - this.lastStreamHighlight < 800) return; // Shorter cooldown for streaming
-    
-    console.log('[VoicePilot] Real-time highlight attempt:', elementText);
-    if (domHighlighter.highlightElement(elementText)) {
-      this.lastStreamHighlight = now;
-      this.streamBuffer = ''; // Clear buffer on successful highlight
-    }
-  }
-
-  processStreamBuffer() {
-    // Extract the most recent potential element name
-    const words = this.streamBuffer.trim().split(/\s+/);
-    if (words.length >= 2) {
-      // Try last 2-4 words as potential element names
-      for (let i = Math.min(4, words.length); i >= 2; i--) {
-        const phrase = words.slice(-i).join(' ');
-        if (phrase.length > 3 && phrase.length < 30) {
-          this.processStream(phrase);
-          break;
-        }
-      }
-    }
-  }
-
-  // Original method for backward compatibility
-  addText(txt) {
-    if (!txt || !txt.trim()) return;
-    if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-    this.textBuffer += (this.textBuffer && !this.textBuffer.endsWith(' ') && /^[A-Za-z]/.test(txt) ? ' ' : '') + txt;
-    this.bufferTimeout = setTimeout(() => this.process(), this.delay);
-  }
-
-  process() {
-    const now = Date.now();
-    if (now - this.lastHighlightTime < this.cooldown) {
-      this.textBuffer = '';
-      return;
-    }
-    const phrase = this.textBuffer.trim();
-    this.textBuffer = '';
-    if (!phrase || phrase.length < 3) return;
-    // simple filter to skip greetings
-    if (/^(hi|hello|thanks?|please)$/i.test(phrase)) return;
-    console.log('[VoicePilot] Trying to highlight:', phrase);
-    if (domHighlighter.highlightElement(phrase)) {
-      this.lastHighlightTime = now;
-    }
-  }
-
-  clear() {
-    this.textBuffer = '';
-    this.streamBuffer = '';
-    if (this.bufferTimeout) clearTimeout(this.bufferTimeout);
-    if (this.streamTimeout) clearTimeout(this.streamTimeout);
-  }
-}
-
-// Initialize the highlighting system
-const domHighlighter = new DOMHighlighter();
-const smartHighlighter = new SmartHighlighter();
-
-// Expose global functions (keeping same names for compatibility)
-window.voicePilotHighlight = (message) => {
-  if (!message) return;
-  
-  // Use the enhanced highlighting system
-  if (smartHighlighter.addText) {
-    smartHighlighter.addText(message);
-  }
-  return true;
-};
-
-// 🆕 NEW: Expose real-time streaming highlight function
-window.voicePilotHighlightStream = text => {
-  if (text && text.trim()) {
-    smartHighlighter.addStreamingText(text);
-  }
-  return true;
-};
-
-window.voicePilotClearHighlights = () => {
-  domHighlighter.clearHighlights();
-  smartHighlighter.clear();
-};
-
-window.voicePilotGetPageContext = () => {
-  return `Page: ${document.title || 'Unknown'}, URL: ${window.location.pathname}`;
-};
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  if (domHighlighter && domHighlighter.destroy) {
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    pageContextCapture.destroy();
     domHighlighter.destroy();
-  }
-});
+  });
+
+})();
