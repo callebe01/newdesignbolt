@@ -138,11 +138,23 @@
     document.head.appendChild(style);
   }
 
-  // Enhanced element highlighting function
+  // Enhanced element highlighting function - only highlights text in quotes
   function highlightElement(message) {
     if (!message || typeof message !== 'string') return false;
     
     console.log('[VoicePilot] Attempting to highlight element for message:', message);
+    
+    // Extract text within quotes using regex
+    const quotedTextMatches = message.match(/"([^"]+)"/g);
+    
+    if (!quotedTextMatches || quotedTextMatches.length === 0) {
+      console.log('[VoicePilot] No quoted text found in message');
+      return false;
+    }
+    
+    // Remove quotes from the matched text
+    const quotedTexts = quotedTextMatches.map(match => match.slice(1, -1));
+    console.log('[VoicePilot] Found quoted texts:', quotedTexts);
     
     // Comprehensive selector for UI elements
     const selectors = [
@@ -209,9 +221,6 @@
     const candidates = Array.from(document.querySelectorAll(selectors.join(',')));
     console.log('[VoicePilot] Found', candidates.length, 'potential elements to check');
     
-    // Normalize the message for comparison
-    const normalizedMessage = message.toLowerCase().trim();
-    
     // Function to extract text content from an element
     function getElementText(element) {
       const texts = [];
@@ -237,41 +246,50 @@
       return texts;
     }
     
-    // Function to check if text matches the message
-    function textMatches(text, message) {
-      if (!text || text.length < 2) return false;
+    // Function to check if text matches any of the quoted texts
+    function textMatches(text, quotedTexts) {
+      if (!text || text.length < 2) return null;
       
       const normalizedText = text.toLowerCase().trim();
       
-      // Exact match
-      if (normalizedText === message) return { score: 100, type: 'exact' };
-      
-      // Contains match
-      if (normalizedText.includes(message) || message.includes(normalizedText)) {
-        return { score: 80, type: 'contains' };
-      }
-      
-      // Word boundary match
-      const messageWords = message.split(/\s+/);
-      const textWords = normalizedText.split(/\s+/);
-      
-      let matchingWords = 0;
-      for (const messageWord of messageWords) {
-        if (textWords.some(textWord => 
-          textWord.includes(messageWord) || messageWord.includes(textWord)
-        )) {
-          matchingWords++;
+      for (const quotedText of quotedTexts) {
+        const normalizedQuoted = quotedText.toLowerCase().trim();
+        
+        // Exact match
+        if (normalizedText === normalizedQuoted) {
+          return { score: 100, type: 'exact', matchedText: quotedText };
         }
-      }
-      
-      if (matchingWords > 0) {
-        const score = (matchingWords / messageWords.length) * 60;
-        return { score, type: 'partial' };
-      }
-      
-      // Fuzzy match for common variations
-      if (normalizedText.replace(/[^a-z0-9]/g, '').includes(message.replace(/[^a-z0-9]/g, ''))) {
-        return { score: 40, type: 'fuzzy' };
+        
+        // Contains match
+        if (normalizedText.includes(normalizedQuoted) || normalizedQuoted.includes(normalizedText)) {
+          return { score: 80, type: 'contains', matchedText: quotedText };
+        }
+        
+        // Word boundary match
+        const quotedWords = normalizedQuoted.split(/\s+/);
+        const textWords = normalizedText.split(/\s+/);
+        
+        let matchingWords = 0;
+        for (const quotedWord of quotedWords) {
+          if (textWords.some(textWord => 
+            textWord.includes(quotedWord) || quotedWord.includes(textWord)
+          )) {
+            matchingWords++;
+          }
+        }
+        
+        if (matchingWords > 0) {
+          const score = (matchingWords / quotedWords.length) * 60;
+          return { score, type: 'partial', matchedText: quotedText };
+        }
+        
+        // Fuzzy match for common variations (case insensitive, punctuation removed)
+        const cleanText = normalizedText.replace(/[^a-z0-9]/g, '');
+        const cleanQuoted = normalizedQuoted.replace(/[^a-z0-9]/g, '');
+        
+        if (cleanText.includes(cleanQuoted) || cleanQuoted.includes(cleanText)) {
+          return { score: 40, type: 'fuzzy', matchedText: quotedText };
+        }
       }
       
       return null;
@@ -291,7 +309,7 @@
       const texts = getElementText(element);
       
       for (const text of texts) {
-        const match = textMatches(text, normalizedMessage);
+        const match = textMatches(text, quotedTexts);
         if (match && match.score > bestScore) {
           bestScore = match.score;
           bestMatch = { element, text, ...match };
@@ -304,6 +322,7 @@
       console.log('[VoicePilot] Highlighting element:', {
         element: bestMatch.element,
         text: bestMatch.text,
+        matchedQuotedText: bestMatch.matchedText,
         score: bestScore,
         type: bestMatch.type
       });
@@ -333,7 +352,7 @@
       return true;
     }
     
-    console.log('[VoicePilot] No suitable element found for highlighting. Best score:', bestScore);
+    console.log('[VoicePilot] No suitable element found for highlighting quoted text. Best score:', bestScore);
     return false;
   }
 
@@ -707,7 +726,7 @@ When responding, consider the user's current location and what they can see on t
                   partialTextRef = '';
                   updateTranscriptDisplay();
                   
-                  // Highlight elements mentioned by AI
+                  // Highlight elements mentioned by AI (only if they contain quoted text)
                   if (partialText) {
                     highlightElement(partialText);
                   }
