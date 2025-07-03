@@ -920,131 +920,285 @@
     return pageContextCapture.getContextSummary();
   };
 
-  // ────────────────────────────────────────────────────
-  // Widget creation
-  // ────────────────────────────────────────────────────
-  function createWidget() {
-    // Create widget container
-    const widget = document.createElement('div');
-    widget.id = 'voicepilot-widget';
-    
-    // Position mapping
-    const positions = {
-      'bottom-right': { bottom: '20px', right: '20px' },
-      'bottom-left': { bottom: '20px', left: '20px' },
-      'top-right': { top: '20px', right: '20px' },
-      'top-left': { top: '20px', left: '20px' }
-    };
-    
-    const pos = positions[position] || positions['bottom-right'];
-    
-    // Apply styles
-    Object.assign(widget.style, {
-      position: 'fixed',
-      zIndex: '10000',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      ...pos
-    });
-
-    // Widget HTML
-    widget.innerHTML = `
-      <div id="voicepilot-container" style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 25px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        padding: 20px;
-        min-width: 320px;
-        max-width: 400px;
-        color: white;
-        transition: all 0.3s ease;
+// Widget creation
+// ────────────────────────────────────────────────────
+function createWidget() {
+  // Create widget container
+  const widget = document.createElement('div');
+  widget.id = 'voicepilot-widget';
+  
+  // Position mapping
+  const positions = {
+    'bottom-right': { bottom: '20px', right: '20px' },
+    'bottom-left': { bottom: '20px', left: '20px' },
+    'top-right': { top: '20px', right: '20px' },
+    'top-left': { top: '20px', left: '20px' }
+  };
+  
+  const pos = positions[position] || positions['bottom-right'];
+  
+  // Apply styles
+  Object.assign(widget.style, {
+    position: 'fixed',
+    zIndex: '10000',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    ...pos
+  });
+  
+  // Widget HTML
+  widget.innerHTML = `
+    <div id="voicepilot-container" style="
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(20px);
+      border-radius: 30px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px;
+      color: #1f2937;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      height: 60px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      overflow: hidden;
+    ">
+      <!-- Compact widget view -->
+      <div class="widget-compact" style="
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
       ">
-        <div id="voicepilot-header" style="
+        <button class="mic-button" id="mic-toggle" style="
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: #e5e7eb;
+          border: none;
+          cursor: pointer;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          margin-bottom: 15px;
-        ">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">
-            🎯 Voice Guide
-          </h3>
-          <button id="voicepilot-close" style="
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            color: white;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">×</button>
-        </div>
-        
-        <div id="voicepilot-status" style="
-          text-align: center;
-          margin-bottom: 20px;
-        ">
-          <div id="voicepilot-status-indicator" style="
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            margin: 0 auto 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-          ">🎤</div>
-          <div id="voicepilot-status-text" style="
-            font-size: 14px;
-            opacity: 0.9;
-          ">Ready to help</div>
-        </div>
-        
-        <div id="voicepilot-controls" style="
-          display: flex;
-          gap: 10px;
           justify-content: center;
+          transition: all 0.2s ease;
+          position: relative;
         ">
-          <button id="voicepilot-start" style="
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 20px;
-            padding: 12px 24px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-          ">Start Call</button>
-          <button id="voicepilot-end" style="
-            background: rgba(255,255,255,0.1);
-            border: none;
-            border-radius: 20px;
-            padding: 12px 24px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            display: none;
-          ">End Call</button>
-        </div>
-        
-        <div id="voicepilot-transcript" style="
-          margin-top: 15px;
-          padding: 10px;
-          background: rgba(255,255,255,0.1);
-          border-radius: 10px;
-          font-size: 12px;
-          max-height: 100px;
-          overflow-y: auto;
+          <svg style="width: 20px; height: 20px; fill: #6b7280;" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+            <line x1="12" x2="12" y1="19" y2="23"/>
+            <line x1="8" x2="16" y1="23" y2="23"/>
+          </svg>
+        </button>
+        <button class="action-button" id="compact-action" style="
+          background: #000000;
+          color: white;
+          border: none;
+          border-radius: 20px;
+          padding: 12px 20px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
           display: none;
-        "></div>
+          align-items: center;
+          gap: 8px;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+          END CALL
+        </button>
       </div>
-    `;
+      
+      <!-- Expanded widget view -->
+      <div id="voicepilot-header" style="
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      ">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #1f2937;">
+          Voice Guide
+        </h3>
+        <button id="voicepilot-close" style="
+          background: #f3f4f6;
+          border: none;
+          border-radius: 50%;
+          width: 32px;
+          height: 32px;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        ">×</button>
+      </div>
+      
+      <div id="voicepilot-status" style="
+        display: none;
+        text-align: center;
+        margin-bottom: 20px;
+      ">
+        <div id="voicepilot-status-indicator" style="
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background: #f3f4f6;
+          margin: 0 auto 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+          border: 3px solid #e5e7eb;
+        ">
+          <svg style="width: 24px; height: 24px; fill: #6b7280;" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+            <line x1="12" x2="12" y1="19" y2="23"/>
+            <line x1="8" x2="16" y1="23" y2="23"/>
+          </svg>
+        </div>
+        <div id="voicepilot-status-text" style="
+          font-size: 14px;
+          color: #6b7280;
+          font-weight: 500;
+        ">Ready to help</div>
+      </div>
+      
+      <div id="voicepilot-controls" style="
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      ">
+        <button id="voicepilot-start" style="
+          background: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 12px 20px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        ">Start Call</button>
+        <button id="voicepilot-end" style="
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 12px 20px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          display: none;
+        ">End Call</button>
+      </div>
+      
+      <div id="voicepilot-transcript" style="
+        margin-top: 15px;
+        padding: 12px;
+        background: #f9fafb;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        font-size: 12px;
+        max-height: 120px;
+        overflow-y: auto;
+        display: none;
+        color: #374151;
+      "></div>
+    </div>
+  `;
+
+  // Add dynamic styles for expanded state
+  const style = document.createElement('style');
+  style.textContent = `
+    #voicepilot-container.expanded {
+      width: 320px !important;
+      height: auto !important;
+      border-radius: 20px !important;
+      padding: 20px !important;
+      cursor: default !important;
+    }
+    
+    #voicepilot-container.expanded .widget-compact {
+      display: none !important;
+    }
+    
+    #voicepilot-container.expanded #voicepilot-header {
+      display: flex !important;
+    }
+    
+    #voicepilot-container.expanded #voicepilot-status {
+      display: block !important;
+    }
+    
+    #voicepilot-container.expanded #voicepilot-controls {
+      display: flex !important;
+    }
+    
+    .mic-button.recording {
+      background: #ef4444 !important;
+    }
+    
+    .mic-button.recording svg {
+      fill: white !important;
+    }
+    
+    .action-button.end-call {
+      background: #ef4444 !important;
+    }
+    
+    #voicepilot-status-indicator.listening {
+      background: #dcfce7 !important;
+      border-color: #22c55e !important;
+      animation: pulse-green 2s infinite;
+    }
+    
+    #voicepilot-status-indicator.listening svg {
+      fill: #22c55e !important;
+    }
+    
+    @keyframes pulse-green {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    }
+    
+    .mic-button:hover {
+      background: #d1d5db !important;
+      transform: scale(1.05);
+    }
+    
+    .mic-button.recording:hover {
+      background: #dc2626 !important;
+    }
+    
+    .action-button:hover {
+      background: #1f2937 !important;
+      transform: translateY(-1px);
+    }
+    
+    .action-button.end-call:hover {
+      background: #dc2626 !important;
+    }
+    
+    #voicepilot-close:hover {
+      background: #e5e7eb !important;
+      color: #374151 !important;
+    }
+    
+    #voicepilot-start:hover {
+      background: #2563eb !important;
+    }
+    
+    #voicepilot-end:hover {
+      background: #dc2626 !important;
+    }
+  `;
+
 
     document.body.appendChild(widget);
 
