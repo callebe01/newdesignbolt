@@ -9,7 +9,7 @@
   <body>
     <div id="root"></div>
     <script>
-      window.voicePilotHighlight = (message) => {
+      window.highlightTextMatch = (message) => {
         if (!message) return;
         const lower = message.toLowerCase();
         const candidates = Array.from(
@@ -28,13 +28,6 @@
             break;
           }
         }
-      };
-
-      window.voicePilotClearHighlights = () => {
-        const highlightedElements = document.querySelectorAll('.agent-highlight');
-        highlightedElements.forEach(el => {
-          el.classList.remove('agent-highlight');
-        });
       };
     </script>
     <script type="module" src="/src/main.tsx"></script>
