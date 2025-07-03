@@ -73,6 +73,53 @@
     }
   }
 
+  // Fetch agent details from Supabase
+  async function fetchAgentDetails(agentId) {
+    try {
+      console.log('[VoicePilot] Fetching agent details for:', agentId);
+      
+      if (!supabaseClient) {
+        await initSupabase();
+      }
+
+      if (!supabaseClient) {
+        throw new Error('Failed to initialize Supabase client');
+      }
+
+      const { data, error } = await supabaseClient
+        .from('agents')
+        .select('instructions, documentation_urls, status')
+        .eq('id', agentId)
+        .single();
+
+      if (error) {
+        console.error('[VoicePilot] Supabase error fetching agent:', error);
+        throw new Error(`Failed to fetch agent details: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('Agent not found');
+      }
+
+      if (data.status !== 'active') {
+        throw new Error('Agent is not active');
+      }
+
+      console.log('[VoicePilot] Successfully fetched agent details:', {
+        instructionsLength: data.instructions?.length || 0,
+        documentationUrls: data.documentation_urls?.length || 0
+      });
+
+      return {
+        instructions: data.instructions || 'You are a helpful AI assistant.',
+        documentationUrls: data.documentation_urls || []
+      };
+    } catch (err) {
+      console.error('[VoicePilot] Error fetching agent details:', err);
+      throw err;
+    }
+  }
+
   // Create widget HTML
   function createWidget() {
     const widget = document.createElement('div');
@@ -699,6 +746,16 @@
       
       window.addEventListener('beforeunload', handleBeforeUnload);
 
+      // Fetch agent details from Supabase
+      console.log('[VoicePilot] Fetching agent details before starting call...');
+      let agentDetails;
+      try {
+        agentDetails = await fetchAgentDetails(agentId);
+      } catch (err) {
+        console.error('[VoicePilot] Failed to fetch agent details:', err);
+        throw new Error(`Failed to load agent configuration: ${err.message}`);
+      }
+
       // Check agent owner's usage limits
       const canUse = await checkAgentOwnerUsage(agentId);
       if (!canUse) {
@@ -724,8 +781,8 @@
         },
         body: JSON.stringify({ 
           agentId, 
-          instructions: 'You are a helpful AI assistant.',
-          documentationUrls: []
+          instructions: agentDetails.instructions,
+          documentationUrls: agentDetails.documentationUrls
         })
       });
 
@@ -749,7 +806,19 @@
         lastSentPageContextRef = pageContext;
         console.log('[VoicePilot] Initial page context:', pageContext);
 
-        const enhancedSystemInstruction = `You are a helpful AI assistant. 
+        // Create URL context tools if documentation URLs are provided
+        const tools = [];
+        
+        if (agentDetails.documentationUrls?.length) {
+          tools.push({
+            url_context: {
+              urls: agentDetails.documentationUrls
+            }
+          });
+        }
+
+        // Enhanced system instruction with page context and agent's custom instructions
+        const enhancedSystemInstruction = `${agentDetails.instructions} 
 
 CURRENT PAGE CONTEXT: ${pageContext}
 
@@ -768,6 +837,7 @@ When responding, consider the user's current location and what they can see on t
                 }
               }
             },
+            tools: tools.length > 0 ? tools : undefined,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
             systemInstruction: {
@@ -780,7 +850,10 @@ When responding, consider the user's current location and what they can see on t
           },
         };
 
-        console.log('[VoicePilot][WebSocket] Sending setup:', setupMsg);
+        console.log('[VoicePilot][WebSocket] Sending setup with agent instructions:', {
+          instructionsLength: agentDetails.instructions.length,
+          toolsCount: tools.length
+        });
         ws.send(JSON.stringify(setupMsg));
       };
 
