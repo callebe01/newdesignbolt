@@ -30,38 +30,37 @@ export async function saveTranscript(agentId: string, content: string, fromUnloa
   }
 
   try {
-    // Prepare the insert payload
-    const insertPayload = {
-      agent_id: agentId,
-      content: content.trim(),
-      metadata: {
-        saved_at: new Date().toISOString(),
-        length: content.trim().length
-      }
-    };
-
     console.log('Saving transcript for agent:', agentId);
     console.log('Content length:', content.trim().length);
 
-    // Use authenticated supabase client which handles RLS properly
-    const { data, error } = await supabase
-      .from('transcriptions')
-      .insert(insertPayload)
-      .select()
-      .single();
+    // Get the current session to access the access token
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
 
-    if (error) {
-      console.error('Supabase error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
-      throw error;
+    // Use the Edge Function to save the transcript
+    const response = await fetch(
+      `${env.VITE_SUPABASE_URL}/functions/v1/save-transcript-record`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          agentId,
+          content: content.trim()
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save transcript');
     }
 
-    console.log('Transcript saved successfully:', data?.id);
-    return data;
+    const result = await response.json();
+    console.log('Transcript saved successfully:', result.transcriptId);
+    return result;
   } catch (err: any) {
     const message = err?.message || JSON.stringify(err);
     console.error('Failed to save transcript:', message);
@@ -71,7 +70,7 @@ export async function saveTranscript(agentId: string, content: string, fromUnloa
 }
 
 export async function saveTranscriptBeacon(agentId: string, content: string) {
-  // Use the same function with fromUnload flag
+  // Use the same Edge Function approach for beacon saves
   return saveTranscript(agentId, content, true);
 }
 

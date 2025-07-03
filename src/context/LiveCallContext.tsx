@@ -290,23 +290,33 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const createConversationRecord = async (agentId: string): Promise<string | null> => {
     try {
-      const { data, error } = await supabase
-        .from('agent_conversations')
-        .insert({
-          agent_id: agentId,
-          status: 'active',
-          start_time: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+      console.log(`[Live] Creating conversation record for agent ${agentId}`);
 
-      if (error) {
-        console.error('Failed to create conversation record:', error);
-        return null;
+      // Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      // Use the Edge Function to create the conversation record
+      const response = await fetch(
+        `${env.VITE_SUPABASE_URL}/functions/v1/create-conversation-record`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ agentId })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create conversation record');
       }
 
-      console.log('Created conversation record:', data.id);
-      return data.id;
+      const result = await response.json();
+      console.log('Created conversation record via Edge Function:', result.conversationId);
+      return result.conversationId;
     } catch (err) {
       console.error('Error creating conversation record:', err);
       return null;
@@ -353,23 +363,38 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const saveConversationMessages = async (conversationId: string, transcript: string): Promise<void> => {
     try {
-      // For now, save the entire transcript as a single message
-      // In the future, we could parse it into individual messages
-      const { error } = await supabase
-        .from('conversation_messages')
-        .insert({
-          conversation_id: conversationId,
-          role: 'user',
-          content: transcript,
-        });
+      console.log(`[Live] Saving conversation messages for ${conversationId}`);
 
-      if (error) {
-        console.error('Failed to save conversation messages:', error);
-      } else {
-        console.log('Saved conversation messages for:', conversationId);
+      // Get the current session to access the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      // Use the Edge Function to save conversation messages
+      const response = await fetch(
+        `${env.VITE_SUPABASE_URL}/functions/v1/save-conversation-messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            conversationId,
+            content: transcript
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save conversation messages');
       }
+
+      const result = await response.json();
+      console.log('Saved conversation messages for:', conversationId);
     } catch (err) {
       console.error('Error saving conversation messages:', err);
+      // Don't throw here to avoid breaking the call end flow
     }
   };
 
@@ -418,7 +443,7 @@ export const LiveCallProvider: React.FC<{ children: React.ReactNode }> = ({
           throw new Error('You have exceeded your monthly minute limit. Please upgrade your plan to continue using the service.');
         }
 
-        // Create conversation record
+        // Create conversation record using Edge Function
         const conversationId = await createConversationRecord(agentId);
         conversationIdRef.current = conversationId;
       }
@@ -1049,7 +1074,7 @@ When responding, consider the user's current location and what they can see on t
         }
       }
 
-      // Save transcript and conversation data
+      // Save transcript and conversation data using Edge Functions
       if (agentId && finalTranscript) {
         console.log('[Live] Saving transcript for agent:', agentId);
         const save = fromUnload ? saveTranscriptBeacon : saveTranscript;
