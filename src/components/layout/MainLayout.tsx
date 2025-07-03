@@ -2,7 +2,6 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { VoiceChatWidget } from '../widget/VoiceChatWidget';
 import { useAuth } from '../../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
@@ -29,9 +28,6 @@ export const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
-      
-      {/* Voice Chat Widget */}
-      <VoiceChatWidget agentId="2d85d376-15e2-4eb6-8495-7023559b886a" />
     </div>
   );
 };
