@@ -1172,18 +1172,6 @@ When responding, consider the user's current location and what they can see on t
 
         <div style="padding: 16px;">
           ${status !== 'active' ? `
-            <div style="text-align: center; margin-bottom: 16px;">
-              <div style="
-                width: 64px;
-                height: 64px;
-                background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 12px;
-                font-size: 24px;
-              ">🎤</div>
               <p style="margin: 0; color: #6b7280; font-size: 14px;">
                 ${status === 'connecting' ? 'Establishing connection...' : 'Start a voice conversation with your AI assistant'}
               </p>
