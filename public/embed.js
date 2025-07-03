@@ -333,13 +333,6 @@
       // Add highlight class
       bestMatch.element.classList.add('voicepilot-highlight');
       
-      // Remove highlight after 3 seconds
-      setTimeout(() => {
-        if (bestMatch.element) {
-          bestMatch.element.classList.remove('voicepilot-highlight');
-        }
-      }, 3000);
-      
       // Scroll element into view if needed
       const rect = bestMatch.element.getBoundingClientRect();
       if (rect.bottom < 0 || rect.top > window.innerHeight) {
@@ -368,6 +361,23 @@
   // Expose highlighting functions globally
   window.voicePilotHighlight = highlightElement;
   window.voicePilotClearHighlights = clearHighlights;
+
+  // Clear highlights on page navigation
+  let currentUrl = window.location.href;
+  const observer = new MutationObserver(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      clearHighlights();
+      console.log('[VoicePilot] Page navigation detected, cleared highlights');
+    }
+  });
+  observer.observe(document, { subtree: true, childList: true });
+
+  // Also listen for popstate events (back/forward navigation)
+  window.addEventListener('popstate', () => {
+    clearHighlights();
+    console.log('[VoicePilot] Popstate navigation detected, cleared highlights');
+  });
 
   // Fetch agent details from Supabase
   async function fetchAgentDetails(agentId) {
@@ -839,7 +849,7 @@ When responding, consider the user's current location and what they can see on t
 
       console.log('[VoicePilot] Ending call - Duration:', finalDuration, 'seconds, Transcript length:', finalTranscript.length);
 
-      // Clear highlights
+      // Clear highlights when call ends
       clearHighlights();
 
       // Stop all streams
@@ -1072,9 +1082,14 @@ When responding, consider the user's current location and what they can see on t
         justify-content: center;
         transition: all 0.3s ease;
         color: white;
-        font-size: 24px;
+        font-size: 0;
+        overflow: hidden;
       " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-        💬
+        <img src="/logovp.png" alt="VoicePilot" style="
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
+        " onerror="this.style.display='none'; this.parentElement.innerHTML='💬'; this.parentElement.style.fontSize='24px';">
       </button>
     `;
 
@@ -1121,8 +1136,14 @@ When responding, consider the user's current location and what they can see on t
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 18px;
-            ">🤖</div>
+              overflow: hidden;
+            ">
+              <img src="/logovp.png" alt="VoicePilot" style="
+                width: 24px;
+                height: 24px;
+                object-fit: contain;
+              " onerror="this.style.display='none'; this.parentElement.innerHTML='🤖'; this.parentElement.style.fontSize='18px';">
+            </div>
             <div>
               <div style="font-weight: 600; font-size: 14px;">AI Assistant</div>
               <div style="font-size: 12px; opacity: 0.9;">
