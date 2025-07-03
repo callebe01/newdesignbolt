@@ -273,6 +273,9 @@
     `;
     
     document.head.appendChild(style);
+    
+    // Return the widget element
+    return widget;
   }
 
   // Supabase client setup
@@ -615,8 +618,8 @@
 
   // Initialize
   function init() {
-    createWidget();
-    document.body.appendChild(document.getElementById('voicepilot-widget'));
+    const widget = createWidget();
+    document.body.appendChild(widget);
     setupEventHandlers();
   }
 
