@@ -1196,7 +1196,7 @@ When responding, consider the user's current location and what they can see on t
               font-size: 14px;
               ${status === 'connecting' ? 'opacity: 0.7; cursor: not-allowed;' : ''}
             " ${status === 'connecting' ? 'disabled' : ''}>
-              ${status === 'connecting' ? 'Connecting...' : '🎤 Start Voice Chat'}
+              ${status === 'connecting' ? 'Connecting...' : 'Start Voice Chat'}
             </button>
           ` : `
             <div style="display: flex; align-items: center; justify-center; gap: 8px; margin-bottom: 12px;">
