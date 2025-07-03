@@ -1228,6 +1228,10 @@
         const bufferSize = 4096;
         const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
 
+        micStreamRef.current  = micStream;
+        sourceNodeRef.current = sourceNode;
+        processorRef.current  = processor;
+
         sourceNode.connect(processor);
         processor.connect(audioCtx.destination);
 
