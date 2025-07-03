@@ -24,15 +24,16 @@ serve(async (req) => {
   try {
     const { agentId, instructions, documentationUrls } = await req.json();
 
+    // Create admin client using service role key to bypass RLS
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!  // ← bypasses RLS
+    );
+
     // Optional: Reuse existing usage check logic for authenticated agent owners
     if (agentId) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-
       // Get the agent and its owner
-      const { data: agent, error: agentError } = await supabase
+      const { data: agent, error: agentError } = await supabaseAdmin
         .from("agents")
         .select("user_id, status")
         .eq("id", agentId)
@@ -47,7 +48,7 @@ serve(async (req) => {
       }
 
       // Check if the agent owner can perform the action
-      const { data: canUse, error: checkError } = await supabase.rpc(
+      const { data: canUse, error: checkError } = await supabaseAdmin.rpc(
         "can_user_perform_action",
         {
           user_uuid: agent.user_id,
@@ -65,8 +66,8 @@ serve(async (req) => {
         throw new Error("Usage limit exceeded. Please upgrade your plan to continue.");
       }
 
-      // Fetch agent tools for this agent
-      const { data: tools, error: toolsError } = await supabase
+      // Fetch agent tools for this agent using admin client
+      const { data: tools, error: toolsError } = await supabaseAdmin
         .from('agent_tools')
         .select('name, description, parameters')
         .eq('agent_id', agentId);
@@ -74,6 +75,8 @@ serve(async (req) => {
       if (toolsError) {
         console.error("Error fetching agent tools:", toolsError);
       }
+
+      console.log(`[start-call] Found ${tools?.length || 0} tools for agent ${agentId}:`, tools);
 
       // Create tool declarations for Gemini Live API
       const toolDeclarations = (tools || []).map(t => ({
@@ -84,12 +87,8 @@ serve(async (req) => {
         }]
       }));
 
-      console.log(`[Start-Call] Found ${tools?.length || 0} tools for agent ${agentId}`);
-
-      // Store tools info in a way that can be accessed by the relay
-      // For now, we'll pass this through the WebSocket setup
       if (tools && tools.length > 0) {
-        console.log("[Start-Call] Agent has custom tools:", tools.map(t => t.name));
+        console.log("[start-call] Agent has custom tools:", tools.map(t => t.name));
       }
     }
 

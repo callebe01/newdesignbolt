@@ -519,6 +519,7 @@ CURRENT PAGE CONTEXT: ${pageContext}
 When responding, consider the user's current location and what they can see on the page. If they ask about something that doesn't match their current context, gently guide them or ask for clarification. When you mention specific UI elements, buttons, or parts of the interface in your responses, I will automatically highlight them for the user. Speak naturally about what you see and what actions the user might take.`;
 
         // Setup message with tools and Kore voice - AUDIO ONLY
+        // ✅ IMPORTANT: Include agent ID for tool call handling
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.0-flash-live-001',
