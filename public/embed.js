@@ -422,20 +422,6 @@
     }
   }
 
-  // ✅ NEW: Clean transcript text by removing tool execution artifacts
-  function cleanTranscriptText(text) {
-    if (!text) return text;
-    
-    // Remove tool_code patterns and other technical artifacts
-    return text
-      // Remove "tool_code [toolname]" patterns
-      .replace(/\btool_code\s+\w+\b/gi, '')
-      // Remove multiple spaces
-      .replace(/\s+/g, ' ')
-      // Remove leading/trailing spaces
-      .trim();
-  }
-
   // Update transcript display
   function updateTranscriptDisplay() {
     const committed = committedTextRef;
@@ -449,8 +435,7 @@
       fullText = partial;
     }
     
-    // ✅ Clean the transcript before displaying
-    transcript = cleanTranscriptText(fullText);
+    transcript = fullText;
     updateUI();
   }
 
@@ -677,8 +662,6 @@ When responding, consider the user's current location and what they can see on t
               parts: [{ text: enhancedSystemInstruction }],
             },
           },
-          // Include agent ID for tool call handling
-          agentId: agentId
         };
 
         console.log('[VoicePilot] Sending setup with agent instructions');
@@ -735,13 +718,9 @@ When responding, consider the user's current location and what they can see on t
                 const { text, finished } = sc.outputTranscription;
                 
                 if (text) {
-                  // ✅ Clean the text before adding to partial buffer
-                  const cleanedText = cleanTranscriptText(text);
-                  if (cleanedText) {
-                    partialTextRef += cleanedText;
-                    updateTranscriptDisplay();
-                    console.log('[VoicePilot] AI transcription fragment (cleaned):', cleanedText);
-                  }
+                  partialTextRef += text;
+                  updateTranscriptDisplay();
+                  console.log('[VoicePilot] AI transcription fragment:', text);
                 }
 
                 if (finished && partialTextRef) {
@@ -768,7 +747,7 @@ When responding, consider the user's current location and what they can see on t
 
               // Handle user speech transcription
               if (sc.inputTranscription?.text) {
-                const userText = cleanTranscriptText(sc.inputTranscription.text.trim());
+                const userText = sc.inputTranscription.text.trim();
                 if (userText) {
                   if (committedTextRef) {
                     const needsSpace = !committedTextRef.endsWith(' ') && !userText.startsWith(' ');
@@ -778,7 +757,7 @@ When responding, consider the user's current location and what they can see on t
                   }
                   
                   updateTranscriptDisplay();
-                  console.log('[VoicePilot] User transcription (cleaned):', userText);
+                  console.log('[VoicePilot] User transcription:', userText);
                 }
               }
 
@@ -864,7 +843,7 @@ When responding, consider the user's current location and what they can see on t
   async function endCall(fromUnload = false) {
     try {
       const finalDuration = duration;
-      const finalTranscript = cleanTranscriptText((committedTextRef + partialTextRef).trim());
+      const finalTranscript = (committedTextRef + partialTextRef).trim();
       const currentAgentId = agentId;
       const currentConversationId = conversationId;
 
