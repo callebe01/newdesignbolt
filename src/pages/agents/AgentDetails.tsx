@@ -25,13 +25,15 @@ import {
   Copy,
   Link as LinkIcon,
   Users,
-  TrendingDown
+  TrendingDown,
+  Settings
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
 import { Dialog } from '../../components/ui/Dialog';
+import { AgentActionsMVP } from '../../components/agents/AgentActionsMVP';
 import { formatDateTime, formatDuration } from '../../utils/format';
 import { useAgents } from '../../context/AgentContext';
 import { Agent } from '../../types';
@@ -893,6 +895,7 @@ export const AgentDetails: React.FC = () => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="conversations">Conversations ({conversations.length})</TabsTrigger>
           <TabsTrigger value="analysis">Analysis ({analysisResults.length})</TabsTrigger>
+          <TabsTrigger value="actions">Actions</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -1153,6 +1156,10 @@ export const AgentDetails: React.FC = () => {
               )}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="actions" className="space-y-6">
+          <AgentActionsMVP agentId={agentId!} />
         </TabsContent>
       </Tabs>
 

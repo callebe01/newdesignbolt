@@ -11,6 +11,7 @@ export const config = {
 };
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 // Additional JWT bypass - handle requests without authentication
 const handler = (req: Request) => {
@@ -86,11 +87,84 @@ const handler = (req: Request) => {
     // ✅ IMPROVED: Track connection states and prevent double-close
     let browserClosed = false;
     let geminiClosed = false;
+    let currentAgentId: string | null = null;
 
-    /* 6️⃣  Pipe traffic both ways with message buffering */
-    browser.onmessage = (e) => {
+    // Initialize Supabase client for tool calls
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Tool call utility function
+    async function runToolCall(agentId: string, name: string, args: any) {
+      try {
+        console.log('[Relay][ToolCall] Running tool:', name, 'with args:', args);
+
+        // Fetch the tool configuration
+        const { data: tools, error } = await supabase
+          .from('agent_tools')
+          .select('*')
+          .eq('agent_id', agentId);
+
+        if (error) {
+          console.error('[Relay][ToolCall] Error fetching tools:', error);
+          throw new Error('Failed to fetch tool configuration');
+        }
+
+        const tool = tools?.find(t => t.name === name);
+        if (!tool) {
+          console.error('[Relay][ToolCall] Tool not found:', name);
+          throw new Error(`Tool '${name}' not found`);
+        }
+
+        console.log('[Relay][ToolCall] Found tool configuration:', {
+          name: tool.name,
+          endpoint: tool.endpoint,
+          method: tool.method
+        });
+
+        // Make the API call
+        const response = await fetch(tool.endpoint, {
+          method: tool.method,
+          headers: { 
+            'Content-Type': 'application/json',
+            'User-Agent': 'VoicePilot-Agent/1.0'
+          },
+          body: tool.method !== 'GET' ? JSON.stringify(args) : undefined
+        });
+
+        if (!response.ok) {
+          console.error('[Relay][ToolCall] API call failed:', response.status, response.statusText);
+          throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('[Relay][ToolCall] Tool call successful:', result);
+        
+        return result;
+      } catch (error) {
+        console.error('[Relay][ToolCall] Tool call error:', error);
+        throw error;
+      }
+    }
+
+    /* 6️⃣  Pipe traffic both ways with message buffering and tool call handling */
+    browser.onmessage = async (e) => {
       if (gemini.readyState === WebSocket.OPEN && !geminiClosed) {
         try {
+          // Parse message to extract agent ID from setup if available
+          let messageData;
+          try {
+            messageData = JSON.parse(e.data);
+            if (messageData.setup?.systemInstruction?.parts?.[0]?.text) {
+              // Try to extract agent ID from system instruction or other setup data
+              // For now, we'll need to pass this through the setup message
+              console.log("[Relay] Setup message received");
+            }
+          } catch (parseError) {
+            // Not JSON, just forward as-is
+          }
+
           console.log("[Relay] Forwarding message from browser to Gemini");
           gemini.send(e.data);
         } catch (error) {
@@ -103,9 +177,57 @@ const handler = (req: Request) => {
       }
     };
     
-    gemini.onmessage = (e) => {
+    gemini.onmessage = async (e) => {
       if (browser.readyState === WebSocket.OPEN && !browserClosed) {
         try {
+          // Check for tool calls in the message
+          let messageData;
+          try {
+            messageData = JSON.parse(e.data);
+            
+            // Handle tool calls from Gemini Live API
+            if (messageData.toolCall && currentAgentId) {
+              console.log("[Relay] Tool call detected:", messageData.toolCall);
+              
+              for (const fc of messageData.toolCall.functionCalls) {
+                try {
+                  const result = await runToolCall(currentAgentId, fc.name, fc.args);
+                  const responseMsg = {
+                    functionResponses: [{
+                      id: fc.id,
+                      name: fc.name,
+                      response: result
+                    }]
+                  };
+                  
+                  // Send function response back to Gemini
+                  if (gemini.readyState === WebSocket.OPEN && !geminiClosed) {
+                    gemini.send(JSON.stringify(responseMsg));
+                    console.log("[Relay] Sent function response to Gemini");
+                  }
+                } catch (toolError) {
+                  console.error("[Relay] Tool execution error:", toolError);
+                  
+                  // Send error response back to Gemini
+                  const errorResponse = {
+                    functionResponses: [{
+                      id: fc.id,
+                      name: fc.name,
+                      response: { error: toolError.message }
+                    }]
+                  };
+                  
+                  if (gemini.readyState === WebSocket.OPEN && !geminiClosed) {
+                    gemini.send(JSON.stringify(errorResponse));
+                  }
+                }
+              }
+              return; // Don't forward tool call messages to browser
+            }
+          } catch (parseError) {
+            // Not JSON or no tool calls, continue with normal forwarding
+          }
+
           console.log("[Relay] Forwarding message from Gemini to browser");
           browser.send(e.data);
         } catch (error) {
@@ -210,7 +332,7 @@ const handler = (req: Request) => {
       console.log("[Relay] Browser WebSocket connection established successfully");
     };
 
-    gemini.onopen = () => {
+    gemini.onopen = async () => {
       console.log("[Relay] Gemini Live API WebSocket connection established successfully");
       
       // ✅ NEW: Send all buffered messages now that Gemini is ready
@@ -218,6 +340,49 @@ const handler = (req: Request) => {
         console.log(`[Relay] Sending ${messageQueue.length} buffered messages to Gemini`);
         for (const message of messageQueue) {
           try {
+            // Extract agent ID from setup message if available
+            try {
+              const messageData = JSON.parse(message);
+              if (messageData.setup && messageData.agentId) {
+                currentAgentId = messageData.agentId;
+                console.log("[Relay] Agent ID extracted:", currentAgentId);
+                
+                // Fetch and add tools to the setup
+                const { data: tools, error: toolsError } = await supabase
+                  .from('agent_tools')
+                  .select('name, description, parameters')
+                  .eq('agent_id', currentAgentId);
+
+                if (!toolsError && tools && tools.length > 0) {
+                  console.log(`[Relay] Adding ${tools.length} tools to setup`);
+                  
+                  const toolDeclarations = tools.map(t => ({
+                    functionDeclarations: [{
+                      name: t.name,
+                      description: t.description,
+                      parameters: t.parameters
+                    }]
+                  }));
+
+                  // Add tools to existing setup
+                  if (!messageData.setup.tools) {
+                    messageData.setup.tools = [];
+                  }
+                  messageData.setup.tools.unshift(...toolDeclarations);
+                  
+                  // Remove agentId from the message before sending to Gemini
+                  delete messageData.agentId;
+                  
+                  // Send modified setup
+                  gemini.send(JSON.stringify(messageData));
+                  console.log("[Relay] Sent enhanced setup with tools to Gemini");
+                  continue;
+                }
+              }
+            } catch (parseError) {
+              // Not JSON or no agent ID, send as-is
+            }
+
             gemini.send(message);
             console.log("[Relay] Sent buffered message to Gemini");
           } catch (error) {

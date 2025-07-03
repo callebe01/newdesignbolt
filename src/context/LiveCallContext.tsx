@@ -8,6 +8,7 @@ import React, {
 import { LiveCallStatus } from '../types';
 import { useAuth } from './AuthContext';
 import { saveTranscript, saveTranscriptBeacon } from '../services/transcripts';
+import { runToolCall } from '../services/runToolCall';
 import { supabase } from '../services/supabase';
 
 const env: any =
@@ -542,6 +543,8 @@ When responding, consider the user's current location and what they can see on t
               ],
             },
           },
+          // Include agent ID for tool call handling
+          agentId: agentId
         };
 
         console.log('[Live][WebSocket] Sending setup:', setupMsg);
@@ -600,6 +603,50 @@ When responding, consider the user's current location and what they can see on t
 
               startMicStreaming();
               return;
+            }
+
+            // --- TOOL CALL SUPPORT ---
+            if (parsed.toolCall && currentAgentIdRef.current) {
+              console.log('[Live] Tool call detected:', parsed.toolCall);
+              
+              for (const fc of parsed.toolCall.functionCalls) {
+                try {
+                  const result = await runToolCall(
+                    currentAgentIdRef.current, 
+                    fc.name, 
+                    fc.args
+                  );
+                  
+                  const responseMsg = {
+                    functionResponses: [{
+                      id: fc.id,
+                      name: fc.name,
+                      response: result
+                    }]
+                  };
+                  
+                  if (websocketRef.current?.readyState === WebSocket.OPEN) {
+                    websocketRef.current.send(JSON.stringify(responseMsg));
+                    console.log('[Live] Sent function response back to Gemini');
+                  }
+                } catch (toolError) {
+                  console.error('[Live] Tool execution error:', toolError);
+                  
+                  // Send error response back to Gemini
+                  const errorResponse = {
+                    functionResponses: [{
+                      id: fc.id,
+                      name: fc.name,
+                      response: { error: toolError.message }
+                    }]
+                  };
+                  
+                  if (websocketRef.current?.readyState === WebSocket.OPEN) {
+                    websocketRef.current.send(JSON.stringify(errorResponse));
+                  }
+                }
+              }
+              return; // skip normal flow
             }
 
             if (parsed.serverContent) {

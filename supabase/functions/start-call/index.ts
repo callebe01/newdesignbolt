@@ -64,6 +64,33 @@ serve(async (req) => {
       if (!canUse) {
         throw new Error("Usage limit exceeded. Please upgrade your plan to continue.");
       }
+
+      // Fetch agent tools for this agent
+      const { data: tools, error: toolsError } = await supabase
+        .from('agent_tools')
+        .select('name, description, parameters')
+        .eq('agent_id', agentId);
+
+      if (toolsError) {
+        console.error("Error fetching agent tools:", toolsError);
+      }
+
+      // Create tool declarations for Gemini Live API
+      const toolDeclarations = (tools || []).map(t => ({
+        functionDeclarations: [{
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters
+        }]
+      }));
+
+      console.log(`[Start-Call] Found ${tools?.length || 0} tools for agent ${agentId}`);
+
+      // Store tools info in a way that can be accessed by the relay
+      // For now, we'll pass this through the WebSocket setup
+      if (tools && tools.length > 0) {
+        console.log("[Start-Call] Agent has custom tools:", tools.map(t => t.name));
+      }
     }
 
     // Verify that the API key is configured on the server
