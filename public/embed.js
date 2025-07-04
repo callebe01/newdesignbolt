@@ -385,7 +385,12 @@
     try {
       console.log('[VoicePilot] Loading agent tools for:', agentId);
       
-      const response = await fetch(`${supabaseUrl}/functions/v1/get-agent-tools?agentId=${agentId}`);
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-agent-tools?agentId=${agentId}`, {
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
         let errorMessage = 'Failed to fetch agent tools';
