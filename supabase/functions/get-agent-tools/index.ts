@@ -16,10 +16,16 @@ serve(async (req) => {
   }
 
   if (req.method !== "GET") {
-    return new Response("Method not allowed", { 
-      status: 405, 
-      headers: corsHeaders 
-    });
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }), 
+      { 
+        status: 405, 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        }
+      }
+    );
   }
 
   try {
@@ -32,11 +38,15 @@ serve(async (req) => {
 
     console.log(`[Get-Agent-Tools] Fetching tools for agent ${agentId}`);
 
-    // Use service role key to bypass RLS and ensure the operation succeeds
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Initialize Supabase client inside try block to catch any initialization errors
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Missing Supabase configuration");
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify the agent exists and is active
     const { data: agent, error: agentError } = await supabase
@@ -88,8 +98,15 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("[Get-Agent-Tools] Error:", error);
+    
+    // Ensure we always return a valid JSON response
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        success: false 
+      }),
       { 
         status: 500,
         headers: { 
