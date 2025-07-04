@@ -1325,24 +1325,8 @@ When responding, consider the user's current location and what they can see on t
           justify-content: space-between;
         ">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="
-              width: 40px;
-              height: 40px;
-              background: rgba(255,255,255,0.2);
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              overflow: hidden;
-            ">
-              <img src="/logovp.png" alt="VoicePilot" style="
-                width: 24px;
-                height: 24px;
-                object-fit: contain;
-              " onerror="this.style.display='none'; this.parentElement.innerHTML='🤖'; this.parentElement.style.fontSize='18px';">
-            </div>
             <div>
-              <div style="font-weight: 600; font-size: 14px;">AI Assistant</div>
+              <div style="font-weight: 600; font-size: 14px;">Voice Pilot</div>
               <div style="font-size: 12px; opacity: 0.9;">
                 ${status === 'active' ? `${formatTime(duration)} elapsed` : status}
               </div>
