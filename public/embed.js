@@ -1346,7 +1346,7 @@ When responding, consider the user's current location and what they can see on t
               <div style="font-size: 12px; opacity: 0.9;">
                 ${status === 'active' ? `${formatTime(duration)} elapsed` : status}
               </div>
-            " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\"font-size: 18px;\\">🤖</div>';">
+            </div>
           </div>
           <button id="voicepilot-close" style="
             background: rgba(255,255,255,0.2);
@@ -1361,7 +1361,7 @@ When responding, consider the user's current location and what they can see on t
             justify-content: center;
             font-size: 16px;
           ">×</button>
-            <img src="https://app.voicepilot.live/logovp.png" alt="VoicePilot" style="
+        </div>
 
         <div style="padding: 16px;">
           ${status !== 'active' ? `
