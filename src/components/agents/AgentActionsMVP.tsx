@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Save, Trash2 } from 'lucide-react';
+import { Plus, X, Save, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -12,6 +12,7 @@ interface AgentTool {
   endpoint: string;
   method: string;
   parameters: any;
+  api_key?: string;
 }
 
 interface AgentActionsMVPProps {
@@ -23,12 +24,14 @@ export const AgentActionsMVP: React.FC<AgentActionsMVPProps> = ({ agentId }) => 
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [form, setForm] = useState({
     name: '',
     description: '',
     endpoint: '',
     method: 'POST',
     parameters: '{}',
+    apiKey: '',
   });
 
   useEffect(() => {
@@ -66,18 +69,28 @@ export const AgentActionsMVP: React.FC<AgentActionsMVPProps> = ({ agentId }) => 
         return;
       }
 
-      const { error } = await supabase.from('agent_tools').insert({
+      const toolData = {
         agent_id: agentId,
         name: form.name.trim(),
         description: form.description.trim(),
         endpoint: form.endpoint.trim(),
         method: form.method,
-        parameters: parsedParameters
-      });
+        parameters: parsedParameters,
+        ...(form.apiKey.trim() && { api_key: form.apiKey.trim() })
+      };
+
+      const { error } = await supabase.from('agent_tools').insert(toolData);
 
       if (error) throw error;
 
-      setForm({ name: '', description: '', endpoint: '', method: 'POST', parameters: '{}' });
+      setForm({ 
+        name: '', 
+        description: '', 
+        endpoint: '', 
+        method: 'POST', 
+        parameters: '{}',
+        apiKey: ''
+      });
       setFormOpen(false);
       fetchTools();
     } catch (err) {
@@ -143,7 +156,7 @@ export const AgentActionsMVP: React.FC<AgentActionsMVPProps> = ({ agentId }) => 
 
             <div className="space-y-4">
               <Input
-                placeholder="Action name (e.g., createEvent)"
+                placeholder="Action name (e.g., saveEmail)"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 fullWidth
@@ -178,10 +191,35 @@ export const AgentActionsMVP: React.FC<AgentActionsMVPProps> = ({ agentId }) => 
 
               <div>
                 <label className="text-sm font-medium mb-2 block">
+                  API Key (Optional)
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder="Bearer token for authentication (optional)"
+                    value={form.apiKey}
+                    onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                    fullWidth
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will be used as "Authorization: Bearer {'{token}'}" header
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
                   Parameters (JSON Schema)
                 </label>
                 <textarea
-                  placeholder='{"type":"object","properties":{"msg":{"type":"string"}},"required":["msg"]}'
+                  placeholder='{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]}'
                   value={form.parameters}
                   onChange={(e) => setForm({ ...form, parameters: e.target.value })}
                   className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px]"
@@ -219,6 +257,11 @@ export const AgentActionsMVP: React.FC<AgentActionsMVPProps> = ({ agentId }) => 
                       <span className="px-2 py-1 text-xs bg-muted rounded-full">
                         {tool.method}
                       </span>
+                      {tool.api_key && (
+                        <span className="px-2 py-1 text-xs bg-success/10 text-success rounded-full">
+                          🔐 Authenticated
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
                       {tool.description}

@@ -4,7 +4,7 @@ export async function runToolCall(agentId: string, name: string, args: any) {
   try {
     console.log('[ToolCall] Running tool:', name, 'with args:', args);
 
-    // Fetch the tool configuration
+    // Fetch the tool configuration including API key
     const { data: tools, error } = await supabase
       .from('agent_tools')
       .select('*')
@@ -24,22 +24,40 @@ export async function runToolCall(agentId: string, name: string, args: any) {
     console.log('[ToolCall] Found tool configuration:', {
       name: tool.name,
       endpoint: tool.endpoint,
-      method: tool.method
+      method: tool.method,
+      hasApiKey: !!tool.api_key
     });
+
+    // Prepare headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'VoicePilot-Agent/1.0'
+    };
+
+    // Add Authorization header if API key is provided
+    if (tool.api_key) {
+      headers['Authorization'] = `Bearer ${tool.api_key}`;
+      console.log('[ToolCall] Added Authorization header with Bearer token');
+    }
 
     // Make the API call
     const response = await fetch(tool.endpoint, {
       method: tool.method,
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'VoicePilot-Agent/1.0'
-      },
+      headers,
       body: tool.method !== 'GET' ? JSON.stringify(args) : undefined
     });
 
     if (!response.ok) {
       console.error('[ToolCall] API call failed:', response.status, response.statusText);
-      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      
+      // Provide more specific error messages for common auth issues
+      if (response.status === 401) {
+        throw new Error(`Authentication failed: ${response.status} ${response.statusText}. Check if the API key is valid.`);
+      } else if (response.status === 403) {
+        throw new Error(`Access forbidden: ${response.status} ${response.statusText}. Check API key permissions.`);
+      } else {
+        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      }
     }
 
     const result = await response.json();
