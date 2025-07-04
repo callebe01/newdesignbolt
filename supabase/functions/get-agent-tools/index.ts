@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 // 🔓 DISABLE JWT VERIFICATION - Allow unauthenticated calls from embedded widgets
@@ -9,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
     const agentId = url.searchParams.get('agentId');
 
     if (!agentId) {
-      throw new Error("agentId query parameter is required");
+      throw new Error("Agent ID is required");
     }
 
     console.log(`[Get-Agent-Tools] Fetching tools for agent ${agentId}`);
@@ -69,10 +70,10 @@ Deno.serve(async (req) => {
       name: tool.name,
       endpoint: tool.endpoint,
       method: tool.method,
-      ...(tool.api_key && { apiKey: tool.api_key })
+      apiKey: tool.api_key
     }));
 
-    console.log(`[Get-Agent-Tools] Found ${formattedTools.length} tools for agent ${agentId}`);
+    console.log(`[Get-Agent-Tools] Successfully fetched ${formattedTools.length} tools for agent ${agentId}`);
 
     return new Response(
       JSON.stringify({ 
