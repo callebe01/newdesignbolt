@@ -388,8 +388,18 @@
       const response = await fetch(`${supabaseUrl}/functions/v1/get-agent-tools?agentId=${agentId}`);
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch agent tools');
+        let errorMessage = 'Failed to fetch agent tools';
+        
+        try {
+          const errorData = await response.json();
+          // Check for both 'error' and 'message' properties in the error response
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (parseError) {
+          // If we can't parse the error response, use the status text
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
