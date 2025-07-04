@@ -385,21 +385,15 @@
     try {
       console.log('[VoicePilot] Loading agent tools for:', agentId);
       
-      if (!supabaseClient) {
-        throw new Error('Supabase client not initialized');
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-agent-tools?agentId=${agentId}`);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch agent tools');
       }
 
-      const { data, error } = await supabaseClient
-        .from('agent_tools')
-        .select('*')
-        .eq('agent_id', agentId);
-
-      if (error) {
-        console.error('[VoicePilot] Error fetching agent tools:', error);
-        throw new Error(`Failed to fetch agent tools: ${error.message}`);
-      }
-
-      agentTools = data || [];
+      const data = await response.json();
+      agentTools = data.tools || [];
       console.log('[VoicePilot] Loaded', agentTools.length, 'tools for agent:', agentTools.map(t => t.name));
       return agentTools;
     } catch (error) {
@@ -472,7 +466,7 @@
         name: tool.name,
         endpoint: tool.endpoint,
         method: tool.method,
-        hasApiKey: !!tool.api_key
+        hasApiKey: !!tool.apiKey
       });
       
       // Prepare headers
@@ -482,8 +476,8 @@
       };
       
       // Add Authorization header if API key is provided
-      if (tool.api_key) {
-        headers['Authorization'] = `Bearer ${tool.api_key}`;
+      if (tool.apiKey) {
+        headers['Authorization'] = `Bearer ${tool.apiKey}`;
         console.log('[VoicePilot] Added Authorization header with Bearer token');
       }
       
