@@ -1335,6 +1335,12 @@ When responding, consider the user's current location and what they can see on t
               justify-content: center;
               overflow: hidden;
             ">
+              <img src="/logovp.png" alt="VoicePilot" style="
+                width: 24px;
+                height: 24px;
+                object-fit: contain;
+              " onerror="this.style.display='none'; this.parentElement.innerHTML='🤖'; this.parentElement.style.fontSize='18px';">
+            </div>
             <div>
               <div style="font-weight: 600; font-size: 14px;">AI Assistant</div>
               <div style="font-size: 12px; opacity: 0.9;">
