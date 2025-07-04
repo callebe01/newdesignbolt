@@ -48,6 +48,7 @@
   let maxDurationTimer = null;
   let conversationId = null;
   let agentDetails = null;
+  let agentTools = [];
 
   // Audio context and streams
   let audioContext = null;
@@ -379,6 +380,181 @@
     console.log('[VoicePilot] Popstate navigation detected, cleared highlights');
   });
 
+  // Tool execution functionality
+  async function loadAgentTools(agentId) {
+    try {
+      console.log('[VoicePilot] Loading agent tools for:', agentId);
+      
+      if (!supabaseClient) {
+        throw new Error('Supabase client not initialized');
+      }
+
+      const { data, error } = await supabaseClient
+        .from('agent_tools')
+        .select('*')
+        .eq('agent_id', agentId);
+
+      if (error) {
+        console.error('[VoicePilot] Error fetching agent tools:', error);
+        throw new Error(`Failed to fetch agent tools: ${error.message}`);
+      }
+
+      agentTools = data || [];
+      console.log('[VoicePilot] Loaded', agentTools.length, 'tools for agent:', agentTools.map(t => t.name));
+      return agentTools;
+    } catch (error) {
+      console.error('[VoicePilot] Failed to load agent tools:', error);
+      agentTools = [];
+      return [];
+    }
+  }
+
+  // Parse tool calls from transcript text
+  function parseToolCalls(text) {
+    if (!text || typeof text !== 'string') return [];
+    
+    // Look for patterns like ```tool_code functionName(param="value") ```
+    const toolCallRegex = /```tool_code\s*(\w+)\((.*?)\)\s*```/gs;
+    const toolCalls = [];
+    let match;
+    
+    while ((match = toolCallRegex.exec(text)) !== null) {
+      const [fullMatch, functionName, paramsString] = match;
+      
+      try {
+        // Parse parameters from string like: email="test@example.com", name="John"
+        const params = parseToolParameters(paramsString);
+        
+        toolCalls.push({
+          name: functionName,
+          parameters: params,
+          rawMatch: fullMatch
+        });
+        
+        console.log('[VoicePilot] Parsed tool call:', functionName, 'with params:', params);
+      } catch (error) {
+        console.error('[VoicePilot] Failed to parse tool call parameters:', error);
+      }
+    }
+    
+    return toolCalls;
+  }
+
+  // Parse tool parameters from strings like: email="test@example.com", name="John"
+  function parseToolParameters(paramsString) {
+    if (!paramsString || !paramsString.trim()) return {};
+    
+    const params = {};
+    // Match parameter patterns: paramName="value" or paramName='value'
+    const paramRegex = /(\w+)\s*=\s*["']([^"']*?)["']/g;
+    let match;
+    
+    while ((match = paramRegex.exec(paramsString)) !== null) {
+      const [, paramName, paramValue] = match;
+      params[paramName] = paramValue;
+    }
+    
+    return params;
+  }
+
+  // Execute a tool call
+  async function executeToolCall(toolCall) {
+    try {
+      console.log('[VoicePilot] Executing tool call:', toolCall.name, 'with parameters:', toolCall.parameters);
+      
+      // Find the tool configuration
+      const tool = agentTools.find(t => t.name === toolCall.name);
+      if (!tool) {
+        throw new Error(`Tool '${toolCall.name}' not found in agent configuration`);
+      }
+      
+      console.log('[VoicePilot] Found tool configuration:', {
+        name: tool.name,
+        endpoint: tool.endpoint,
+        method: tool.method,
+        hasApiKey: !!tool.api_key
+      });
+      
+      // Prepare headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'VoicePilot-Widget/1.0'
+      };
+      
+      // Add Authorization header if API key is provided
+      if (tool.api_key) {
+        headers['Authorization'] = `Bearer ${tool.api_key}`;
+        console.log('[VoicePilot] Added Authorization header with Bearer token');
+      }
+      
+      // Prepare request body with agent_id and tool parameters
+      const requestBody = {
+        agent_id: agentId,
+        ...toolCall.parameters
+      };
+      
+      // Make the API call
+      const response = await fetch(tool.endpoint, {
+        method: tool.method,
+        headers,
+        body: tool.method !== 'GET' ? JSON.stringify(requestBody) : undefined
+      });
+      
+      if (!response.ok) {
+        console.error('[VoicePilot] Tool execution failed:', response.status, response.statusText);
+        
+        // Provide more specific error messages for common auth issues
+        if (response.status === 401) {
+          throw new Error(`Authentication failed: ${response.status} ${response.statusText}. Check if the API key is valid.`);
+        } else if (response.status === 403) {
+          throw new Error(`Access forbidden: ${response.status} ${response.statusText}. Check API key permissions.`);
+        } else {
+          throw new Error(`Tool execution failed: ${response.status} ${response.statusText}`);
+        }
+      }
+      
+      const result = await response.json();
+      console.log('[VoicePilot] Tool execution successful:', result);
+      
+      return {
+        success: true,
+        result,
+        toolName: toolCall.name
+      };
+    } catch (error) {
+      console.error('[VoicePilot] Tool execution error:', error);
+      return {
+        success: false,
+        error: error.message,
+        toolName: toolCall.name
+      };
+    }
+  }
+
+  // Process tool calls found in transcript
+  async function processToolCalls(text) {
+    const toolCalls = parseToolCalls(text);
+    
+    if (toolCalls.length === 0) return;
+    
+    console.log('[VoicePilot] Found', toolCalls.length, 'tool calls to execute');
+    
+    // Execute all tool calls
+    for (const toolCall of toolCalls) {
+      try {
+        const result = await executeToolCall(toolCall);
+        
+        if (result.success) {
+          console.log(`[VoicePilot] Successfully executed ${result.toolName}:`, result.result);
+        } else {
+          console.error(`[VoicePilot] Failed to execute ${result.toolName}:`, result.error);
+        }
+      } catch (error) {
+        console.error(`[VoicePilot] Unexpected error executing ${toolCall.name}:`, error);
+      }
+    }
+  }
+
   // Fetch agent details from Supabase
   async function fetchAgentDetails(agentId) {
     try {
@@ -587,6 +763,9 @@
       // Fetch agent details first
       agentDetails = await fetchAgentDetails(agentId);
 
+      // Load agent tools for tool execution
+      await loadAgentTools(agentId);
+
       // Create conversation record
       conversationId = await createConversationRecord(agentId);
 
@@ -741,6 +920,9 @@ When responding, consider the user's current location and what they can see on t
                     highlightElement(partialText);
                   }
                   
+                  // Process tool calls in the completed AI response
+                  await processToolCalls(partialText);
+                  
                   console.log('[VoicePilot] AI said (complete):', partialText);
                 }
               }
@@ -803,6 +985,8 @@ When responding, consider the user's current location and what they can see on t
                 
                 if (partialText) {
                   highlightElement(partialText);
+                  // Process tool calls in the completed AI response
+                  await processToolCalls(partialText);
                 }
                 
                 console.log('[VoicePilot] AI said (turn complete):', partialText);
