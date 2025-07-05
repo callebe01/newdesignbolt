@@ -17,7 +17,9 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b bg-card">
-
+      <div className="flex items-center">
+        <h1 className="text-xl font-semibold">Welcome</h1>
+      </div>
       
       <div className="flex items-center space-x-4">
         <Button
