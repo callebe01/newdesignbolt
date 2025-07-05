@@ -25,7 +25,7 @@ export const Sidebar: React.FC = () => {
     >
       <div className="flex h-16 items-center justify-between px-4 border-b">
         {!collapsed && (
-          <h2 className="text-xl font-semibold truncate">Design Testing</h2>
+          <h2 className="text-xl font-semibold truncate">Voice Pilot</h2>
         )}
         <button 
           onClick={toggleSidebar}
