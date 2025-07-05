@@ -39,7 +39,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md bg-card rounded-lg shadow-md border border-border p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Welcome back</h1>
-          <p className="text-muted-foreground">Sign in to continue to Design Testing</p>
+          <p className="text-muted-foreground">Sign in to continue to Voice Pilot</p>
         </div>
         
         {error && (
